@@ -1,0 +1,5 @@
+# Project configuration
+project_id        = "your-project-id"
+region           = "your-region"
+service_account  = "your-service-account-email"
+environment      = "development"

@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Rules for fingerprints collection
+    match /fingerprints/{fingerprintId} {
+      allow read: if true;  // Allow public read for fingerprints
+      allow write: if false;  // Only Cloud Functions can write
+    }
+
+    // Rules for visits collection
+    match /visits/{visitId} {
+      allow read: if true;  // Allow public read for visits
+      allow write: if false;  // Only Cloud Functions can write
+    }
+
+    // Rules for presence tracking
+    match /presence/{fingerprintId} {
+      allow read: if true;  // Allow public read for presence
+      allow write: if false;  // Only Cloud Functions can write
+    }
+
+    // Rules for API keys
+    match /apiKeys/{keyId} {
+      allow read, write: if false;  // Only Cloud Functions can access
+    }
+  }
+}

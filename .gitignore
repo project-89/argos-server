@@ -1,0 +1,67 @@
+# Terraform files
+*.tfstate
+*.tfstate.*
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+crash.log
+tfplan
+# Environment and secrets
+.env
+*.json
+!package.json
+!package-lock.json
+
+# Dependencies and build artifacts
+node_modules/
+functions.zip
+temp_functions/
+
+# Service account keys
+*-e32ad60750b1.json
+*-compute@developer.gserviceaccount.com.json
+
+# Build and temporary files
+.DS_Store
+*.log
+
+# Firebase
+.firebase/
+firebase-debug.log*
+ui-debug.log*
+
+# Functions scripts
+functions/scripts/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build outputs
+dist/
+build/
+*.zip
+
+# IDE and Editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
