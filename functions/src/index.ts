@@ -31,6 +31,7 @@ import {
   RemoveSiteRequest,
   UpdateTagsRequest,
   UpdateRolesByTagsRequest,
+  RoleResponse,
 } from "./types";
 
 // Initialize admin if not already initialized
