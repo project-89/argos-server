@@ -1,7 +1,8 @@
 {
   "name": "functions",
   "version": "1.0.0",
-  "main": "src/index.js",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
   "dependencies": {
     "@google-cloud/firestore": "^7.1.0",
     "@types/express": "^4.17.3",
@@ -9,31 +10,72 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "firebase-admin": "^11.0.0",
-    "firebase-functions": "^6.1.1",
+    "firebase-functions": "^5.1.0",
+    "module-alias": "^2.2.3",
     "technicalindicators": "^3.1.0"
   },
   "engines": {
-    "node": "22"
+    "node": "20"
   },
   "scripts": {
+    "build": "rimraf lib && tsc",
+    "build:watch": "tsc --watch",
     "lint": "eslint .",
-    "serve": "firebase emulators:start --only functions,firestore,pubsub",
-    "shell": "firebase functions:shell",
+    "serve": "npm run kill-ports && npm run build && firebase emulators:start --only functions,firestore,pubsub",
+    "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
-    "deploy": "npm install && firebase deploy --only functions",
+    "deploy": "npm run build && firebase deploy --only functions",
     "logs": "firebase functions:log --project argos-434718",
     "logs:watch": "firebase functions:log -n 1000 --project argos-434718",
     "env:sync": "node scripts/setEnv.js",
     "env:list": "firebase functions:secrets:list --project argos-434718",
     "env:get": "firebase functions:secrets:get",
     "env:set": "firebase functions:secrets:set",
-    "generate-key": "node scripts/generateApiKey.js",
-    "realityStabilityTest": "node src/test/simulateStabilityIndex.js"
+    "generate-key": "ts-node scripts/generateApiKey.ts",
+    "realityStabilityTest": "ts-node src/test/simulateStabilityIndex.ts",
+    "clean": "rimraf lib",
+    "test": "jest",
+    "test:ci": "npm run kill-ports && firebase emulators:start --only functions,firestore,pubsub & wait-on tcp:9090 tcp:5001 && jest --forceExit --detectOpenHandles",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:debug": "node --inspect-brk node_modules/.bin/jest --runInBand",
+    "test:endpoints": "npm run kill-ports && firebase emulators:start --only functions,firestore,pubsub & wait-on tcp:9090 tcp:5001 && ts-node src/scripts/test-endpoints.ts",
+    "emulators:stop": "firebase emulators:stop",
+    "kill-ports": "kill-port 9090 5001 8086 4000 9099 4400 4500 || true"
   },
   "devDependencies": {
-    "eslint": "^9.15.0",
+    "@types/cors": "^2.8.17",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.15.0",
     "eslint-config-google": "^0.14.0",
     "globals": "^15.12.0",
-    "jest": "^29.7.0"
+    "jest": "^29.7.0",
+    "kill-port": "^2.0.1",
+    "rimraf": "^5.0.0",
+    "ts-jest": "^29.1.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0",
+    "wait-on": "^8.0.1"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/test/setup.ts"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "moduleNameMapper": {
+      "@/(.*)": "<rootDir>/src/$1"
+    },
+    "globals": {
+      "ts-jest": {
+        "tsconfig": "tsconfig.json"
+      }
+    }
   }
 }
