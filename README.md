@@ -14,6 +14,132 @@ Argos Server is a secure, scalable fingerprinting and tracking system. It manage
 - 🏷️ Dynamic tagging system
 - 🔄 Automatic role updates based on tags
 - ⚡ Serverless architecture
+- 📊 Reality Stability Index
+- 💰 Cryptocurrency price tracking
+
+## API Documentation
+
+### Authentication
+All endpoints except those marked as public require an API key in the `x-api-key` header.
+
+### Price Endpoints
+#### GET /price/:tokenId
+Get historical price data for a specific token.
+- Parameters:
+  - `tokenId`: Token identifier
+  - `timeframe` (optional): "1h", "24h", "7d"
+  - `interval` (optional): "15m", "1h", "4h", "1d"
+- Returns: Array of price data points
+
+#### GET /prices
+Get current prices for multiple tokens.
+- Parameters:
+  - `symbols`: Comma-separated list of token symbols
+- Returns: Current price data for requested tokens
+
+### Reality Stability Index
+#### GET /reality-stability (Public)
+Get the current reality stability index based on Project89 token movements.
+- Returns: 
+  - `realityStabilityIndex`: Current stability value
+  - `resistanceLevel`: Current resistance level
+  - `metadata`: Additional stability metrics
+
+### Fingerprint Management
+#### POST /register-fingerprint (Public)
+Register a new fingerprint.
+- Body:
+  ```json
+  {
+    "fingerprint": "string",
+    "metadata": {
+      "key": "value"
+    }
+  }
+  ```
+- Returns: `{ fingerprintId: string }`
+
+#### GET /get-fingerprint/:id (Public)
+Get fingerprint details.
+- Returns: Complete fingerprint object with metadata
+
+### Visit Tracking
+#### POST /log-visit (Public)
+Log a new visit.
+- Body:
+  ```json
+  {
+    "fingerprintId": "string",
+    "timestamp": "number"
+  }
+  ```
+
+#### POST /update-presence (Public)
+Update presence status.
+- Body:
+  ```json
+  {
+    "fingerprintId": "string",
+    "timestamp": "number"
+  }
+  ```
+
+#### POST /remove-site (Public)
+Remove a site from presence tracking.
+- Body:
+  ```json
+  {
+    "fingerprintId": "string",
+    "siteId": "string",
+    "timestamp": "number"
+  }
+  ```
+
+### API Key Management
+#### POST /register-api-key
+Register a new API key.
+- Body:
+  ```json
+  {
+    "name": "string",
+    "fingerprintId": "string",
+    "metadata": {
+      "key": "value"
+    },
+    "agentType": "string"
+  }
+  ```
+- Returns: 
+  ```json
+  {
+    "apiKey": "string",
+    "fingerprintId": "string",
+    "message": "Store this API key safely - it won't be shown again"
+  }
+  ```
+
+### Role and Tag Management
+#### POST /argosAddOrUpdateTags
+Update tags for a fingerprint.
+- Body:
+  ```json
+  {
+    "fingerprintId": "string",
+    "tags": {
+      "key": "value"
+    }
+  }
+  ```
+
+#### POST /argosUpdateRolesBasedOnTags
+Update roles based on tags.
+- Body:
+  ```json
+  {
+    "fingerprintId": "string"
+  }
+  ```
+- Returns: Array of updated roles
 
 ## Architecture
 
@@ -114,17 +240,6 @@ terraform init
 terraform plan    # Review changes
 terraform apply   # Apply infrastructure changes
 ```
-
-## API Documentation
-
-Detailed API documentation can be found in the [API.md](./docs/API.md) file.
-
-### Key Endpoints
-
-- `/fingerprint` - Manage fingerprint operations
-- `/visits` - Track and log visits
-- `/roles` - Handle role assignments
-- `/tags` - Manage tagging system
 
 ## Security
 
