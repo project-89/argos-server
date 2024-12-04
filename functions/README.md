@@ -1,65 +1,126 @@
-# IndraNet Cloud Functions
+# Project 89: Argos Server Functions
 
-Backend serverless functions that power the IndraNet fingerprinting and tracking system within Project Argos.
+Backend serverless functions that power the Argos fingerprinting and tracking system.
 
 ## Overview
 
-This package contains six core Cloud Functions that handle:
-- Visit tracking and history
-- Role management and assignment
-- Tag management and updates
-- Automatic role updates based on tags
+This package contains several core Cloud Functions that handle:
+- Visit tracking and presence management
+- Role-based access control
+- Dynamic tag management
+- Reality stability monitoring
+- Cryptocurrency price tracking
+- API key management
 
 ## Functions
 
+### Price and Reality Stability
+
+#### `getTokenPrice`
+Get historical price data for a specific token.
+
+**Request:**
+```
+GET /price/:tokenId?timeframe=24h&interval=15m
+```
+
+**Response:**
+```json
+{
+  "prices": [
+    {
+      "timestamp": "number",
+      "price": "number"
+    }
+  ]
+}
+```
+
+#### `fetchCryptoPrices`
+Get current prices for multiple tokens.
+
+**Request:**
+```
+GET /prices?symbols=project89,solana
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "prices": {
+    "project89": {
+      "usd": "number"
+    }
+  }
+}
+```
+
+#### `calculateRealityStabilityIndex`
+Calculate the current reality stability index.
+
+**Request:**
+```
+GET /reality-stability
+```
+
+**Response:**
+```json
+{
+  "realityStabilityIndex": "number",
+  "resistanceLevel": "number",
+  "metadata": {
+    "currentPrice": "number",
+    "shortTermChange": "number",
+    "mediumTermChange": "number",
+    "recentVolatility": "number",
+    "resistanceImpact": "number",
+    "simulationResponse": "number",
+    "matrixIntegrity": "string",
+    "timestamp": "number"
+  }
+}
+```
+
 ### Visit Management
 
-#### `argosVisitLogger`
+#### `logVisit`
 Records site visits with fingerprint tracking.
 
 **Request:**
 ```json
 {
   "fingerprintId": "string",
-  "siteId": "string"
+  "timestamp": "number"
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true
-}
-```
-
-#### `argosGetVisitedSites`
-Retrieves visit history for a fingerprint.
+#### `updatePresence`
+Updates presence status for a fingerprint.
 
 **Request:**
 ```json
 {
-  "fingerprintId": "string"
+  "fingerprintId": "string",
+  "timestamp": "number"
 }
 ```
 
-**Response:**
+#### `removeSite`
+Removes a site from presence tracking.
+
+**Request:**
 ```json
 {
-  "sites": [
-    {
-      "id": "string",
-      "fingerprintId": "string",
-      "siteId": "string",
-      "timestamp": "timestamp",
-      "createdAt": "string"
-    }
-  ]
+  "fingerprintId": "string",
+  "siteId": "string",
+  "timestamp": "number"
 }
 ```
 
 ### Role Management
 
-#### `argosAssignRole`
+#### `assignRole`
 Manages role assignments from predefined roles:
 - user
 - agent-initiate
@@ -74,16 +135,7 @@ Manages role assignments from predefined roles:
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true
-}
-```
-
-Note: Only predefined roles are allowed. Any existing roles not in the predefined list will be filtered out.
-
-#### `argosGetAvailableRoles`
+#### `getAvailableRoles`
 Retrieves all available roles from the system.
 
 **Response:**
@@ -92,7 +144,8 @@ Retrieves all available roles from the system.
   "roles": [
     {
       "id": "string",
-      ...doc.data()
+      "permissions": ["array"],
+      "metadata": {}
     }
   ]
 }
@@ -100,7 +153,7 @@ Retrieves all available roles from the system.
 
 ### Tag Management
 
-#### `argosAddOrUpdateTags`
+#### `addOrUpdateTags`
 Updates tags for a fingerprint.
 
 **Request:**
@@ -113,16 +166,8 @@ Updates tags for a fingerprint.
 }
 ```
 
-**Response:**
-```json
-{
-  "success": true
-}
-```
-
-#### `argosUpdateRolesBasedOnTags`
+#### `updateRolesBasedOnTags`
 Automatically updates roles based on tag conditions.
-We still need to add the dynamic role logic here.
 
 **Request:**
 ```json
@@ -131,23 +176,50 @@ We still need to add the dynamic role logic here.
 }
 ```
 
-**Response:**
+### API Key Management
+
+#### `createApiKey`
+Creates a new API key for a fingerprint.
+
+**Request:**
 ```json
 {
-  "success": true
+  "name": "string",
+  "fingerprintId": "string",
+  "metadata": {
+    "key": "value"
+  },
+  "agentType": "string"
 }
 ```
 
-Current Rules:
-- TODO: Add dynamic role logic here
+**Response:**
+```json
+{
+  "apiKey": "string",
+  "fingerprintId": "string",
+  "message": "Store this API key safely - it won't be shown again"
+}
+```
+
+#### `validateApiKey`
+Validates an API key and updates usage statistics.
 
 ## Development
 
 ### Prerequisites
-- Node.js 18 (required by package.json engines)
+- Node.js 22 (required by package.json engines)
 - Firebase CLI
 - Google Cloud credentials
-- Access to Firebase project (via [Firebase Console](https://console.firebase.google.com))
+- Access to Firebase project
+
+### Environment Setup
+1. Copy the environment template:
+```bash
+cp ../.env.template ../.env
+```
+
+2. Update the .env file with your credentials
 
 ### Installation
 ```bash
@@ -155,10 +227,12 @@ npm install
 ```
 
 ### Available Scripts
-```javascript:functions/package.json
-startLine: 15
-endLine: 22
-```
+- `npm run serve` - Start local emulator
+- `npm run deploy` - Deploy functions
+- `npm run logs` - View function logs
+- `npm run logs:watch` - Watch function logs
+- `npm run env:sync` - Sync environment variables
+- `npm run generate-key` - Generate new API key
 
 ### Local Development
 1. Start the emulator:
@@ -166,26 +240,27 @@ endLine: 22
 npm run serve
 ```
 
-2. Use the test script to verify endpoints:
+2. Test endpoints:
 ```bash
 ../test-endpoints.sh
 ```
 
 ### Code Style
-This project uses ESLint and Prettier for code formatting. Configuration files are provided:
-- `eslint.config.js` - ESLint rules
-- `.prettierrc.js` - Prettier configuration
+ESLint and Prettier configuration provided:
+- `eslint.config.js`
+- `.prettierrc.js`
 
-### Required Database Indexes
-For visit history queries:
-```javascript:functions/visit-history.js
-startLine: 27
-endLine: 29
-```
+## Security
+
+- API key authentication required for most endpoints
+- Firestore security rules
+- Role-based access control
+- Input validation on all endpoints
+- Rate limiting on price endpoints
 
 ## Error Handling
 
-All endpoints follow a consistent error response format:
+Standard error response format:
 ```json
 {
   "error": "Error message description"
@@ -193,37 +268,32 @@ All endpoints follow a consistent error response format:
 ```
 
 Common errors:
-- Missing fingerprintId
-- Invalid tags object
-- Database index not ready
-- Fingerprint not found
-
-## Security
-
-- All functions require Firebase authentication
-- Firestore rules enforce access control
-- Role-based access control for sensitive operations
-- Data validation on all inputs
+- Missing or invalid API key
+- Invalid fingerprintId
+- Rate limit exceeded
+- Invalid input data
+- Resource not found
 
 ## Deployment
 
-Deploy all functions:
 ```bash
+# Deploy all functions
 npm run deploy
-```
 
-Deploy a specific function:
-```bash
+# Deploy specific function
 firebase deploy --only functions:functionName
 ```
 
 ## Monitoring
 
-View function logs:
 ```bash
+# View logs
 npm run logs
+
+# Watch logs
+npm run logs:watch
 ```
 
 ---
 
-For more information about the overall project, see the main [IndraNet README](../README.md).
+For more information about the overall project, see the main [README](../README.md).

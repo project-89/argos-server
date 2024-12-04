@@ -1,5 +1,6 @@
 import axios from "axios";
-import { TEST_CONFIG, createTestData } from "./setup";
+import { TEST_CONFIG } from "./testConfig";
+import { createTestData } from "./testUtils";
 import { describe, it, expect } from "@jest/globals";
 
 describe("Visit Tracking Endpoints", () => {
@@ -9,22 +10,15 @@ describe("Visit Tracking Endpoints", () => {
 
   beforeEach(async () => {
     // Create test data and get API key
-    const { fingerprintId: id } = await createTestData();
-    fingerprintId = id;
-
-    // Register API key
-    const keyResponse = await axios.post(`${API_URL}/register-api-key`, {
-      name: "test-key",
-      fingerprintId,
-      metadata: { test: true },
-    });
-    apiKey = keyResponse.data.apiKey;
+    const testData = await createTestData();
+    fingerprintId = testData.fingerprintId;
+    apiKey = testData.apiKey;
   });
 
-  describe("POST /log-visit", () => {
+  describe("POST /visit", () => {
     it("should log a visit", async () => {
       const response = await axios.post(
-        `${API_URL}/log-visit`,
+        `${API_URL}/visit`,
         {
           fingerprintId,
           url: "https://test.com",
@@ -43,9 +37,9 @@ describe("Visit Tracking Endpoints", () => {
     });
 
     it("should require fingerprintId and url", async () => {
-      try {
-        await axios.post(
-          `${API_URL}/log-visit`,
+      await expect(
+        axios.post(
+          `${API_URL}/visit`,
           {
             fingerprintId, // missing url
           },
@@ -54,19 +48,22 @@ describe("Visit Tracking Endpoints", () => {
               "x-api-key": apiKey,
             },
           },
-        );
-        fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.response.status).toBe(400);
-        expect(error.response.data.error).toContain("Missing required fields");
-      }
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: expect.objectContaining({
+            error: expect.stringContaining("Missing required fields"),
+          }),
+        },
+      });
     });
   });
 
-  describe("POST /update-presence", () => {
+  describe("POST /presence", () => {
     it("should update presence status", async () => {
       const response = await axios.post(
-        `${API_URL}/update-presence`,
+        `${API_URL}/presence`,
         {
           fingerprintId,
           status: "online",
@@ -84,9 +81,9 @@ describe("Visit Tracking Endpoints", () => {
     });
 
     it("should require fingerprintId and status", async () => {
-      try {
-        await axios.post(
-          `${API_URL}/update-presence`,
+      await expect(
+        axios.post(
+          `${API_URL}/presence`,
           {
             fingerprintId, // missing status
           },
@@ -95,52 +92,52 @@ describe("Visit Tracking Endpoints", () => {
               "x-api-key": apiKey,
             },
           },
-        );
-        fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.response.status).toBe(400);
-        expect(error.response.data.error).toContain("Missing required fields");
-      }
+        ),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: expect.objectContaining({
+            error: expect.stringContaining("Missing required fields"),
+          }),
+        },
+      });
     });
   });
 
-  describe("POST /remove-site", () => {
+  describe("DELETE /presence/site", () => {
     it("should remove a site", async () => {
-      const response = await axios.post(
-        `${API_URL}/remove-site`,
-        {
+      const response = await axios.delete(`${API_URL}/presence/site`, {
+        data: {
           fingerprintId,
           siteId: "test-site",
         },
-        {
-          headers: {
-            "x-api-key": apiKey,
-          },
+        headers: {
+          "x-api-key": apiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
     });
 
     it("should require fingerprintId and siteId", async () => {
-      try {
-        await axios.post(
-          `${API_URL}/remove-site`,
-          {
+      await expect(
+        axios.delete(`${API_URL}/presence/site`, {
+          data: {
             fingerprintId, // missing siteId
           },
-          {
-            headers: {
-              "x-api-key": apiKey,
-            },
+          headers: {
+            "x-api-key": apiKey,
           },
-        );
-        fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.response.status).toBe(400);
-        expect(error.response.data.error).toContain("Missing required fields");
-      }
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: expect.objectContaining({
+            error: expect.stringContaining("Missing required fields"),
+          }),
+        },
+      });
     });
   });
 });

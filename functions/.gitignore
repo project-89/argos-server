@@ -1,2 +1,24 @@
+# Dependencies
 node_modules/
-*.local
+
+# Build output
+lib/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

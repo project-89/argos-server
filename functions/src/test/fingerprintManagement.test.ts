@@ -1,13 +1,13 @@
 import axios from "axios";
-import { TEST_CONFIG } from "./setup";
+import { TEST_CONFIG } from "./testConfig";
 import { describe, it, expect } from "@jest/globals";
 
 describe("Fingerprint Management Endpoints", () => {
   const API_URL = TEST_CONFIG.apiUrl;
 
-  describe("POST /register-fingerprint", () => {
+  describe("POST /fingerprint", () => {
     it("should register a new fingerprint", async () => {
-      const response = await axios.post(`${API_URL}/register-fingerprint`, {
+      const response = await axios.post(`${API_URL}/fingerprint`, {
         fingerprint: "test-fingerprint",
         metadata: {
           test: true,
@@ -17,36 +17,42 @@ describe("Fingerprint Management Endpoints", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.message).toContain("Fingerprint registered with ID:");
+      expect(response.data.fingerprint).toHaveProperty("id");
+      expect(response.data.fingerprint).toHaveProperty("fingerprint", "test-fingerprint");
+      expect(response.data.fingerprint).toHaveProperty("roles");
+      expect(response.data.fingerprint.roles).toContain("user");
     });
 
     it("should require fingerprint field", async () => {
-      try {
-        await axios.post(`${API_URL}/register-fingerprint`, {
+      await expect(
+        axios.post(`${API_URL}/fingerprint`, {
           metadata: { test: true },
-        });
-        fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.response.status).toBe(400);
-        expect(error.response.data.error).toContain("Missing required field: fingerprint");
-      }
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: {
+            error: "Missing required field: fingerprint",
+          },
+        },
+      });
     });
   });
 
-  describe("GET /get-fingerprint/:id", () => {
+  describe("GET /fingerprint/:id", () => {
     let fingerprintId: string;
 
     beforeEach(async () => {
       // Create a test fingerprint
-      const response = await axios.post(`${API_URL}/register-fingerprint`, {
+      const response = await axios.post(`${API_URL}/fingerprint`, {
         fingerprint: "test-fingerprint",
         metadata: { test: true },
       });
-      fingerprintId = response.data.message.split(": ")[1];
+      fingerprintId = response.data.fingerprint.id;
     });
 
     it("should get fingerprint by ID", async () => {
-      const response = await axios.get(`${API_URL}/get-fingerprint/${fingerprintId}`);
+      const response = await axios.get(`${API_URL}/fingerprint/${fingerprintId}`);
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -57,13 +63,14 @@ describe("Fingerprint Management Endpoints", () => {
     });
 
     it("should handle non-existent fingerprint", async () => {
-      try {
-        await axios.get(`${API_URL}/get-fingerprint/non-existent-id`);
-        fail("Should have thrown an error");
-      } catch (error: any) {
-        expect(error.response.status).toBe(404);
-        expect(error.response.data.error).toBe("Fingerprint not found");
-      }
+      await expect(axios.get(`${API_URL}/fingerprint/non-existent-id`)).rejects.toMatchObject({
+        response: {
+          status: 404,
+          data: {
+            error: "Fingerprint not found",
+          },
+        },
+      });
     });
   });
 });
