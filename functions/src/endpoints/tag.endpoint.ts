@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS, ROLES } from "../constants";
 
 interface TagValue {
   [key: string]: number;
@@ -14,6 +14,11 @@ interface TagRule {
 interface TagRules {
   [tag: string]: TagRule;
 }
+
+// Helper to check if a role is valid
+const isValidRole = (role: string): boolean => {
+  return Object.values(ROLES).includes(role as (typeof ROLES)[keyof typeof ROLES]);
+};
 
 export const addOrUpdateTags = async (req: Request, res: Response): Promise<Response> => {
   try {
@@ -120,6 +125,14 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
         return res.status(400).json({
           success: false,
           error: `Invalid role value for tag '${tag}': must be a string`,
+        });
+      }
+
+      // Validate role name
+      if (!isValidRole(rule.role)) {
+        return res.status(400).json({
+          success: false,
+          error: `Invalid role: ${rule.role}`,
         });
       }
     }

@@ -86,17 +86,18 @@ export const apiKeyAuth = async (req: Request, res: Response, next: NextFunction
 };
 
 // Middleware to validate test environment
-export const testAuth = async (req: Request, res: Response, next: NextFunction) => {
+export const testAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     // Only apply in test environment
     if (process.env.NODE_ENV === "test" || req.header("x-test-env") === "true") {
       // Get test fingerprint ID from header
       const fingerprintId = req.header("x-test-fingerprint-id");
       if (!fingerprintId) {
-        return res.status(401).json({
+        res.status(401).json({
           success: false,
           error: "Test fingerprint ID is required",
         });
+        return;
       }
 
       // Add fingerprint ID to request

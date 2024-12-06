@@ -1,283 +1,345 @@
 # Project 89: Argos Server 🔍
 
-A sophisticated cloud-based fingerprinting and tracking system built with Firebase Cloud Functions and Terraform.
+A sophisticated cloud-based fingerprinting and tracking system built with Firebase Cloud Functions, TypeScript, and Terraform.
 
 ## Overview
 
-Argos Server is a secure, scalable fingerprinting and tracking system. It manages user fingerprints, visits, roles, and tags through a series of serverless functions, using Firebase Cloud Functions for backend operations and Terraform for infrastructure management.
+Argos Server is a secure, scalable fingerprinting and tracking system designed for Project89. It provides comprehensive user tracking, role management, and price monitoring capabilities through a set of well-tested serverless functions. Built with infrastructure as code principles, it ensures consistent deployment and scalability.
 
 ## Features
 
-- 🔐 Secure fingerprint management
-- 📍 Visit tracking and logging
-- 👤 Role-based access control
-- 🏷️ Dynamic tagging system
-- 🔄 Automatic role updates based on tags
-- ⚡ Serverless architecture
+- 🔐 Secure API Key Management
+- 👆 Fingerprint Registration & Tracking
+- 💰 Project89 Token Price Monitoring
 - 📊 Reality Stability Index
-- 💰 Cryptocurrency price tracking
+- 👤 Role-based Access Control
+- 🏷️ Dynamic Tag System
+- 📍 Visit & Presence Tracking
+- 🧪 100% Test Coverage
+- ⚡ TypeScript & Firebase
+- 🏗️ Infrastructure as Code with Terraform
+- 📦 Automated Deployments
+- 🔄 CI/CD Integration
+
+## Architecture
+
+The system consists of several key components:
+
+### Backend Services
+- **Firebase Cloud Functions**: Handles all backend operations
+  - Visit logging and tracking
+  - Role management and assignment
+  - Tag management
+  - Price monitoring
+  - Reality stability calculations
+
+### Data Storage
+- **Firestore**: NoSQL database for storing
+  - Fingerprints
+  - Visit history
+  - Role assignments
+  - API keys
+  - Price cache
+  - Custom security rules
+
+### Infrastructure
+- **Terraform**: Infrastructure as Code
+  - Firebase project configuration
+  - Service account management
+  - Security rules deployment
+  - Function deployment settings
+  - Environment configuration
+
+### Security
+- **Firebase Auth**: Authentication and authorization
+- **Custom Middleware**: Rate limiting and API key validation
+- **Security Rules**: Custom Firestore rules for data protection
 
 ## API Documentation
 
 ### Authentication
 All endpoints except those marked as public require an API key in the `x-api-key` header.
 
-### Price Endpoints
-#### GET /price/:tokenId
-Get historical price data for a specific token.
-- Parameters:
-  - `tokenId`: Token identifier
-  - `timeframe` (optional): "1h", "24h", "7d"
-  - `interval` (optional): "15m", "1h", "4h", "1d"
-- Returns: Array of price data points
-
-#### GET /prices
-Get current prices for multiple tokens.
-- Parameters:
-  - `symbols`: Comma-separated list of token symbols
-- Returns: Current price data for requested tokens
-
-### Reality Stability Index
-#### GET /reality-stability (Public)
-Get the current reality stability index based on Project89 token movements.
-- Returns: 
-  - `realityStabilityIndex`: Current stability value
-  - `resistanceLevel`: Current resistance level
-  - `metadata`: Additional stability metrics
-
-### Fingerprint Management
-#### POST /register-fingerprint (Public)
-Register a new fingerprint.
-- Body:
-  ```json
-  {
-    "fingerprint": "string",
-    "metadata": {
-      "key": "value"
-    }
-  }
-  ```
-- Returns: `{ fingerprintId: string }`
-
-#### GET /get-fingerprint/:id (Public)
-Get fingerprint details.
-- Returns: Complete fingerprint object with metadata
-
-### Visit Tracking
-#### POST /log-visit (Public)
-Log a new visit.
-- Body:
-  ```json
-  {
-    "fingerprintId": "string",
-    "timestamp": "number"
-  }
-  ```
-
-#### POST /update-presence (Public)
-Update presence status.
-- Body:
-  ```json
-  {
-    "fingerprintId": "string",
-    "timestamp": "number"
-  }
-  ```
-
-#### POST /remove-site (Public)
-Remove a site from presence tracking.
-- Body:
-  ```json
-  {
-    "fingerprintId": "string",
-    "siteId": "string",
-    "timestamp": "number"
-  }
-  ```
+### Public Endpoints
+The following endpoints are publicly accessible:
+- `/fingerprint/register`
+- `/apiKey/register`
+- `/price/current`
+- `/price/history`
+- `/reality-stability`
 
 ### API Key Management
-#### POST /register-api-key
+#### POST /apiKey/register
 Register a new API key.
-- Body:
-  ```json
-  {
-    "name": "string",
-    "fingerprintId": "string",
-    "metadata": {
-      "key": "value"
-    },
-    "agentType": "string"
-  }
-  ```
-- Returns: 
-  ```json
-  {
-    "apiKey": "string",
-    "fingerprintId": "string",
-    "message": "Store this API key safely - it won't be shown again"
-  }
-  ```
+- Body: `{ fingerprintId: string }`
+- Returns: `{ success: true, data: { key: string, fingerprintId: string } }`
 
-### Role and Tag Management
-#### POST /argosAddOrUpdateTags
+#### POST /apiKey/validate
+Validate an API key.
+- Body: `{ key: string }`
+- Returns: `{ success: true, data: { isValid: boolean, fingerprintId?: string } }`
+
+#### POST /apiKey/revoke
+Revoke an existing API key.
+- Body: `{ key: string }`
+- Returns: `{ success: true, data: { message: string } }`
+
+### Fingerprint Management
+#### POST /fingerprint/register
+Register a new fingerprint.
+- Body: `{ fingerprint: string, metadata?: object }`
+- Returns: `{ success: true, data: { id: string, fingerprint: string, ... } }`
+
+#### GET /fingerprint/:id
+Get fingerprint details.
+- Returns: `{ success: true, data: { id: string, fingerprint: string, ... } }`
+
+### Price Information
+#### GET /price/current
+Get current Project89 token price.
+- Query: `?symbols=Project89` (optional)
+- Returns: `{ success: true, data: { Project89: { usd: number, usd_24h_change: number } } }`
+
+#### GET /price/history/:tokenId
+Get price history for Project89 token.
+- Returns: Array of price data points with timestamps
+
+### Reality Stability
+#### GET /reality-stability
+Get the current reality stability index.
+- Returns: `{ success: true, data: { stabilityIndex: number, currentPrice: number, ... } }`
+
+### Role Management
+#### POST /role/assign
+Assign a role to a fingerprint.
+- Body: `{ fingerprintId: string, role: string }`
+- Returns: `{ success: true, data: { fingerprintId: string, role: string, roles: string[] } }`
+
+#### POST /role/remove
+Remove a role from a fingerprint.
+- Body: `{ fingerprintId: string, role: string }`
+- Returns: `{ success: true, data: { fingerprintId: string, role: string, roles: string[] } }`
+
+#### GET /role/available
+Get list of available roles.
+- Returns: `{ success: true, data: string[] }`
+
+### Tag Management
+#### POST /tag/update
 Update tags for a fingerprint.
-- Body:
-  ```json
-  {
-    "fingerprintId": "string",
-    "tags": {
-      "key": "value"
-    }
-  }
-  ```
+- Body: `{ fingerprintId: string, tags: object }`
+- Returns: `{ success: true, data: { fingerprintId: string, tags: object } }`
 
-#### POST /argosUpdateRolesBasedOnTags
-Update roles based on tags.
-- Body:
-  ```json
-  {
-    "fingerprintId": "string"
-  }
-  ```
-- Returns: Array of updated roles
+#### POST /tag/roles/update
+Update roles based on tag rules.
+- Body: `{ fingerprintId: string, tagRules: object }`
+- Returns: `{ success: true, data: { fingerprintId: string, roles: string[] } }`
 
-## Architecture
+### Visit Tracking
+#### POST /visit/log
+Log a new visit.
+- Body: `{ fingerprintId: string, url: string }`
+- Returns: `{ success: true, data: { id: string, ... } }`
 
-The system consists of several key components:
+#### POST /visit/presence
+Update presence status.
+- Body: `{ fingerprintId: string, status: string }`
+- Returns: `{ success: true, data: { fingerprintId: string, status: string } }`
 
-- **Firebase Cloud Functions**: Handles all backend operations
-  - Visit logging and tracking
-  - Role management and assignment
-  - Tag management
-  - Automatic role updates based on tags
-- **Firestore**: Database for storing fingerprints, visits, and roles
-  - Custom security rules for data protection
-  - Required indexes for efficient querying
-- **Terraform**: Infrastructure as Code for deployment
-- **Security Rules**: Custom Firestore rules for data protection
+#### POST /visit/site/remove
+Remove a site from tracking.
+- Body: `{ fingerprintId: string, siteId: string }`
+- Returns: `{ success: true, data: { message: string } }`
 
-## Prerequisites
+#### GET /visit/history/:fingerprintId
+Get visit history for a fingerprint.
+- Returns: `{ success: true, data: Visit[] }`
 
-- Node.js 18.x
+### Debug Endpoints
+#### POST /debug/cleanup
+Run cleanup operations (protected endpoint).
+- Returns: `{ success: true, data: { total: number, ... } }`
+
+## Development Setup
+
+### Prerequisites
+- Node.js 18.x or higher
 - Firebase CLI
 - Terraform >= 1.0
 - Google Cloud SDK
 - Firebase Project
+- Access to Google Cloud Console
 
-## Setup
+### Local Development Setup
 
 1. Clone the repository:
-```bash
-git clone https://github.com/project-89/argos-server
+\`\`\`bash
+git clone <repository-url>
 cd argos-server
-```
+\`\`\`
 
 2. Install dependencies:
-```bash
+\`\`\`bash
 cd functions
 npm install
-```
+\`\`\`
 
-## Configuration
+3. Set up environment:
+\`\`\`bash
+cp .env.example .env
+# Edit .env with your configuration
+\`\`\`
 
-### Setting up Google Cloud Credentials
+### Infrastructure Setup
 
-1. Go to the [Google Cloud Console](https://console.cloud.google.com)
-2. Create a new project or select an existing one
-3. Navigate to "IAM & Admin" > "Service Accounts"
-4. Click "Create Service Account"
-5. Name your service account (e.g., "argos-dev")
-6. Grant the following roles:
-   - Cloud Functions Developer
-   - Firebase Admin
-   - Cloud Datastore User
-   - Service Account User
-7. Click "Create Key" and select JSON format
-8. Save the downloaded JSON file securely
+1. Initialize Terraform:
+\`\`\`bash
+cd terraform
+terraform init
+\`\`\`
 
-### Environment Setup
+2. Configure Google Cloud credentials:
+\`\`\`bash
+# Set up application default credentials
+gcloud auth application-default login
 
-1. Copy the environment template:
-```bash
-cp .env.template .env
-```
+# Or use a service account key
+export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
+\`\`\`
 
-2. Update the .env file with your credentials path:
-```bash
-GOOGLE_APPLICATION_CREDENTIALS="path/to/your/credentials.json"
-```
+3. Plan and apply infrastructure:
+\`\`\`bash
+terraform plan    # Review changes
+terraform apply   # Apply infrastructure changes
+\`\`\`
 
-> **Security Notes**: 
-> - Never commit service account JSON files to version control
-> - Keep your credentials secure and rotate them regularly
-> - For production deployments, use secret management services
+### Running Locally
+\`\`\`bash
+npm run serve
+\`\`\`
 
-### Required Firestore Indexes
-```
+### Testing
+All endpoints have comprehensive test coverage:
+\`\`\`bash
+npm test                     # Run all tests
+npm run test:coverage        # Run tests with coverage
+npm test <pattern>          # Run specific tests
+\`\`\`
+
+Current test status:
+- ✅ API Key Endpoints (9 tests)
+- ✅ Fingerprint Endpoints (5 tests)
+- ✅ Price Endpoints (6 tests)
+- ✅ Reality Stability Endpoints (2 tests)
+- ✅ Role Endpoints (6 tests)
+- ✅ Tag Endpoints (6 tests)
+- ✅ Visit Endpoints (8 tests)
+- ✅ Debug Endpoints (2 tests)
+
+Total: 46 tests passing
+
+### Deployment
+
+1. Deploy infrastructure:
+\`\`\`bash
+cd terraform
+terraform apply
+\`\`\`
+
+2. Deploy functions:
+\`\`\`bash
+cd functions
+npm run deploy              # Deploy all functions
+npm run deploy:function <name>  # Deploy specific function
+\`\`\`
+
+## Security Features
+
+- 🔒 API Key Authentication
+- 🚦 Rate Limiting
+- 🔐 Role-Based Access Control
+- 🛡️ Request Validation
+- 📝 Comprehensive Logging
+- 🧹 Automated Cleanup
+- 🔐 Secure Infrastructure Configuration
+- 📜 Audit Logging
+
+## Error Handling
+
+All endpoints follow a consistent error response format:
+\`\`\`json
+{
+  "success": false,
+  "error": "Descriptive error message"
+}
+\`\`\`
+
+Common HTTP status codes:
+- 400: Bad Request (invalid input)
+- 401: Unauthorized (invalid/missing API key)
+- 404: Not Found
+- 429: Too Many Requests (rate limit)
+- 500: Internal Server Error
+
+## Contributing
+
+We welcome contributions! Please follow these steps:
+
+1. Fork the repository
+2. Create a feature branch (\`git checkout -b feature/amazing-feature\`)
+3. Make your changes
+4. Run tests (\`npm test\`)
+5. Commit your changes (\`git commit -m 'Add amazing feature'\`)
+6. Push to the branch (\`git push origin feature/amazing-feature\`)
+7. Open a Pull Request
+
+### Development Guidelines
+
+- Write tests for new features
+- Follow TypeScript best practices
+- Use consistent error handling
+- Document new endpoints
+- Update infrastructure code as needed
+
+## Required Firestore Indexes
+
+\`\`\`
 Collection: visits
 Fields: 
   - fingerprintId (ASC)
   - timestamp (DESC)
-```
 
-## Deployment
-
-### Firebase Functions
-
-```bash
-# Deploy all functions
-npm run deploy
-
-# Deploy specific function
-npm run deploy:function <function-name>
-```
-
-### Infrastructure
-
-```bash
-cd terraform
-terraform init
-terraform plan    # Review changes
-terraform apply   # Apply infrastructure changes
-```
-
-## Security
-
-- All endpoints require authentication
-- Data is encrypted at rest and in transit
-- Role-based access control (RBAC) implemented
-- Regular security audits performed
-
-## Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test suite
-npm test <suite-name>
-
-# Run with coverage
-npm run test:coverage
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Collection: fingerprints
+Fields:
+  - enabled (ASC)
+  - createdAt (DESC)
+\`\`\`
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
+## Security Considerations
+
+When deploying this project:
+- Never commit service account keys
+- Rotate API keys regularly
+- Monitor rate limits
+- Review security rules
+- Keep dependencies updated
+- Enable audit logging
+- Use secure communication
+
 ## Support
 
-For support, please open an issue in the GitHub repository.
+For support:
+1. Check the documentation
+2. Search existing issues
+3. Open a new issue with:
+   - Clear description
+   - Steps to reproduce
+   - Expected vs actual behavior
+   - Environment details
 
 ## Project Status
 
@@ -286,75 +348,3 @@ For support, please open an issue in the GitHub repository.
 ---
 
 Built with ❤️ by ONEIROCOM
-
-## Tag-to-Role Update Logic
-
-### Overview
-The system automatically updates user roles based on their tags through two main components:
-- `auto-update-roles.js`: Triggers on fingerprint document updates
-- `update-role-by-tags.js`: Contains the logic for role assignment
-
-### Adding New Role Logic
-
-1. Open `functions/update-role-by-tags.js`
-2. Locate the TODO section in the `updateRolesBasedOnTags` function:
-
-```javascript
-// Example role logic implementation:
-const tags = data.tags || {};
-let roles = data.roles || [];
-
-// Add your conditions here
-if (tags.puzzle_solved >= 3 && !roles.includes("puzzle_master")) {
-  roles.push("puzzle_master");
-}
-
-if (tags.sites_visited >= 10 && !roles.includes("explorer")) {
-  roles.push("explorer");
-}
-```
-
-### Role Logic Guidelines
-
-- Each condition should check for specific tag values
-- Always verify the role doesn't already exist using `!roles.includes()`
-- Use descriptive role names that reflect the achievement
-- Consider tag combinations for advanced roles
-
-Example tag-role mappings:
-```javascript
-// Basic achievements
-if (tags.login_count >= 5) addRole("regular_user")
-if (tags.posts_created >= 3) addRole("contributor")
-
-// Combined achievements
-if (tags.puzzle_solved >= 3 && tags.login_streak >= 7) addRole("dedicated_solver")
-
-// Progressive roles
-if (tags.mission_complete >= 1) addRole("agent-initiate")
-if (tags.mission_complete >= 5) addRole("agent-field")
-if (tags.mission_complete >= 10) addRole("agent-senior")
-```
-
-### Testing Role Updates
-
-1. Update a fingerprint's tags:
-```bash
-curl -X POST https://your-function-url/argosAddOrUpdateTags \
-  -d '{"fingerprintId": "test123", "tags": {"puzzle_solved": 3}}'
-```
-
-2. The system will automatically:
-   - Trigger `autoUpdateRolesOnTagChange`
-   - Process the new tags
-   - Update roles if conditions are met
-
-### Monitoring Role Changes
-
-Monitor role updates through Firebase Console:
-1. Navigate to Functions > Logs
-2. Filter for "autoUpdateRolesOnTagChange"
-3. Look for log entries showing tag processing and role updates
-```
-
-</rewritten_file>
