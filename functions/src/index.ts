@@ -4,7 +4,7 @@ import express from "express";
 import cors from "cors";
 
 // Import middleware
-import { validateApiKey } from "./middleware/auth.middleware";
+import { validateApiKeyMiddleware } from "./middleware/auth.middleware";
 import { rateLimit } from "./middleware/rateLimit.middleware";
 
 // Import endpoints
@@ -31,12 +31,12 @@ const app = express();
 // Middleware
 app.use(cors({ origin: true }));
 app.use(express.json());
-app.use(validateApiKey);
+app.use(validateApiKeyMiddleware);
 app.use(rateLimit());
 
 // API Key routes
 app.post("/apiKey/register", apiKey.register);
-app.post("/apiKey/validate", apiKey.validateEndpoint);
+app.post("/apiKey/validate", apiKey.validate);
 app.post("/apiKey/revoke", apiKey.revoke);
 
 // Fingerprint routes

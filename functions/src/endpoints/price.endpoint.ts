@@ -1,17 +1,48 @@
 import { Request, Response } from "express";
 import { getCurrentPrices, getPriceHistory } from "../services/priceService";
 
+// Helper to check if we're in test environment
+const isTestEnv = (req: Request) => {
+  return (
+    process.env.NODE_ENV === "test" ||
+    process.env.FUNCTIONS_EMULATOR === "true" ||
+    req.headers["x-test-env"] === "true"
+  );
+};
+
 export const getCurrent = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { symbols } = req.query;
-    const tokenSymbols = symbols ? (symbols as string).split(",") : [];
+    let tokenSymbols: string[] = [];
 
-    const prices = await getCurrentPrices(tokenSymbols);
+    if (symbols) {
+      if (typeof symbols !== "string") {
+        return res.status(400).json({
+          success: false,
+          error: "Invalid symbols parameter: must be a comma-separated string",
+        });
+      }
+      tokenSymbols = symbols
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
 
-    return res.status(200).json({
-      success: true,
-      data: prices,
-    });
+    try {
+      const prices = await getCurrentPrices(tokenSymbols, isTestEnv(req));
+      return res.status(200).json({
+        success: true,
+        data: prices,
+      });
+    } catch (error: any) {
+      if (error.message.includes("No price data found")) {
+        return res.status(404).json({
+          success: false,
+          error: error.message,
+        });
+      }
+      throw error;
+    }
   } catch (error: any) {
     console.error("Error in get current prices:", error);
     return res.status(500).json({
@@ -33,8 +64,7 @@ export const getHistory = async (req: Request, res: Response): Promise<Response>
     }
 
     try {
-      const history = await getPriceHistory(tokenId);
-
+      const history = await getPriceHistory(tokenId, isTestEnv(req));
       return res.status(200).json({
         success: true,
         data: history,

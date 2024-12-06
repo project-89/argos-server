@@ -19,10 +19,18 @@ export const addOrUpdateTags = async (req: Request, res: Response): Promise<Resp
   try {
     const { fingerprintId, tags } = req.body as { fingerprintId: string; tags: TagValue };
 
-    if (!fingerprintId || !tags) {
+    // Check fields one by one for better error messages
+    if (!fingerprintId) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: fingerprintId and tags",
+        error: "Missing required field: fingerprintId",
+      });
+    }
+
+    if (!tags) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: tags",
       });
     }
 
@@ -77,10 +85,18 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
   try {
     const { fingerprintId, tagRules } = req.body as { fingerprintId: string; tagRules: TagRules };
 
-    if (!fingerprintId || !tagRules) {
+    // Check fields one by one for better error messages
+    if (!fingerprintId) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: fingerprintId and tagRules",
+        error: "Missing required field: fingerprintId",
+      });
+    }
+
+    if (!tagRules) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: tagRules",
       });
     }
 

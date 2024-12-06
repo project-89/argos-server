@@ -8,10 +8,17 @@ export const assign = async (req: Request, res: Response): Promise<Response> => 
   try {
     const { fingerprintId, role } = req.body;
 
-    if (!fingerprintId || !role) {
+    if (!fingerprintId) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: fingerprintId and role",
+        error: "Missing required field: fingerprintId",
+      });
+    }
+
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: role",
       });
     }
 
@@ -61,10 +68,17 @@ export const remove = async (req: Request, res: Response): Promise<Response> => 
   try {
     const { fingerprintId, role } = req.body;
 
-    if (!fingerprintId || !role) {
+    if (!fingerprintId) {
       return res.status(400).json({
         success: false,
-        error: "Missing required fields: fingerprintId and role",
+        error: "Missing required field: fingerprintId",
+      });
+    }
+
+    if (!role) {
+      return res.status(400).json({
+        success: false,
+        error: "Missing required field: role",
       });
     }
 

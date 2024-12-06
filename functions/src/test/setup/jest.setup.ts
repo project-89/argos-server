@@ -1,15 +1,27 @@
 import { jest, beforeAll, afterAll, beforeEach } from "@jest/globals";
-import { initializeTestEnvironment, cleanDatabase } from "../utils/testUtils";
+import { initializeTestEnvironment, cleanDatabase, configureAxios } from "../utils/testUtils";
 import { TEST_CONFIG } from "./testConfig";
+import * as admin from "firebase-admin";
 
 // Set test environment
 process.env.NODE_ENV = "test";
 process.env.FUNCTIONS_EMULATOR = "true";
 process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
+process.env.FIREBASE_CONFIG = JSON.stringify({
+  projectId: TEST_CONFIG.projectId,
+});
+
+// Initialize Firebase Admin if not already initialized
+if (!admin.apps.length) {
+  admin.initializeApp({
+    projectId: TEST_CONFIG.projectId,
+  });
+}
 
 // Set up global beforeAll hook
 beforeAll(async () => {
   await initializeTestEnvironment();
+  configureAxios(); // Configure axios with test headers
 });
 
 // Clean up after all tests

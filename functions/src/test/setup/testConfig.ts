@@ -71,16 +71,13 @@ export const TEST_CONFIG: TestConfig = {
     "x-test-env": "true",
     "x-test-fingerprint-id": "test-fingerprint-id",
     "x-api-key": "test-api-key-123456789",
+    "Content-Type": "application/json",
   },
 };
 
 export const MOCK_PRICES: PriceData = {
-  solana: {
-    usd: 100.0,
-    usd_24h_change: 5.0,
-  },
-  project89: {
-    usd: 1.0,
-    usd_24h_change: 2.0,
+  Project89: {
+    usd: 0.15,
+    usd_24h_change: 2.5,
   },
 };

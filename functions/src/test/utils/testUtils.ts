@@ -9,8 +9,14 @@ export const configureAxios = (): void => {
   axios.defaults.headers.common = {
     ...axios.defaults.headers.common,
     ...TEST_CONFIG.testHeaders,
+    "x-test-env": "true",
   };
   axios.defaults.timeout = TEST_CONFIG.defaultTimeout;
+
+  // Ensure test environment is set
+  process.env.NODE_ENV = "test";
+  process.env.FUNCTIONS_EMULATOR = "true";
+  process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
 };
 
 // Check if emulators are running
@@ -90,7 +96,29 @@ export const createTestData = async (): Promise<void> => {
       key: TEST_CONFIG.mockApiKey,
       fingerprintId: TEST_CONFIG.testFingerprint.id,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      enabled: true,
+      metadata: {
+        testData: true,
+        name: "Test API Key",
+      },
     });
+
+    // Verify test data was created
+    const fingerprintDoc = await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .doc(TEST_CONFIG.testFingerprint.id)
+      .get();
+    if (!fingerprintDoc.exists) {
+      throw new Error("Failed to create test fingerprint");
+    }
+
+    const apiKeySnapshot = await db
+      .collection(COLLECTIONS.API_KEYS)
+      .where("key", "==", TEST_CONFIG.mockApiKey)
+      .get();
+    if (apiKeySnapshot.empty) {
+      throw new Error("Failed to create test API key");
+    }
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;

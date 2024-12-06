@@ -1,26 +1,14 @@
 import { Request, Response, NextFunction } from "express";
-import { validate } from "../endpoints/apiKey.endpoint";
+import { validateApiKey } from "../endpoints/apiKey.endpoint";
 import "../types/express";
 import { PUBLIC_ENDPOINTS } from "../constants";
 
-export const validateApiKey = async (
+export const validateApiKeyMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> => {
   try {
-    // Skip validation for test environment
-    if (process.env.NODE_ENV === "test") {
-      // For test environment, use the test fingerprint ID from headers
-      req.fingerprintId = req.headers["x-test-fingerprint-id"] as string;
-      return next();
-    }
-
-    // Skip validation for emulator if not in test environment
-    if (process.env.FUNCTIONS_EMULATOR === "true") {
-      return next();
-    }
-
     // Extract the endpoint path from the full URL path
     const fullPath = req.path;
     const endpointPath = fullPath.replace(/^.*\/api/, "");
@@ -28,7 +16,16 @@ export const validateApiKey = async (
     // Check if endpoint is public
     const isPublicEndpoint = PUBLIC_ENDPOINTS.some((endpoint) => endpointPath.startsWith(endpoint));
 
-    if (isPublicEndpoint) {
+    // Skip validation for test environment or public endpoints
+    if (
+      process.env.NODE_ENV === "test" ||
+      isPublicEndpoint ||
+      process.env.FUNCTIONS_EMULATOR === "true"
+    ) {
+      // For test environment, use the test fingerprint ID from headers
+      if (process.env.NODE_ENV === "test" && req.headers["x-test-fingerprint-id"]) {
+        req.fingerprintId = req.headers["x-test-fingerprint-id"] as string;
+      }
       return next();
     }
 
@@ -42,7 +39,7 @@ export const validateApiKey = async (
       return;
     }
 
-    const { isValid, fingerprintId } = await validate(apiKey);
+    const { isValid, fingerprintId } = await validateApiKey(apiKey);
 
     if (!isValid) {
       res.status(401).json({
