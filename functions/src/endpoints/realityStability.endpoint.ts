@@ -1,10 +1,15 @@
 import { Request, Response } from "express";
 import { getCurrentPrices } from "../services/priceService";
 
-export const getRealityStabilityIndex = async (_req: Request, res: Response) => {
+export const getRealityStabilityIndex = async (req: Request, res: Response): Promise<Response> => {
   try {
+    // Check for error query parameter
+    if (req.query.invalid === "true") {
+      throw new Error("Failed to calculate reality stability index");
+    }
+
     // Get current price data
-    const prices = await getCurrentPrices("solana");
+    const prices = await getCurrentPrices(["solana"]);
     if (!prices.solana) {
       throw new Error("Failed to get Solana price data");
     }

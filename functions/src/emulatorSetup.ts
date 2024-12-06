@@ -3,7 +3,7 @@ import * as admin from "firebase-admin";
 
 // Environment configuration
 export const CONFIG = {
-  projectId: "argos-434718",
+  projectId: "argos-dev",
   firestoreEmulator: "localhost:9090",
 };
 

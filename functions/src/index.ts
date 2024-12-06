@@ -1,62 +1,79 @@
-import "./register";
-import * as functions from "firebase-functions";
-import express, { Request, Response } from "express";
+import { onRequest } from "firebase-functions/v2/https";
+import * as admin from "firebase-admin";
+import express from "express";
 import cors from "cors";
-import { initializeApp } from "firebase-admin/app";
-import { validateApiKeyMiddleware } from "./middleware/auth";
-import { getRealityStabilityIndex } from "./endpoints/realityStabilityIndex";
-import { getTokenPriceEndpoint, getCurrentPricesEndpoint } from "./endpoints/priceEndpoints";
-import { registerFingerprint, getFingerprint } from "./endpoints/fingerprintManagement";
-import { logVisit, updatePresence, removeSite } from "./endpoints/visitLogger";
-import { assignRole, removeRole, getAvailableRoles } from "./endpoints/roleManagement";
-import { addOrUpdateTags, updateRolesBasedOnTags } from "./endpoints/tagManagement";
-import { registerApiKeyEndpoint } from "./endpoints/apiKeyManagement";
-import { getVisitHistory } from "./endpoints/visitHistory";
+
+// Import middleware
+import { validateApiKey } from "./middleware/auth.middleware";
+import { rateLimit } from "./middleware/rateLimit.middleware";
+
+// Import endpoints
+import * as apiKey from "./endpoints/apiKey.endpoint";
+import * as fingerprint from "./endpoints/fingerprint.endpoint";
+import * as price from "./endpoints/price.endpoint";
+import * as realityStability from "./endpoints/realityStability.endpoint";
+import * as role from "./endpoints/role.endpoint";
+import * as tag from "./endpoints/tag.endpoint";
+import * as visit from "./endpoints/visit.endpoint";
+import * as debug from "./endpoints/debug.endpoint";
+
+// Import scheduled functions
+export { scheduledCleanup } from "./scheduled/cleanup.scheduled";
 
 // Initialize Firebase Admin
-initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
-// Initialize Express app
+// Create Express app
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({ origin: true }));
 app.use(express.json());
-app.use(validateApiKeyMiddleware);
+app.use(validateApiKey);
+app.use(rateLimit());
 
-// Health check endpoint
-app.get("/health", (_req: Request, res: Response) => {
-  res.status(200).json({ status: "ok" });
-});
+// API Key routes
+app.post("/apiKey/register", apiKey.register);
+app.post("/apiKey/validate", apiKey.validateEndpoint);
+app.post("/apiKey/revoke", apiKey.revoke);
 
-// Reality Stability Endpoints
-app.get("/reality-stability", getRealityStabilityIndex);
+// Fingerprint routes
+app.post("/fingerprint/register", fingerprint.register);
+app.get("/fingerprint/:id", fingerprint.get);
 
-// Price Endpoints
-app.get("/price/:tokenId", getTokenPriceEndpoint);
-app.get("/prices", getCurrentPricesEndpoint);
+// Price routes
+app.get("/price/current", price.getCurrent);
+app.get("/price/history/:tokenId", price.getHistory);
 
-// Fingerprint Management
-app.post("/fingerprint", registerFingerprint);
-app.get("/fingerprint/:id", getFingerprint);
+// Reality Stability routes
+app.get("/reality-stability", realityStability.getRealityStabilityIndex);
 
-// Visit Tracking
-app.post("/visit", logVisit);
-app.post("/presence", updatePresence);
-app.delete("/presence/site", removeSite);
-app.get("/visit-history", getVisitHistory);
+// Role routes
+app.post("/role/assign", role.assign);
+app.post("/role/remove", role.remove);
+app.get("/role/available", role.getAvailable);
 
-// Role Management
-app.post("/role", assignRole);
-app.delete("/role", removeRole);
-app.get("/roles", getAvailableRoles);
+// Tag routes
+app.post("/tag/update", tag.addOrUpdateTags);
+app.post("/tag/roles/update", tag.updateRolesBasedOnTags);
 
-// Tag Management
-app.post("/tags", addOrUpdateTags);
-app.post("/tags/roles", updateRolesBasedOnTags);
+// Visit routes
+app.post("/visit/log", visit.log);
+app.post("/visit/presence", visit.updatePresence);
+app.post("/visit/site/remove", visit.removeSite);
+app.get("/visit/history/:fingerprintId", visit.getHistory);
 
-// API Key Management
-app.post("/api-key", registerApiKeyEndpoint);
+// Debug routes (protected by API key)
+app.post("/debug/cleanup", debug.cleanup);
 
 // Export the Express app as a Firebase Function
-export const api = functions.https.onRequest(app);
+export const api = onRequest(
+  {
+    memory: "2GiB",
+    timeoutSeconds: 540,
+    region: "us-central1",
+  },
+  app,
+);

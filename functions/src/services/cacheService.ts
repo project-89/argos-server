@@ -1,30 +1,39 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
-import { CACHE_CONFIG } from "../constants";
 
-/**
- * Cleans up expired cache entries from Firestore
- */
-export const cleanupCache = async (): Promise<void> => {
-  const db = getFirestore();
-  const now = Date.now();
-  const cutoff = now - CACHE_CONFIG.MAX_AGE;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-  // Get all expired cache entries
-  const snapshot = await db
-    .collection(COLLECTIONS.PRICE_CACHE)
-    .where("timestamp", "<", cutoff)
-    .get();
+export const getCachedData = async <T>(key: string, collection: string): Promise<T | null> => {
+  try {
+    const db = getFirestore();
+    const doc = await db.collection(collection).doc(key).get();
 
-  if (snapshot.empty) {
-    return;
+    if (!doc.exists) {
+      return null;
+    }
+
+    const data = doc.data();
+    if (!data || Date.now() - data.timestamp > CACHE_DURATION) {
+      return null;
+    }
+
+    return data as T;
+  } catch (error) {
+    console.error("Error getting cached data:", error);
+    return null;
   }
+};
 
-  // Delete expired entries in batches
-  const batch = db.batch();
-  snapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-
-  await batch.commit();
+export const setCachedData = async <T>(key: string, collection: string, data: T): Promise<void> => {
+  try {
+    const db = getFirestore();
+    await db
+      .collection(collection)
+      .doc(key)
+      .set({
+        ...data,
+        timestamp: Date.now(),
+      });
+  } catch (error) {
+    console.error("Error setting cached data:", error);
+  }
 };

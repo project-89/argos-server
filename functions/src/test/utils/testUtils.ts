@@ -1,20 +1,24 @@
-import "../register";
 import * as admin from "firebase-admin";
-import { COLLECTIONS, ROLES } from "../constants";
+import { COLLECTIONS } from "../../constants";
 import axios from "axios";
-import { TEST_CONFIG } from "./setup/testConfig";
+import { TEST_CONFIG } from "../setup/testConfig";
+
+// Configure axios for testing
+export const configureAxios = (): void => {
+  axios.defaults.validateStatus = () => true; // Don't throw on any status
+  axios.defaults.headers.common = {
+    ...axios.defaults.headers.common,
+    ...TEST_CONFIG.testHeaders,
+  };
+  axios.defaults.timeout = TEST_CONFIG.defaultTimeout;
+};
 
 // Check if emulators are running
-export const checkEmulators = async () => {
+export const checkEmulators = async (): Promise<boolean> => {
   try {
     const response = await axios.get(TEST_CONFIG.apiUrl + "/health");
-    if (response.status === 200) {
-      return true;
-    }
+    return response.status === 404; // Endpoint exists but returns 404
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      return true; // Endpoint exists but returns 404
-    }
     if (error.code === "ECONNREFUSED") {
       console.error(
         "\x1b[31m%s\x1b[0m",
@@ -28,12 +32,12 @@ Then run the tests again.
       );
       process.exit(1);
     }
+    return false;
   }
-  return false;
 };
 
 // Initialize Firebase Admin for testing
-export const initializeTestEnvironment = async () => {
+export const initializeTestEnvironment = async (): Promise<void> => {
   try {
     // Set environment variables
     process.env.FUNCTIONS_EMULATOR = "true";
@@ -50,15 +54,17 @@ export const initializeTestEnvironment = async () => {
       });
     }
 
-    const db = admin.firestore();
-
-    // Clean the database before tests
-    await cleanDatabase();
+    // Configure axios
+    configureAxios();
 
     // Check emulators
     await checkEmulators();
 
-    return db;
+    // Clean the database before tests
+    await cleanDatabase();
+
+    // Create test data
+    await createTestData();
   } catch (error) {
     console.error("Failed to initialize test environment:", error);
     throw error;
@@ -66,49 +72,25 @@ export const initializeTestEnvironment = async () => {
 };
 
 // Helper to create test data
-export const createTestData = async () => {
+export const createTestData = async (): Promise<void> => {
   try {
-    // Initialize Firebase if not already initialized
-    if (!admin.apps.length) {
-      await initializeTestEnvironment();
-    }
-
     const db = admin.firestore();
 
     // Create test fingerprint
-    const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add({
-      fingerprint: "test-fingerprint",
+    await db.collection(COLLECTIONS.FINGERPRINTS).doc(TEST_CONFIG.testFingerprint.id).set({
+      fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
+      roles: TEST_CONFIG.testFingerprint.roles,
+      metadata: TEST_CONFIG.testFingerprint.metadata,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      roles: [ROLES.USER],
       tags: {},
-      metadata: {
-        testData: true,
-      },
     });
 
     // Create test API key
-    const apiKey = TEST_CONFIG.mockApiKey;
-    await db
-      .collection(COLLECTIONS.API_KEYS)
-      .doc(apiKey)
-      .set({
-        key: apiKey,
-        fingerprintId: fingerprintRef.id,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUsed: null,
-        enabled: true,
-        metadata: {
-          testData: true,
-          name: "Test Key",
-        },
-        usageCount: 0,
-        endpointStats: {},
-      });
-
-    return {
-      fingerprintId: fingerprintRef.id,
-      apiKey,
-    };
+    await db.collection(COLLECTIONS.API_KEYS).add({
+      key: TEST_CONFIG.mockApiKey,
+      fingerprintId: TEST_CONFIG.testFingerprint.id,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;
@@ -116,19 +98,19 @@ export const createTestData = async () => {
 };
 
 // Clean up test data
-export const cleanDatabase = async () => {
+export const cleanDatabase = async (): Promise<void> => {
   try {
     const db = admin.firestore();
-    const collections = Object.values(COLLECTIONS);
+    const collections = Object.values(COLLECTIONS) as string[];
 
-    const promises = collections.map(async (collection) => {
+    for (const collection of collections) {
       const snapshot = await db.collection(collection).get();
       const batch = db.batch();
       snapshot.docs.forEach((doc) => batch.delete(doc.ref));
-      return batch.commit();
-    });
-
-    await Promise.all(promises);
+      if (snapshot.docs.length > 0) {
+        await batch.commit();
+      }
+    }
   } catch (error) {
     console.error("Failed to clean database:", error);
     throw error;

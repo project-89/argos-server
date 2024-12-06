@@ -1,47 +1,41 @@
 import { Request, Response, NextFunction } from "express";
-import { validateApiKey } from "@/services/apiKeyService";
+import { validateApiKey } from "../services/apiKeyService";
+import "../types/express";
 
-// Extend Express Request type to include fingerprintId
-declare global {
-  namespace Express {
-    interface Request {
-      fingerprintId?: string;
-    }
-  }
-}
-
-export const validateApiKeyMiddleware = async (
+export const authMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction,
-): Promise<void | Response> => {
-  // List of public endpoints that don't require API key
-  const publicEndpoints = [
-    "/reality-stability",
-    "/register-fingerprint",
-    "/get-fingerprint",
-    "/log-visit",
-    "/update-presence",
-    "/remove-site",
-  ];
+): Promise<void> => {
+  try {
+    const apiKey = req.headers["x-api-key"];
 
-  // Skip API key check for public endpoints or if in development
-  if (publicEndpoints.includes(req.path) || process.env.FUNCTIONS_EMULATOR) {
-    return next();
+    if (!apiKey || typeof apiKey !== "string") {
+      res.status(401).json({
+        success: false,
+        error: "Missing API key",
+      });
+      return;
+    }
+
+    const result = await validateApiKey(apiKey);
+
+    if (!result.isValid) {
+      res.status(401).json({
+        success: false,
+        error: "Invalid API key",
+      });
+      return;
+    }
+
+    // Add fingerprintId to request for use in endpoints
+    req.fingerprintId = result.fingerprintId;
+    next();
+  } catch (error: any) {
+    console.error("Error validating API key:", error);
+    res.status(500).json({
+      success: false,
+      error: error.message || "Internal server error",
+    });
   }
-
-  const apiKey = req.headers["x-api-key"];
-  if (!apiKey || typeof apiKey !== "string") {
-    return res.status(401).json({ error: "API key is required" });
-  }
-
-  const endpoint = req.path.substring(1);
-  const validation = await validateApiKey(apiKey, endpoint);
-
-  if (!validation.isValid) {
-    return res.status(403).json({ error: "Invalid API key" });
-  }
-
-  req.fingerprintId = validation.fingerprintId;
-  next();
 };

@@ -1,12 +1,12 @@
 import { PriceData } from "./priceService";
 
-export const MOCK_PRICE_DATA: Record<string, PriceData> = {
-  solana: {
-    usd: 100.0,
-    usd_24h_change: 5.0,
-  },
+export const MOCK_PRICE_DATA: PriceData = {
   project89: {
-    usd: 1.0,
-    usd_24h_change: 2.0,
+    usd: 0.15,
+    usd_24h_change: 2.5,
+  },
+  solana: {
+    usd: 20.45,
+    usd_24h_change: -1.2,
   },
 };
