@@ -1,44 +1,29 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import axios from "axios";
+import { describe, it, expect } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
+import { makeRequest } from "../utils/testUtils";
 
 describe("Fingerprint Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
-  const testFingerprint = TEST_CONFIG.testFingerprint;
-
-  beforeEach(async () => {
-    // Clear existing fingerprints
-    const db = getFirestore();
-    const fingerprintsSnapshot = await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .where("fingerprint", "==", testFingerprint.fingerprint)
-      .get();
-
-    const batch = db.batch();
-    fingerprintsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    await batch.commit();
-  });
 
   describe("POST /fingerprint/register", () => {
     it("should register a new fingerprint", async () => {
-      const response = await axios.post(`${API_URL}/fingerprint/register`, {
-        fingerprint: testFingerprint.fingerprint,
+      const response = await makeRequest("post", `${API_URL}/fingerprint/register`, {
+        fingerprint: "test-fingerprint",
         metadata: { test: true },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("id");
-      expect(response.data.data).toHaveProperty("fingerprint", testFingerprint.fingerprint);
-      expect(response.data.data).toHaveProperty("metadata.test", true);
-      expect(response.data.data).toHaveProperty("roles");
-      expect(response.data.data.roles).toContain("user");
+      expect(response.data.data).toHaveProperty("fingerprint", "test-fingerprint");
+      expect(response.data.data).toHaveProperty("roles", ["user"]);
+      expect(response.data.data).toHaveProperty("createdAt");
+      expect(response.data.data).toHaveProperty("metadata");
+      expect(response.data.data.metadata).toHaveProperty("test", true);
     });
 
     it("should require fingerprint field", async () => {
-      const response = await axios.post(`${API_URL}/fingerprint/register`, {
+      const response = await makeRequest("post", `${API_URL}/fingerprint/register`, {
         metadata: { test: true },
       });
 
@@ -51,26 +36,27 @@ describe("Fingerprint Endpoint", () => {
   describe("GET /fingerprint/:id", () => {
     it("should get fingerprint by ID", async () => {
       // First register a fingerprint
-      const registerResponse = await axios.post(`${API_URL}/fingerprint/register`, {
-        fingerprint: testFingerprint.fingerprint,
+      const registerResponse = await makeRequest("post", `${API_URL}/fingerprint/register`, {
+        fingerprint: "test-fingerprint",
         metadata: { test: true },
       });
 
       const fingerprintId = registerResponse.data.data.id;
 
-      const response = await axios.get(`${API_URL}/fingerprint/${fingerprintId}`);
+      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`);
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("id", fingerprintId);
-      expect(response.data.data).toHaveProperty("fingerprint", testFingerprint.fingerprint);
-      expect(response.data.data).toHaveProperty("metadata.test", true);
-      expect(response.data.data).toHaveProperty("roles");
-      expect(response.data.data.roles).toContain("user");
+      expect(response.data.data).toHaveProperty("fingerprint", "test-fingerprint");
+      expect(response.data.data).toHaveProperty("roles", ["user"]);
+      expect(response.data.data).toHaveProperty("createdAt");
+      expect(response.data.data).toHaveProperty("metadata");
+      expect(response.data.data.metadata).toHaveProperty("test", true);
     });
 
     it("should handle non-existent fingerprint", async () => {
-      const response = await axios.get(`${API_URL}/fingerprint/non-existent-id`);
+      const response = await makeRequest("get", `${API_URL}/fingerprint/non-existent-id`);
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
@@ -79,7 +65,7 @@ describe("Fingerprint Endpoint", () => {
 
     it("should handle missing ID parameter", async () => {
       try {
-        await axios.get(`${API_URL}/fingerprint/`);
+        await makeRequest("get", `${API_URL}/fingerprint/`);
       } catch (error: any) {
         expect(error.response.status).toBe(404);
         expect(error.response.data).toBe("Cannot GET /fingerprint/");

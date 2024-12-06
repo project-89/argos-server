@@ -12,10 +12,19 @@ interface CleanupResult {
   deletedVisits: number;
   deletedPresence: number;
   total: number;
+  cleanupTime: number;
+  itemsCleaned: {
+    priceCache: number;
+    rateLimitStats: number;
+    rateLimitRequests: number;
+    visits: number;
+    presence: number;
+  };
 }
 
 export const cleanupData = async (shouldError = false): Promise<CleanupResult> => {
   try {
+    const startTime = Date.now();
     // If shouldError is true, throw an error for testing
     if (shouldError) {
       throw new Error("Simulated error for testing");
@@ -79,6 +88,14 @@ export const cleanupData = async (shouldError = false): Promise<CleanupResult> =
         rateLimitRequestsSnapshot.size +
         visitsSnapshot.size +
         presenceSnapshot.size,
+      cleanupTime: Date.now() - startTime,
+      itemsCleaned: {
+        priceCache: priceCacheSnapshot.size,
+        rateLimitStats: rateLimitStatsSnapshot.size,
+        rateLimitRequests: rateLimitRequestsSnapshot.size,
+        visits: visitsSnapshot.size,
+        presence: presenceSnapshot.size,
+      },
     };
 
     return result;

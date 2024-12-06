@@ -1,11 +1,12 @@
 import { Request, Response } from "express";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { getFirestore } from "firebase-admin/firestore";
+import { COLLECTIONS, ROLES } from "../constants";
 
 export const register = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { fingerprint, metadata = {} } = req.body;
+    const { fingerprint, metadata } = req.body;
 
+    // Validate required fields
     if (!fingerprint) {
       return res.status(400).json({
         success: false,
@@ -13,33 +14,33 @@ export const register = async (req: Request, res: Response): Promise<Response> =
       });
     }
 
+    // Create fingerprint document
     const db = getFirestore();
     const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add({
       fingerprint,
-      metadata,
-      createdAt: FieldValue.serverTimestamp(),
-      roles: ["user"], // Default role
+      roles: [ROLES.USER], // Default role
+      createdAt: new Date(),
+      metadata: metadata || {},
       tags: {},
     });
 
-    const doc = await fingerprintRef.get();
-    const data = doc.data();
-
-    return res.json({
+    // Return success response
+    return res.status(200).json({
       success: true,
       data: {
-        id: doc.id,
-        fingerprint: data?.fingerprint,
-        metadata: data?.metadata,
-        roles: data?.roles,
-        createdAt: data?.createdAt,
+        id: fingerprintRef.id,
+        fingerprint,
+        roles: [ROLES.USER],
+        createdAt: new Date(),
+        metadata: metadata || {},
+        tags: {},
       },
     });
-  } catch (error: any) {
-    console.error("Error in register fingerprint:", error);
+  } catch (error) {
+    console.error("Error registering fingerprint:", error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Failed to register fingerprint",
+      error: "Internal server error",
     });
   }
 };
@@ -48,40 +49,31 @@ export const get = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
 
-    if (!id) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required parameter: id",
-      });
-    }
-
+    // Get fingerprint document
     const db = getFirestore();
-    const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(id).get();
+    const fingerprintDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(id).get();
 
-    if (!doc.exists) {
+    // Check if fingerprint exists
+    if (!fingerprintDoc.exists) {
       return res.status(404).json({
         success: false,
         error: "Fingerprint not found",
       });
     }
 
-    const data = doc.data();
-
-    return res.json({
+    // Return success response
+    return res.status(200).json({
       success: true,
       data: {
-        id: doc.id,
-        fingerprint: data?.fingerprint,
-        metadata: data?.metadata,
-        roles: data?.roles,
-        createdAt: data?.createdAt,
+        id: fingerprintDoc.id,
+        ...fingerprintDoc.data(),
       },
     });
-  } catch (error: any) {
-    console.error("Error in get fingerprint:", error);
+  } catch (error) {
+    console.error("Error getting fingerprint:", error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Failed to get fingerprint",
+      error: "Internal server error",
     });
   }
 };

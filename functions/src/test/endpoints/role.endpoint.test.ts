@@ -1,29 +1,14 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import axios from "axios";
+import { describe, it, expect } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
+import { makeRequest } from "../utils/testUtils";
 
 describe("Role Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   const testFingerprint = TEST_CONFIG.testFingerprint;
 
-  beforeEach(async () => {
-    // Setup test fingerprint
-    const db = getFirestore();
-    await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .doc(testFingerprint.id)
-      .set({
-        fingerprint: testFingerprint.fingerprint,
-        roles: ["user"],
-        createdAt: new Date(),
-      });
-  });
-
   describe("POST /role/assign", () => {
     it("should assign a role to a fingerprint", async () => {
-      const response = await axios.post(`${API_URL}/role/assign`, {
+      const response = await makeRequest("post", `${API_URL}/role/assign`, {
         fingerprintId: testFingerprint.id,
         role: "premium",
       });
@@ -37,7 +22,7 @@ describe("Role Endpoint", () => {
     });
 
     it("should validate required fields", async () => {
-      const response = await axios.post(`${API_URL}/role/assign`, {
+      const response = await makeRequest("post", `${API_URL}/role/assign`, {
         fingerprintId: testFingerprint.id,
         // missing role
       });
@@ -48,7 +33,7 @@ describe("Role Endpoint", () => {
     });
 
     it("should validate role value", async () => {
-      const response = await axios.post(`${API_URL}/role/assign`, {
+      const response = await makeRequest("post", `${API_URL}/role/assign`, {
         fingerprintId: testFingerprint.id,
         role: "invalid-role",
       });
@@ -62,12 +47,12 @@ describe("Role Endpoint", () => {
   describe("POST /role/remove", () => {
     it("should remove a role from a fingerprint", async () => {
       // First assign a role
-      await axios.post(`${API_URL}/role/assign`, {
+      await makeRequest("post", `${API_URL}/role/assign`, {
         fingerprintId: testFingerprint.id,
         role: "premium",
       });
 
-      const response = await axios.post(`${API_URL}/role/remove`, {
+      const response = await makeRequest("post", `${API_URL}/role/remove`, {
         fingerprintId: testFingerprint.id,
         role: "premium",
       });
@@ -81,7 +66,7 @@ describe("Role Endpoint", () => {
     });
 
     it("should validate required fields", async () => {
-      const response = await axios.post(`${API_URL}/role/remove`, {
+      const response = await makeRequest("post", `${API_URL}/role/remove`, {
         fingerprintId: testFingerprint.id,
         // missing role
       });
@@ -92,7 +77,7 @@ describe("Role Endpoint", () => {
     });
 
     it("should not allow removing user role", async () => {
-      const response = await axios.post(`${API_URL}/role/remove`, {
+      const response = await makeRequest("post", `${API_URL}/role/remove`, {
         fingerprintId: testFingerprint.id,
         role: "user",
       });
@@ -105,7 +90,7 @@ describe("Role Endpoint", () => {
 
   describe("GET /role/available", () => {
     it("should return list of available roles", async () => {
-      const response = await axios.get(`${API_URL}/role/available`);
+      const response = await makeRequest("get", `${API_URL}/role/available`);
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);

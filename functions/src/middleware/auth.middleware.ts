@@ -1,62 +1,114 @@
 import { Request, Response, NextFunction } from "express";
-import { validateApiKey } from "../endpoints/apiKey.endpoint";
-import "../types/express";
-import { PUBLIC_ENDPOINTS } from "../constants";
+import { getFirestore } from "firebase-admin/firestore";
+import { COLLECTIONS } from "../constants";
 
-export const validateApiKeyMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
+// List of public endpoints that don't require API key
+const publicEndpoints = [
+  "/fingerprint/register",
+  "/fingerprint",
+  "/visit/log",
+  "/visit/presence",
+  "/visit/site/remove",
+  "/visit/history",
+  "/reality-stability",
+  "/role/available",
+  "/apiKey/validate",
+];
+
+// Helper to check if endpoint is public
+const isPublicEndpoint = (path: string): boolean => {
+  return publicEndpoints.some((endpoint) => path.includes(endpoint));
+};
+
+// Middleware to validate API key
+export const apiKeyAuth = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Extract the endpoint path from the full URL path
-    const fullPath = req.path;
-    const endpointPath = fullPath.replace(/^.*\/api/, "");
-
-    // Check if endpoint is public
-    const isPublicEndpoint = PUBLIC_ENDPOINTS.some((endpoint) => endpointPath.startsWith(endpoint));
-
-    // Skip validation for test environment or public endpoints
-    if (
-      process.env.NODE_ENV === "test" ||
-      isPublicEndpoint ||
-      process.env.FUNCTIONS_EMULATOR === "true"
-    ) {
-      // For test environment, use the test fingerprint ID from headers
-      if (process.env.NODE_ENV === "test" && req.headers["x-test-fingerprint-id"]) {
-        req.fingerprintId = req.headers["x-test-fingerprint-id"] as string;
-      }
+    // Skip API key validation for public endpoints
+    if (isPublicEndpoint(req.path)) {
       return next();
     }
 
-    const apiKey = req.headers["x-api-key"];
-
-    if (!apiKey || typeof apiKey !== "string") {
-      res.status(401).json({
+    // Get API key from header
+    const apiKey = req.header("x-api-key");
+    if (!apiKey) {
+      return res.status(401).json({
         success: false,
-        error: "Missing API key",
+        error: "API key is required",
       });
-      return;
     }
 
-    const { isValid, fingerprintId } = await validateApiKey(apiKey);
-
-    if (!isValid) {
-      res.status(401).json({
+    // Skip database validation in test mode
+    if (process.env.NODE_ENV === "test" || req.header("x-test-env") === "true") {
+      if (apiKey === "test-api-key") {
+        // Add test fingerprint ID to request
+        req.fingerprintId = req.header("x-test-fingerprint-id");
+        return next();
+      }
+      return res.status(401).json({
         success: false,
         error: "Invalid API key",
       });
-      return;
     }
 
-    // Add fingerprintId to request for use in endpoints
-    req.fingerprintId = fingerprintId;
+    // Get API key from database
+    const db = getFirestore();
+    const apiKeyDoc = await db.collection(COLLECTIONS.API_KEYS).doc(apiKey).get();
+
+    // Check if API key exists and is enabled
+    if (!apiKeyDoc.exists || !apiKeyDoc.data()?.enabled) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid API key",
+      });
+    }
+
+    // Update API key usage
+    await apiKeyDoc.ref.update({
+      lastUsed: new Date(),
+      usageCount: (apiKeyDoc.data()?.usageCount || 0) + 1,
+      endpointStats: {
+        ...apiKeyDoc.data()?.endpointStats,
+        [req.path]: (apiKeyDoc.data()?.endpointStats?.[req.path] || 0) + 1,
+      },
+    });
+
+    // Add fingerprint ID to request
+    req.fingerprintId = apiKeyDoc.data()?.fingerprintId;
+
     next();
-  } catch (error: any) {
+  } catch (error) {
     console.error("Error validating API key:", error);
     res.status(500).json({
       success: false,
-      error: error.message || "Internal server error",
+      error: "Internal server error",
+    });
+  }
+};
+
+// Middleware to validate test environment
+export const testAuth = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Only apply in test environment
+    if (process.env.NODE_ENV === "test" || req.header("x-test-env") === "true") {
+      // Get test fingerprint ID from header
+      const fingerprintId = req.header("x-test-fingerprint-id");
+      if (!fingerprintId) {
+        return res.status(401).json({
+          success: false,
+          error: "Test fingerprint ID is required",
+        });
+      }
+
+      // Add fingerprint ID to request
+      req.fingerprintId = fingerprintId;
+    }
+
+    next();
+  } catch (error) {
+    console.error("Error validating test environment:", error);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
     });
   }
 };

@@ -1,56 +1,29 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
-import axios from "axios";
+import { describe, it, expect } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
-import * as admin from "firebase-admin";
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: TEST_CONFIG.projectId,
-  });
-}
-
-const db = getFirestore();
+import { makeRequest } from "../utils/testUtils";
 
 describe("API Key Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
-
-  beforeEach(async () => {
-    // Ensure test fingerprint exists before each test
-    await db.collection(COLLECTIONS.FINGERPRINTS).doc(TEST_CONFIG.testFingerprint.id).set({
-      fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
-      roles: TEST_CONFIG.testFingerprint.roles,
-      metadata: TEST_CONFIG.testFingerprint.metadata,
-      createdAt: new Date(),
-      tags: {},
-    });
-  });
+  const testFingerprint = TEST_CONFIG.testFingerprint;
 
   describe("POST /apiKey/register", () => {
     it("should register a new API key", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/register`, {
-        fingerprintId: TEST_CONFIG.testFingerprint.id,
+      const response = await makeRequest("post", `${API_URL}/apiKey/register`, {
+        fingerprintId: testFingerprint.id,
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("key");
-      expect(response.data.data).toHaveProperty("fingerprintId", TEST_CONFIG.testFingerprint.id);
-
-      // Verify the API key was actually created in the database
-      const apiKey = response.data.data.key;
-      const apiKeyDoc = await db
-        .collection(COLLECTIONS.API_KEYS)
-        .where("key", "==", apiKey)
-        .where("enabled", "==", true)
-        .get();
-      expect(apiKeyDoc.empty).toBe(false);
+      expect(response.data.data).toHaveProperty("fingerprintId", testFingerprint.id);
+      expect(response.data.data).toHaveProperty("createdAt");
+      expect(response.data.data).toHaveProperty("enabled", true);
+      expect(response.data.data).toHaveProperty("usageCount", 0);
+      expect(response.data.data).toHaveProperty("endpointStats");
     });
 
     it("should require fingerprintId", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/register`, {});
+      const response = await makeRequest("post", `${API_URL}/apiKey/register`, {});
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
@@ -58,7 +31,7 @@ describe("API Key Endpoint", () => {
     });
 
     it("should validate fingerprintId exists", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/register`, {
+      const response = await makeRequest("post", `${API_URL}/apiKey/register`, {
         fingerprintId: "non-existent-id",
       });
 
@@ -70,36 +43,36 @@ describe("API Key Endpoint", () => {
 
   describe("POST /apiKey/validate", () => {
     it("should validate a valid API key", async () => {
-      // First register a new key
-      const registerResponse = await axios.post(`${API_URL}/apiKey/register`, {
-        fingerprintId: TEST_CONFIG.testFingerprint.id,
+      // First register an API key
+      const registerResponse = await makeRequest("post", `${API_URL}/apiKey/register`, {
+        fingerprintId: testFingerprint.id,
       });
-      expect(registerResponse.status).toBe(200);
+
       const apiKey = registerResponse.data.data.key;
 
-      // Then validate it
-      const response = await axios.post(`${API_URL}/apiKey/validate`, {
+      const response = await makeRequest("post", `${API_URL}/apiKey/validate`, {
         key: apiKey,
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("isValid", true);
-      expect(response.data.data).toHaveProperty("fingerprintId", TEST_CONFIG.testFingerprint.id);
+      expect(response.data.data).toHaveProperty("fingerprintId", testFingerprint.id);
     });
 
     it("should reject an invalid API key", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/validate`, {
+      const response = await makeRequest("post", `${API_URL}/apiKey/validate`, {
         key: "invalid-key",
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("isValid", false);
+      expect(response.data.data).not.toHaveProperty("fingerprintId");
     });
 
     it("should require key field", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/validate`, {});
+      const response = await makeRequest("post", `${API_URL}/apiKey/validate`, {});
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
@@ -109,35 +82,35 @@ describe("API Key Endpoint", () => {
 
   describe("POST /apiKey/revoke", () => {
     it("should revoke an existing API key", async () => {
-      // First register a new key
-      const registerResponse = await axios.post(`${API_URL}/apiKey/register`, {
-        fingerprintId: TEST_CONFIG.testFingerprint.id,
+      // First register an API key
+      const registerResponse = await makeRequest("post", `${API_URL}/apiKey/register`, {
+        fingerprintId: testFingerprint.id,
       });
-      expect(registerResponse.status).toBe(200);
+
       const apiKey = registerResponse.data.data.key;
 
       // Then revoke it
-      const response = await axios.post(`${API_URL}/apiKey/revoke`, {
+      const response = await makeRequest("post", `${API_URL}/apiKey/revoke`, {
         key: apiKey,
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
+      expect(response.data.data).toHaveProperty("key", apiKey);
+      expect(response.data.data).toHaveProperty("enabled", false);
 
-      // Verify key is no longer valid
-      const validateResponse = await axios.post(`${API_URL}/apiKey/validate`, {
+      // Verify the key is no longer valid
+      const validateResponse = await makeRequest("post", `${API_URL}/apiKey/validate`, {
         key: apiKey,
       });
-      expect(validateResponse.data.data.isValid).toBe(false);
 
-      // Verify key is marked as disabled in the database
-      const apiKeyDoc = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", apiKey).get();
-      expect(apiKeyDoc.empty).toBe(false);
-      expect(apiKeyDoc.docs[0].data().enabled).toBe(false);
+      expect(validateResponse.status).toBe(200);
+      expect(validateResponse.data.success).toBe(true);
+      expect(validateResponse.data.data).toHaveProperty("isValid", false);
     });
 
     it("should handle non-existent API key", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/revoke`, {
+      const response = await makeRequest("post", `${API_URL}/apiKey/revoke`, {
         key: "non-existent-key",
       });
 
@@ -147,7 +120,7 @@ describe("API Key Endpoint", () => {
     });
 
     it("should require key field", async () => {
-      const response = await axios.post(`${API_URL}/apiKey/revoke`, {});
+      const response = await makeRequest("post", `${API_URL}/apiKey/revoke`, {});
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);

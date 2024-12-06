@@ -11,37 +11,47 @@ export interface TestFingerprint {
 }
 
 export interface TestConfig {
-  apiUrl: string;
-  firestoreEmulator: string;
   projectId: string;
+  firestoreEmulator: string;
+  apiUrl: string;
+  defaultTimeout: number;
+  testFingerprint: {
+    id: string;
+    fingerprint: string;
+    roles: string[];
+    metadata: {
+      testData: boolean;
+      name: string;
+    };
+  };
   mockApiKey: string;
+  testHeaders: {
+    "x-test-env": string;
+    "x-test-fingerprint-id": string;
+  };
   maxRetries: number;
   retryDelay: number;
-  defaultTimeout: number;
-  testFingerprint: TestFingerprint;
   testTags: {
     visits: number;
     timeSpent: number;
   };
   testTagRules: {
-    [key: string]: {
+    visits: {
+      min: number;
+      role: string;
+    };
+    timeSpent: {
       min: number;
       role: string;
     };
   };
   availableRoles: string[];
-  testHeaders: {
-    [key: string]: string;
-  };
 }
 
 export const TEST_CONFIG: TestConfig = {
-  apiUrl: "http://localhost:5001/argos-434718/us-central1/api",
-  firestoreEmulator: "localhost:9090",
   projectId: "argos-434718",
-  mockApiKey: "test-api-key-123456789",
-  maxRetries: 3,
-  retryDelay: 1000,
+  firestoreEmulator: "localhost:9090",
+  apiUrl: "http://localhost:5001/argos-434718/us-central1/api",
   defaultTimeout: 10000,
   testFingerprint: {
     id: "test-fingerprint-id",
@@ -49,9 +59,16 @@ export const TEST_CONFIG: TestConfig = {
     roles: ["user"],
     metadata: {
       testData: true,
-      name: "Test User",
+      name: "Test Fingerprint",
     },
   },
+  mockApiKey: "test-api-key",
+  testHeaders: {
+    "x-test-env": "true",
+    "x-test-fingerprint-id": "test-fingerprint-id",
+  },
+  maxRetries: 3,
+  retryDelay: 1000,
   testTags: {
     visits: 10,
     timeSpent: 600,
@@ -67,12 +84,6 @@ export const TEST_CONFIG: TestConfig = {
     },
   },
   availableRoles: ["user", "premium", "vip", "admin"],
-  testHeaders: {
-    "x-test-env": "true",
-    "x-test-fingerprint-id": "test-fingerprint-id",
-    "x-api-key": "test-api-key-123456789",
-    "Content-Type": "application/json",
-  },
 };
 
 export const MOCK_PRICES: PriceData = {
