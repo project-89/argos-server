@@ -24,8 +24,5 @@ export interface RateLimitConfig {
 
 export interface FirebaseConfig {
   region: string;
-  maxInstances: number;
-  minInstances: number;
-  memory: string;
   timeoutSeconds: number;
 }

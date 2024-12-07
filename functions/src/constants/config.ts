@@ -1,8 +1,5 @@
 export const FIREBASE_CONFIG = {
   region: "us-central1",
-  maxInstances: 10,
-  minInstances: 1,
-  memory: "256MB",
   timeoutSeconds: 60,
 } as const;
 
