@@ -4,6 +4,19 @@ provider "google" {
   credentials = file(var.service_account_key)
 }
 
+# Enable required Google Cloud APIs
+resource "google_project_service" "pubsub" {
+  service = "pubsub.googleapis.com"
+  disable_dependent_services = false
+  disable_on_destroy = true
+}
+
+resource "google_project_service" "scheduler" {
+  service = "cloudscheduler.googleapis.com"
+  disable_dependent_services = false
+  disable_on_destroy = true
+}
+
 # Initialize Firestore (this also sets it to Native mode)
 resource "google_firestore_database" "argos_firestore_main" {
   name        = "(default)"
