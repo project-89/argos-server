@@ -2,12 +2,19 @@ import axios, { AxiosRequestConfig, RawAxiosRequestHeaders } from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { COLLECTIONS, ROLES } from "../../constants";
 import * as admin from "firebase-admin";
+import { Agent } from "http";
 
 interface TestHeaders extends RawAxiosRequestHeaders {
   "x-api-key"?: string;
   "x-test-env"?: string;
   "x-test-fingerprint-id"?: string;
 }
+
+// Create a shared HTTP agent with keepAlive disabled
+const agent = new Agent({
+  keepAlive: false,
+  maxSockets: 1,
+});
 
 export const makeRequest = async (
   method: string,
@@ -35,6 +42,7 @@ export const makeRequest = async (
     data,
     headers,
     validateStatus: null, // Let axios throw on any non-2xx status
+    httpAgent: agent, // Use the shared agent
     ...config,
   };
 
@@ -49,6 +57,9 @@ export const makeRequest = async (
       throw error;
     }
     throw new Error(`Request failed: ${error.message}`);
+  } finally {
+    // Ensure the agent's sockets are destroyed
+    agent.destroy();
   }
 };
 

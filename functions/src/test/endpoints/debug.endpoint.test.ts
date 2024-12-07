@@ -65,9 +65,9 @@ describe("Debug Endpoint", () => {
     });
 
     it("should handle cleanup errors gracefully", async () => {
-      // Force an error by mocking the cleanup service to throw
-      // This is handled by the endpoint's error handling
-      const response = await makeRequest("post", `${API_URL}/debug/cleanup?error=true`);
+      const response = await makeRequest("post", `${API_URL}/debug/cleanup?error=true`, null, {
+        validateStatus: () => true,
+      });
 
       expect(response.status).toBe(500);
       expect(response.data.success).toBe(false);

@@ -15,4 +15,9 @@ module.exports = {
   verbose: true,
   detectOpenHandles: true,
   forceExit: true,
+  silent: true,
+  errorOnDeprecated: false,
+  testEnvironmentOptions: {
+    teardown: { cleanup: true },
+  },
 };

@@ -1,13 +1,13 @@
 import { describe, it, expect } from "@jest/globals";
-import axios from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
+import { makeRequest } from "../utils/testUtils";
 
 describe("Reality Stability Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
 
   describe("GET /reality-stability", () => {
     it("should get reality stability index", async () => {
-      const response = await axios.get(`${API_URL}/reality-stability`);
+      const response = await makeRequest("get", `${API_URL}/reality-stability`);
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -22,8 +22,9 @@ describe("Reality Stability Endpoint", () => {
     });
 
     it("should handle service errors gracefully", async () => {
-      // Mock error by requesting with invalid parameters
-      const response = await axios.get(`${API_URL}/reality-stability?invalid=true`);
+      const response = await makeRequest("get", `${API_URL}/reality-stability?invalid=true`, null, {
+        validateStatus: () => true,
+      });
 
       expect(response.status).toBe(500);
       expect(response.data.success).toBe(false);
