@@ -48,6 +48,14 @@ export interface TestConfig {
   availableRoles: string[];
 }
 
+// Set test environment
+process.env.NODE_ENV = "test";
+process.env.FUNCTIONS_EMULATOR = "true";
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:9090";
+process.env.FIREBASE_CONFIG = JSON.stringify({
+  projectId: "argos-434718",
+});
+
 export const TEST_CONFIG: TestConfig = {
   projectId: "argos-434718",
   firestoreEmulator: "localhost:9090",

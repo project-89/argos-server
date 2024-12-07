@@ -8,3 +8,8 @@ export const MOCK_PRICE_DATA: PriceData = {
 };
 
 export const DEFAULT_TOKENS = ["Project89"];
+
+export const MOCK_PRICE_HISTORY = Array.from({ length: 30 }, (_, i) => ({
+  timestamp: Date.now() - i * 24 * 60 * 60 * 1000,
+  price: 0.15 + Math.sin(i) * 0.01, // Fluctuate around $0.15
+}));

@@ -1,23 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
-
-// List of public endpoints that don't require API key
-const publicEndpoints = [
-  "/fingerprint/register",
-  "/fingerprint",
-  "/visit/log",
-  "/visit/presence",
-  "/visit/site/remove",
-  "/visit/history",
-  "/reality-stability",
-  "/role/available",
-  "/apiKey/validate",
-];
+import { COLLECTIONS, PUBLIC_ENDPOINTS } from "../constants";
 
 // Helper to check if endpoint is public
 const isPublicEndpoint = (path: string): boolean => {
-  return publicEndpoints.some((endpoint) => path.includes(endpoint));
+  return PUBLIC_ENDPOINTS.some((endpoint) => path.includes(endpoint));
 };
 
 // Middleware to validate API key

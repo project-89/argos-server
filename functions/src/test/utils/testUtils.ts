@@ -1,77 +1,55 @@
-import * as admin from "firebase-admin";
-import { COLLECTIONS, ROLES } from "../../constants";
-import axios, { AxiosRequestConfig, Method } from "axios";
+import axios, { AxiosRequestConfig, RawAxiosRequestHeaders } from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
+import { COLLECTIONS, ROLES } from "../../constants";
+import * as admin from "firebase-admin";
 
-// Helper function to make requests with appropriate headers
+interface TestHeaders extends RawAxiosRequestHeaders {
+  "x-api-key"?: string;
+  "x-test-env"?: string;
+  "x-test-fingerprint-id"?: string;
+}
+
 export const makeRequest = async (
-  method: Method,
+  method: string,
   url: string,
-  data: any = undefined,
+  data: any = null,
   config: AxiosRequestConfig = {},
 ) => {
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
+  const headers: TestHeaders = {
+    "x-api-key": TEST_CONFIG.mockApiKey,
     "x-test-env": "true",
     "x-test-fingerprint-id": TEST_CONFIG.testFingerprint.id,
-    "x-api-key": TEST_CONFIG.mockApiKey, // Always include API key in test environment
+    ...config.headers,
   };
+
+  // Remove undefined headers
+  Object.keys(headers).forEach((key) => {
+    if (headers[key as keyof TestHeaders] === undefined) {
+      delete headers[key as keyof TestHeaders];
+    }
+  });
 
   const axiosConfig: AxiosRequestConfig = {
     method,
     url,
+    data,
+    headers,
+    validateStatus: null, // Let axios throw on any non-2xx status
     ...config,
-    headers: {
-      ...headers,
-      ...config.headers,
-    },
   };
 
-  // Only add data if it's not undefined
-  if (data !== undefined) {
-    axiosConfig.data = data;
-  }
-
-  return axios(axiosConfig);
-};
-
-export const configureAxios = () => {
-  // Configure axios defaults for testing
-  axios.defaults.headers.common = {
-    ...axios.defaults.headers.common,
-    "Content-Type": "application/json",
-    "x-test-env": "true",
-    "x-test-fingerprint-id": TEST_CONFIG.testFingerprint.id,
-    "x-api-key": TEST_CONFIG.mockApiKey, // Always include API key in test environment
-  };
-};
-
-// Check if emulators are running
-export const checkEmulators = async () => {
   try {
-    const response = await makeRequest("get", TEST_CONFIG.apiUrl + "/health");
-    if (response.status === 200) {
-      return true;
+    const response = await axios(axiosConfig);
+    if (response.status >= 400 && !config.validateStatus) {
+      throw { response };
     }
+    return response;
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      return true; // Endpoint exists but returns 404
+    if (error.response) {
+      throw error;
     }
-    if (error.code === "ECONNREFUSED") {
-      console.error(
-        "\x1b[31m%s\x1b[0m",
-        `
-Error: Firebase emulators are not running!
-Please start the emulators first using:
-npm run serve
-
-Then run the tests again.
-`,
-      );
-      process.exit(1);
-    }
+    throw new Error(`Request failed: ${error.message}`);
   }
-  return false;
 };
 
 // Initialize Firebase Admin for testing
@@ -98,8 +76,8 @@ export const initializeTestEnvironment = async () => {
     // Clean the database before tests
     await cleanDatabase();
 
-    // Check emulators
-    await checkEmulators();
+    // Wait for emulators to be ready
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     return db;
   } catch (error) {
@@ -118,26 +96,26 @@ export const createTestData = async () => {
 
     const db = admin.firestore();
 
-    // Create test fingerprint with specific ID
-    await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .doc(TEST_CONFIG.testFingerprint.id)
-      .set({
-        id: TEST_CONFIG.testFingerprint.id,
-        fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        roles: [ROLES.USER],
-        tags: {},
-        metadata: TEST_CONFIG.testFingerprint.metadata,
-      });
+    // Create test fingerprint
+    const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add({
+      fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      roles: [ROLES.USER],
+      tags: {},
+      metadata: TEST_CONFIG.testFingerprint.metadata,
+    });
+
+    // Update fingerprint ID in test config
+    TEST_CONFIG.testFingerprint.id = fingerprintRef.id;
 
     // Create test API key
+    const apiKey = TEST_CONFIG.mockApiKey;
     await db
       .collection(COLLECTIONS.API_KEYS)
-      .doc(TEST_CONFIG.mockApiKey)
+      .doc(apiKey)
       .set({
-        key: TEST_CONFIG.mockApiKey,
-        fingerprintId: TEST_CONFIG.testFingerprint.id,
+        key: apiKey,
+        fingerprintId: fingerprintRef.id,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         lastUsed: null,
         enabled: true,
@@ -149,9 +127,12 @@ export const createTestData = async () => {
         endpointStats: {},
       });
 
+    // Wait for data to be available
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
     return {
-      fingerprintId: TEST_CONFIG.testFingerprint.id,
-      apiKey: TEST_CONFIG.mockApiKey,
+      fingerprintId: fingerprintRef.id,
+      apiKey,
     };
   } catch (error) {
     console.error("Failed to create test data:", error);
@@ -173,6 +154,9 @@ export const cleanDatabase = async () => {
     });
 
     await Promise.all(promises);
+
+    // Wait for cleanup to complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   } catch (error) {
     console.error("Failed to clean database:", error);
     throw error;

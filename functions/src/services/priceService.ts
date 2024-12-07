@@ -1,7 +1,7 @@
 import axios from "axios";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
-import { MOCK_PRICE_DATA, DEFAULT_TOKENS } from "./mockData";
+import { MOCK_PRICE_DATA, DEFAULT_TOKENS, MOCK_PRICE_HISTORY } from "./mockData";
 
 interface CoinGeckoPrice {
   usd: number;
@@ -14,11 +14,6 @@ export interface PriceData {
 
 const COINGECKO_API = "https://api.coingecko.com/api/v3";
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-
-const MOCK_PRICE_HISTORY = Array.from({ length: 30 }, (_, i) => ({
-  timestamp: Date.now() - i * 24 * 60 * 60 * 1000,
-  price: 0.15 + Math.sin(i) * 0.01, // Fluctuate around $0.15
-}));
 
 export const getCurrentPrices = async (
   symbols: string[] = [],
@@ -102,6 +97,7 @@ export const getCurrentPrices = async (
 
 export const getPriceHistory = async (tokenId: string, isTestEnv = false): Promise<any[]> => {
   try {
+    // Use mock data in test environment
     if (isTestEnv) {
       if (!MOCK_PRICE_DATA[tokenId]) {
         throw new Error(`No price data found for ${tokenId}`);

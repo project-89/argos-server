@@ -1,10 +1,5 @@
 import { jest, beforeAll, afterAll } from "@jest/globals";
-import {
-  initializeTestEnvironment,
-  cleanDatabase,
-  configureAxios,
-  createTestData,
-} from "../utils/testUtils";
+import { initializeTestEnvironment, cleanDatabase, createTestData } from "../utils/testUtils";
 import { TEST_CONFIG } from "./testConfig";
 import * as admin from "firebase-admin";
 import axios from "axios";
@@ -35,10 +30,8 @@ beforeAll(async () => {
   // Create test data
   await createTestData();
 
-  // Configure axios with test headers
-  configureAxios();
-
-  // Add default headers for all requests
+  // Configure axios defaults
+  axios.defaults.baseURL = TEST_CONFIG.apiUrl;
   axios.defaults.headers.common["x-api-key"] = TEST_CONFIG.mockApiKey;
   axios.defaults.headers.common["x-test-env"] = "true";
   axios.defaults.headers.common["x-test-fingerprint-id"] = TEST_CONFIG.testFingerprint.id;

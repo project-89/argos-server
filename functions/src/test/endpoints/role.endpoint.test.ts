@@ -1,10 +1,15 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, beforeAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest } from "../utils/testUtils";
+import { makeRequest, initializeTestEnvironment, createTestData } from "../utils/testUtils";
 
 describe("Role Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   const testFingerprint = TEST_CONFIG.testFingerprint;
+
+  beforeAll(async () => {
+    await initializeTestEnvironment();
+    await createTestData();
+  });
 
   describe("POST /role/assign", () => {
     it("should assign a role to a fingerprint", async () => {
@@ -22,25 +27,31 @@ describe("Role Endpoint", () => {
     });
 
     it("should validate required fields", async () => {
-      const response = await makeRequest("post", `${API_URL}/role/assign`, {
-        fingerprintId: testFingerprint.id,
-        // missing role
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: role");
+      expect.assertions(3);
+      try {
+        await makeRequest("post", `${API_URL}/role/assign`, {
+          fingerprintId: testFingerprint.id,
+          // missing role
+        });
+      } catch (error: any) {
+        expect(error.response.status).toBe(400);
+        expect(error.response.data.success).toBe(false);
+        expect(error.response.data.error).toBe("Missing required field: role");
+      }
     });
 
     it("should validate role value", async () => {
-      const response = await makeRequest("post", `${API_URL}/role/assign`, {
-        fingerprintId: testFingerprint.id,
-        role: "invalid-role",
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid role");
+      expect.assertions(3);
+      try {
+        await makeRequest("post", `${API_URL}/role/assign`, {
+          fingerprintId: testFingerprint.id,
+          role: "invalid-role",
+        });
+      } catch (error: any) {
+        expect(error.response.status).toBe(400);
+        expect(error.response.data.success).toBe(false);
+        expect(error.response.data.error).toBe("Invalid role");
+      }
     });
   });
 
@@ -66,25 +77,31 @@ describe("Role Endpoint", () => {
     });
 
     it("should validate required fields", async () => {
-      const response = await makeRequest("post", `${API_URL}/role/remove`, {
-        fingerprintId: testFingerprint.id,
-        // missing role
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: role");
+      expect.assertions(3);
+      try {
+        await makeRequest("post", `${API_URL}/role/remove`, {
+          fingerprintId: testFingerprint.id,
+          // missing role
+        });
+      } catch (error: any) {
+        expect(error.response.status).toBe(400);
+        expect(error.response.data.success).toBe(false);
+        expect(error.response.data.error).toBe("Missing required field: role");
+      }
     });
 
     it("should not allow removing user role", async () => {
-      const response = await makeRequest("post", `${API_URL}/role/remove`, {
-        fingerprintId: testFingerprint.id,
-        role: "user",
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Cannot remove user role");
+      expect.assertions(3);
+      try {
+        await makeRequest("post", `${API_URL}/role/remove`, {
+          fingerprintId: testFingerprint.id,
+          role: "user",
+        });
+      } catch (error: any) {
+        expect(error.response.status).toBe(400);
+        expect(error.response.data.success).toBe(false);
+        expect(error.response.data.error).toBe("Cannot remove user role");
+      }
     });
   });
 

@@ -1,8 +1,13 @@
-import { describe, it, expect, beforeEach, beforeAll } from "@jest/globals";
+import { describe, it, expect, beforeAll, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants";
-import { initializeTestEnvironment, cleanDatabase, makeRequest } from "../utils/testUtils";
+import {
+  initializeTestEnvironment,
+  cleanDatabase,
+  makeRequest,
+  createTestData,
+} from "../utils/testUtils";
 
 describe("Visit Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -10,22 +15,11 @@ describe("Visit Endpoint", () => {
 
   beforeAll(async () => {
     await initializeTestEnvironment();
+    await createTestData();
   });
 
-  beforeEach(async () => {
+  afterAll(async () => {
     await cleanDatabase();
-
-    // Setup test fingerprint with complete data
-    const db = getFirestore();
-    await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .doc(testFingerprint.id)
-      .set({
-        fingerprint: testFingerprint.fingerprint,
-        roles: ["user"],
-        createdAt: new Date(),
-        metadata: testFingerprint.metadata,
-      });
   });
 
   describe("POST /visit/log", () => {
@@ -55,25 +49,37 @@ describe("Visit Endpoint", () => {
     });
 
     it("should require fingerprintId and url", async () => {
-      const response = await makeRequest("post", `${API_URL}/visit/log`, {
-        fingerprintId: testFingerprint.id,
-        // missing url
+      await expect(
+        makeRequest("post", `${API_URL}/visit/log`, {
+          fingerprintId: testFingerprint.id,
+          // missing url
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: {
+            success: false,
+            error: "Missing required field: url",
+          },
+        },
       });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: url");
     });
 
     it("should handle non-existent fingerprint", async () => {
-      const response = await makeRequest("post", `${API_URL}/visit/log`, {
-        fingerprintId: "non-existent-id",
-        url: "https://test.com",
+      await expect(
+        makeRequest("post", `${API_URL}/visit/log`, {
+          fingerprintId: "non-existent-id",
+          url: "https://test.com",
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 404,
+          data: {
+            success: false,
+            error: "Fingerprint not found",
+          },
+        },
       });
-
-      expect(response.status).toBe(404);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
     });
   });
 
@@ -92,14 +98,20 @@ describe("Visit Endpoint", () => {
     });
 
     it("should require fingerprintId and status", async () => {
-      const response = await makeRequest("post", `${API_URL}/visit/presence`, {
-        fingerprintId: testFingerprint.id,
-        // missing status
+      await expect(
+        makeRequest("post", `${API_URL}/visit/presence`, {
+          fingerprintId: testFingerprint.id,
+          // missing status
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: {
+            success: false,
+            error: "Missing required field: status",
+          },
+        },
       });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: status");
     });
   });
 
@@ -138,14 +150,20 @@ describe("Visit Endpoint", () => {
     });
 
     it("should require fingerprintId and siteId", async () => {
-      const response = await makeRequest("post", `${API_URL}/visit/site/remove`, {
-        fingerprintId: testFingerprint.id,
-        // missing siteId
+      await expect(
+        makeRequest("post", `${API_URL}/visit/site/remove`, {
+          fingerprintId: testFingerprint.id,
+          // missing siteId
+        }),
+      ).rejects.toMatchObject({
+        response: {
+          status: 400,
+          data: {
+            success: false,
+            error: "Missing required field: siteId",
+          },
+        },
       });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: siteId");
     });
   });
 
@@ -176,12 +194,12 @@ describe("Visit Endpoint", () => {
     });
 
     it("should handle missing ID parameter", async () => {
-      try {
-        await makeRequest("get", `${API_URL}/visit/history/`);
-      } catch (error: any) {
-        expect(error.response.status).toBe(404);
-        expect(error.response.data).toBe("Cannot GET /visit/history/");
-      }
+      await expect(makeRequest("get", `${API_URL}/visit/history/`)).rejects.toMatchObject({
+        response: {
+          status: 404,
+          data: expect.stringContaining("Cannot GET /visit/history/"),
+        },
+      });
     });
   });
 });

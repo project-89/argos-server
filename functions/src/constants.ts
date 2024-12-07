@@ -15,10 +15,16 @@ export const COLLECTIONS = {
 
 export const PUBLIC_ENDPOINTS = [
   "/fingerprint/register",
-  "/apiKey/register",
+  "/fingerprint",
+  "/visit/log",
+  "/visit/presence",
+  "/visit/site/remove",
+  "/visit/history",
+  "/reality-stability",
+  "/role/available",
+  "/apiKey/validate",
   "/price/current",
   "/price/history",
-  "/reality-stability",
 ] as const;
 
 export const ROLES = {

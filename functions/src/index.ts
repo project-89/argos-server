@@ -15,13 +15,14 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Auth middleware - test auth first, then API key auth
+// Auth middleware - API key auth first, then test auth
+app.use(apiKeyAuth);
 app.use(testAuth);
+
 // Skip rate limiting in test mode
 if (process.env.NODE_ENV !== "test") {
   app.use(rateLimit());
 }
-app.use(apiKeyAuth);
 
 // Import endpoints
 import * as fingerprint from "./endpoints/fingerprint.endpoint";
