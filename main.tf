@@ -139,23 +139,3 @@ resource "google_cloudfunctions_function" "getAvailableRoles" {
   }
 }
 
-# Add this new function configuration
-resource "google_cloudfunctions_function" "autoUpdateRolesOnTagChange" {
-  name        = "argos-auto-update-roles-on-tags"
-  description = "Automatically updates roles when tags change"
-  runtime     = "nodejs18"
-  entry_point = "autoUpdateRolesOnTagChange"
-  
-  event_trigger {
-    event_type = "providers/cloud.firestore/eventTypes/document.write"
-    resource   = "projects/${var.project_id}/databases/(default)/documents/fingerprints/{fingerprintId}"
-  }
-
-  source_archive_bucket = google_storage_bucket.functions_bucket.name
-  source_archive_object = google_storage_bucket_object.functions_zip.name
-
-  environment_variables = {
-    FIRESTORE_PROJECT_ID = var.project_id
-  }
-}
-
