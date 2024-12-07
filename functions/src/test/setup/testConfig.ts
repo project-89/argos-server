@@ -51,14 +51,14 @@ export interface TestConfig {
 // Set test environment
 process.env.NODE_ENV = "test";
 process.env.FUNCTIONS_EMULATOR = "true";
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:9090";
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: "argos-434718",
 });
 
 export const TEST_CONFIG: TestConfig = {
   projectId: "argos-434718",
-  firestoreEmulator: "localhost:9090",
+  firestoreEmulator: "localhost:8080",
   apiUrl: "http://localhost:5001/argos-434718/us-central1/api",
   defaultTimeout: 10000,
   testFingerprint: {

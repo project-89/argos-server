@@ -65,3 +65,9 @@ build/
 *.swp
 *.swo
 .DS_Store
+
+# Test coverage
+coverage/
+**/coverage/
+*.lcov
+.nyc_output/

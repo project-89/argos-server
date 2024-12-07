@@ -57,15 +57,14 @@ export const makeRequest = async (
       throw error;
     }
     throw new Error(`Request failed: ${error.message}`);
-  } finally {
-    // Ensure the agent's sockets are destroyed
-    agent.destroy();
   }
 };
 
 // Initialize Firebase Admin for testing
 export const initializeTestEnvironment = async () => {
   try {
+    console.log("Initializing test environment...");
+
     // Set environment variables
     process.env.FUNCTIONS_EMULATOR = "true";
     process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
@@ -87,8 +86,24 @@ export const initializeTestEnvironment = async () => {
     // Clean the database before tests
     await cleanDatabase();
 
-    // Wait for emulators to be ready
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Verify emulator connection
+    let retries = 3;
+    while (retries > 0) {
+      try {
+        console.log("Attempting to connect to Firestore emulator...");
+        const testDoc = await db.collection("_test_").add({
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        await testDoc.delete();
+        console.log("Successfully connected to Firestore emulator");
+        break;
+      } catch (error) {
+        console.error(`Failed to connect to Firestore emulator (${retries} retries left):`, error);
+        retries--;
+        if (retries === 0) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
 
     return db;
   } catch (error) {
@@ -100,6 +115,8 @@ export const initializeTestEnvironment = async () => {
 // Helper to create test data
 export const createTestData = async () => {
   try {
+    console.log("Creating test data...");
+
     // Initialize Firebase if not already initialized
     if (!admin.apps.length) {
       await initializeTestEnvironment();
@@ -138,9 +155,7 @@ export const createTestData = async () => {
         endpointStats: {},
       });
 
-    // Wait for data to be available
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    console.log("Test data created successfully");
     return {
       fingerprintId: fingerprintRef.id,
       apiKey,
@@ -154,6 +169,7 @@ export const createTestData = async () => {
 // Clean up test data
 export const cleanDatabase = async () => {
   try {
+    console.log("Cleaning database...");
     const db = admin.firestore();
     const collections = Object.values(COLLECTIONS);
 
@@ -165,9 +181,7 @@ export const cleanDatabase = async () => {
     });
 
     await Promise.all(promises);
-
-    // Wait for cleanup to complete
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    console.log("Database cleaned successfully");
   } catch (error) {
     console.error("Failed to clean database:", error);
     throw error;
