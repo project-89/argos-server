@@ -1,0 +1,60 @@
+{
+  "name": "@oneirocom/argos-sdk",
+  "version": "0.1.0",
+  "description": "SDK for interacting with the Argos fingerprinting and tracking system",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm test && npm run lint"
+  },
+  "dependencies": {
+    "cross-fetch": "^4.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.10.6",
+    "@types/react": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.16.0",
+    "@typescript-eslint/parser": "^6.16.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.2",
+    "firebase-admin": "^13.0.1",
+    "jest": "^29.7.0",
+    "prettier": "^3.1.1",
+    "react": "^18.2.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.3.3"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "argos",
+    "fingerprinting",
+    "tracking",
+    "analytics"
+  ],
+  "author": "Oneiro",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oneirocom/argos-sdk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/oneirocom/argos-sdk/issues"
+  },
+  "homepage": "https://github.com/oneirocom/argos-sdk#readme"
+}
