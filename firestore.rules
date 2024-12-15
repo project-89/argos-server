@@ -23,5 +23,22 @@ service cloud.firestore {
     match /apiKeys/{keyId} {
       allow read, write: if false;  // Only Cloud Functions can access
     }
+
+    // Rules for price history
+    match /price-history/{docId} {
+      allow read: if true;  // Allow public read for price history
+      allow write: if false;  // Only Cloud Functions can write
+    }
+
+    // Rules for stability metrics
+    match /stability-metrics/{docId} {
+      allow read: if true;  // Allow public read for stability metrics
+      allow write: if false;  // Only Cloud Functions can write
+    }
+
+    // Rules for rate limits
+    match /rate-limits/{docId} {
+      allow read, write: if false;  // Only Cloud Functions should access
+    }
   }
 }
