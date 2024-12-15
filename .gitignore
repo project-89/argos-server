@@ -71,3 +71,6 @@ coverage/
 **/coverage/
 *.lcov
 .nyc_output/
+
+# Argos SDK
+src/lib/argos-sdk-new/
