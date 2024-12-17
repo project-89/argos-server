@@ -24,11 +24,6 @@ export interface TestConfig {
       name: string;
     };
   };
-  mockApiKey: string;
-  testHeaders: {
-    "x-test-env": string;
-    "x-test-fingerprint-id": string;
-  };
   maxRetries: number;
   retryDelay: number;
   testTags: {
@@ -69,11 +64,6 @@ export const TEST_CONFIG: TestConfig = {
       testData: true,
       name: "Test Fingerprint",
     },
-  },
-  mockApiKey: "test-api-key",
-  testHeaders: {
-    "x-test-env": "true",
-    "x-test-fingerprint-id": "test-fingerprint-id",
   },
   maxRetries: 3,
   retryDelay: 1000,

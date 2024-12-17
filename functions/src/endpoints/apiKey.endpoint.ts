@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
-import { generateApiKey } from "../utils/apiKey";
+import { generateApiKey } from "../utils/api-key";
 
 // Internal validation function
 export const validateApiKey = async (

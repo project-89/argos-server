@@ -1,6 +1,6 @@
 import axios, { AxiosRequestConfig, RawAxiosRequestHeaders } from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { COLLECTIONS, ROLES } from "../../constants";
+import { COLLECTIONS } from "../../constants";
 import * as admin from "firebase-admin";
 import { Agent } from "http";
 
@@ -23,9 +23,6 @@ export const makeRequest = async (
   config: AxiosRequestConfig = {},
 ) => {
   const headers: TestHeaders = {
-    "x-api-key": TEST_CONFIG.mockApiKey,
-    "x-test-env": "true",
-    "x-test-fingerprint-id": TEST_CONFIG.testFingerprint.id,
     ...config.headers,
   };
 
@@ -41,22 +38,25 @@ export const makeRequest = async (
     url,
     data,
     headers,
-    validateStatus: null, // Let axios throw on any non-2xx status
+    validateStatus: config.validateStatus ?? null, // Use provided validateStatus or default to null
     httpAgent: agent, // Use the shared agent
     ...config,
   };
 
   try {
     const response = await axios(axiosConfig);
+    // Only throw on non-2xx status if validateStatus is not provided
     if (response.status >= 400 && !config.validateStatus) {
       throw { response };
     }
     return response;
   } catch (error: any) {
-    if (error.response) {
-      throw error;
+    // If validateStatus is provided, return the error response
+    if (error.response && config.validateStatus) {
+      return error.response;
     }
-    throw new Error(`Request failed: ${error.message}`);
+    // Otherwise, throw the error
+    throw error;
   }
 };
 
@@ -122,44 +122,35 @@ export const createTestData = async () => {
       await initializeTestEnvironment();
     }
 
-    const db = admin.firestore();
+    // Register fingerprint through the actual endpoint
+    const fingerprintResponse = await makeRequest(
+      "post",
+      `${TEST_CONFIG.apiUrl}/fingerprint/register`,
+      {
+        fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
+        metadata: TEST_CONFIG.testFingerprint.metadata,
+      },
+    );
 
-    // Create test fingerprint
-    const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add({
-      fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      roles: [ROLES.USER],
-      tags: {},
-      metadata: TEST_CONFIG.testFingerprint.metadata,
+    if (!fingerprintResponse.data.success) {
+      throw new Error("Failed to register fingerprint");
+    }
+
+    const fingerprintId = fingerprintResponse.data.data.id;
+
+    // Register API key through the actual endpoint
+    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/apiKey/register`, {
+      fingerprintId,
     });
 
-    // Update fingerprint ID in test config
-    TEST_CONFIG.testFingerprint.id = fingerprintRef.id;
+    if (!apiKeyResponse.data.success) {
+      throw new Error("Failed to register API key");
+    }
 
-    // Create test API key
-    const apiKey = TEST_CONFIG.mockApiKey;
-    await db
-      .collection(COLLECTIONS.API_KEYS)
-      .doc(apiKey)
-      .set({
-        key: apiKey,
-        fingerprintId: fingerprintRef.id,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        lastUsed: null,
-        enabled: true,
-        metadata: {
-          testData: true,
-          name: "Test Key",
-        },
-        usageCount: 0,
-        endpointStats: {},
-      });
+    const apiKey = apiKeyResponse.data.data.key;
 
     console.log("Test data created successfully");
-    return {
-      fingerprintId: fingerprintRef.id,
-      apiKey,
-    };
+    return { fingerprintId, apiKey };
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;

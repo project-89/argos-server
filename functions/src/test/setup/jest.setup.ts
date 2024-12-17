@@ -1,5 +1,5 @@
 import { jest, beforeAll, afterAll } from "@jest/globals";
-import { initializeTestEnvironment, cleanDatabase, createTestData } from "../utils/testUtils";
+import { initializeTestEnvironment, cleanDatabase } from "../utils/testUtils";
 import { TEST_CONFIG } from "./testConfig";
 import * as admin from "firebase-admin";
 import axios from "axios";
@@ -29,31 +29,18 @@ if (!admin.apps.length) {
   });
 }
 
-// Increase Jest timeout
-jest.setTimeout(60000);
+// Set timeout for all tests
+jest.setTimeout(TEST_CONFIG.defaultTimeout);
 
-// Set up global beforeAll hook
+// Initialize test environment before all tests
 beforeAll(async () => {
-  console.log("Setting up test environment...");
-  try {
-    // Initialize test environment
-    await initializeTestEnvironment();
-
-    // Create test data
-    await createTestData();
-
-    // Configure axios defaults
-    axios.defaults.baseURL = TEST_CONFIG.apiUrl;
-    axios.defaults.headers.common["x-api-key"] = TEST_CONFIG.mockApiKey;
-    axios.defaults.headers.common["x-test-env"] = "true";
-    axios.defaults.headers.common["x-test-fingerprint-id"] = TEST_CONFIG.testFingerprint.id;
-
-    console.log("Test environment setup complete");
-  } catch (error) {
-    console.error("Failed to setup test environment:", error);
-    throw error;
-  }
+  await initializeTestEnvironment();
 });
+
+// Set default axios config for tests
+axios.defaults.baseURL = TEST_CONFIG.apiUrl;
+axios.defaults.validateStatus = () => true; // Don't throw on any status
+axios.defaults.headers.common["Content-Type"] = "application/json";
 
 // Clean up after all tests
 afterAll(async () => {

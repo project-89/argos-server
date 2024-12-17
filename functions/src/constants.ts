@@ -13,19 +13,20 @@ export const COLLECTIONS = {
   SITES: "sites",
 } as const;
 
-export const PUBLIC_ENDPOINTS = [
+// Public endpoints that should not require API key authentication
+export const PUBLIC_ENDPOINTS: readonly string[] = [
   "/fingerprint/register",
-  "/fingerprint",
+  "/apiKey/register",
+  "/apiKey/validate",
+  "/role/available",
+  "/price/current",
+  "/price/history",
+  "/reality-stability",
   "/visit/log",
   "/visit/presence",
   "/visit/site/remove",
   "/visit/history",
-  "/reality-stability",
-  "/role/available",
-  "/apiKey/validate",
-  "/price/current",
-  "/price/history",
-] as const;
+];
 
 export const ROLES = {
   USER: "user",
@@ -35,7 +36,7 @@ export const ROLES = {
 } as const;
 
 export const CACHE_DURATION = {
-  PRICE: 5 * 60 * 1000, // 5 minutes
-  RATE_LIMIT: 60 * 60 * 1000, // 1 hour
-  STABILITY: 24 * 60 * 60 * 1000, // 24 hours
+  PRICE: 5 * 60 * 1000,
+  RATE_LIMIT: 60 * 60 * 1000,
+  STABILITY: 24 * 60 * 60 * 1000,
 } as const;
