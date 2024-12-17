@@ -51,6 +51,12 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: "argos-434718",
 });
 
+// Set CORS environment variables for testing
+process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";
+process.env.DEV_ORIGIN_VITE = "http://localhost:5173";
+process.env.DEV_ORIGIN_REACT = "http://localhost:3000";
+process.env.DEV_ORIGIN_FIREBASE = "http://localhost:5000";
+
 export const TEST_CONFIG: TestConfig = {
   projectId: "argos-434718",
   firestoreEmulator: "localhost:8080",

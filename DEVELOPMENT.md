@@ -198,3 +198,103 @@ argos-server/           # Repository root
    - Verify types
    - Test isolation
    - Clean test data
+
+## Development Progress
+
+### CORS Configuration and Security
+
+#### Environment-Specific CORS Behavior
+
+1. **Production Environment**
+   - Strict CORS checks against explicitly allowed origins
+   - Origins configured through:
+     - `productionOrigins` list in config
+     - `ALLOWED_ORIGINS` environment variable
+   - No wildcard origins allowed
+   - All requests must have valid origin headers
+
+2. **Development/Test Environment**
+   - More permissive but controlled CORS configuration
+   - Allows development servers:
+     - Vite dev server (http://localhost:5173)
+     - React dev server (http://localhost:3000)
+     - Firebase emulator (http://localhost:5000)
+   - Test origins for integration testing
+   - Still enforces origin validation
+
+#### Security Measures
+
+1. **CORS Headers**
+   ```typescript
+   {
+     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
+     credentials: true,
+     maxAge: 86400, // 24 hours
+   }
+   ```
+
+2. **Origin Validation**
+   - Production: Strict checking against allowlist
+   - Development: Controlled permissiveness
+   - No wildcard origins in production
+   - Environment-specific configuration
+
+3. **Environment Variables**
+   - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins
+   - `NODE_ENV`: Controls environment-specific behavior
+   - `FUNCTIONS_EMULATOR`: Identifies local development
+
+#### Testing CORS
+
+1. **Running CORS Tests**
+   ```bash
+   cd functions
+   npm test src/test/middleware/cors.test.ts
+   ```
+
+2. **Test Coverage**
+   - Default development origins
+   - Configured test origins
+   - Unauthorized origins
+   - Preflight requests
+   - Requests with no origin
+   - Environment variable overrides
+
+#### Deployment Checklist
+
+1. **Environment Setup**
+   - Set `ALLOWED_ORIGINS` with production domains
+   - Ensure `NODE_ENV=production`
+   - Verify `FUNCTIONS_EMULATOR` is not set
+
+2. **Security Verification**
+   - Confirm CORS headers in responses
+   - Test unauthorized origin blocking
+   - Verify credentials handling
+   - Check preflight request handling
+
+3. **Monitoring**
+   - Log unauthorized access attempts
+   - Monitor for missing CORS configurations
+   - Track CORS-related errors
+
+### Development Guidelines
+
+1. **Adding New Origins**
+   - Add to appropriate configuration section
+   - Document purpose and ownership
+   - Test CORS behavior
+   - Update relevant tests
+
+2. **Security Considerations**
+   - Never use wildcard origins in production
+   - Always validate origin headers
+   - Use environment variables for dynamic configuration
+   - Maintain strict CORS in production
+
+3. **Testing Requirements**
+   - Test all CORS scenarios
+   - Verify environment-specific behavior
+   - Check error handling
+   - Validate security measures

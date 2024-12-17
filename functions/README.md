@@ -11,6 +11,54 @@ This package contains several core Cloud Functions that handle:
 - Reality stability monitoring
 - Cryptocurrency price tracking
 - API key management
+- CORS security and origin validation
+
+## Security and CORS Configuration
+
+### Environment Setup
+
+1. **Development/Test Environment**
+```bash
+# Default development origins are automatically allowed:
+http://localhost:5173  # Vite dev server
+http://localhost:3000  # React dev server
+http://localhost:5000  # Firebase emulator
+```
+
+2. **Production Environment**
+```bash
+# Set allowed origins in environment:
+firebase functions:config:set cors.allowed_origins="https://oneirocom.ai,https://other-domain.com"
+
+# Or use ALLOWED_ORIGINS environment variable:
+ALLOWED_ORIGINS=https://oneirocom.ai,https://other-domain.com
+```
+
+### Security Features
+
+1. **CORS Protection**
+   - Environment-specific origin validation
+   - No wildcard origins in production
+   - Proper preflight handling
+   - Credentials support
+   - Configurable headers and methods
+
+2. **Request Security**
+   - API key validation
+   - Rate limiting
+   - Request validation
+   - Error handling
+
+3. **Testing**
+```bash
+# Run CORS tests
+npm test src/test/middleware/cors.test.ts
+
+# Test specific origin
+curl -H "Origin: https://yourdomain.com" http://localhost:5001/your-project/us-central1/api/role/available
+```
+
+For detailed CORS configuration and security measures, see [DEVELOPMENT.md](../DEVELOPMENT.md).
 
 ## Functions
 
@@ -220,7 +268,30 @@ Validates an API key and updates usage statistics.
 cp ../.env.template ../.env
 ```
 
-2. Update the .env file with your credentials
+2. Update the .env file with your credentials and CORS settings:
+```bash
+# API credentials
+API_KEY=your-api-key
+PROJECT_ID=your-project-id
+
+# CORS configuration
+NODE_ENV=development  # or "production" or "test"
+ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+
+# For local development, these are automatically allowed:
+# - http://localhost:5173 (Vite)
+# - http://localhost:3000 (React)
+# - http://localhost:5000 (Firebase)
+```
+
+3. For production deployment, set Firebase config:
+```bash
+# Set CORS configuration
+firebase functions:config:set cors.allowed_origins="https://oneirocom.ai,https://other-domain.com"
+
+# Verify configuration
+firebase functions:config:get
+```
 
 ### Installation
 ```bash

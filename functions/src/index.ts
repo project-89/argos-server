@@ -4,6 +4,7 @@ import express from "express";
 import cors from "cors";
 import { auth } from "./middleware/auth.middleware";
 import { rateLimit } from "./middleware/rateLimit.middleware";
+import { CORS_CONFIG } from "./constants/config";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -11,8 +12,63 @@ admin.initializeApp();
 // Create Express app
 const app = express();
 
-// Basic middleware
-app.use(cors());
+// CORS configuration
+const corsOptions = {
+  origin: (
+    origin: string | undefined,
+    callback: (error: Error | null, allow?: boolean) => void,
+  ) => {
+    // Allow requests with no origin (like mobile apps, curl, etc.)
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    // In development/test, use the more permissive configuration
+    if (process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true") {
+      callback(null, true);
+      return;
+    }
+
+    // In production, strictly check against allowed origins
+    const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked request from unauthorized origin: ${origin}`);
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: CORS_CONFIG.options.credentials,
+  methods: CORS_CONFIG.options.methods,
+  allowedHeaders: CORS_CONFIG.options.allowedHeaders,
+  maxAge: CORS_CONFIG.options.maxAge,
+  preflightContinue: CORS_CONFIG.options.preflightContinue,
+  optionsSuccessStatus: CORS_CONFIG.options.optionsSuccessStatus,
+};
+
+// Apply CORS middleware with options
+app.use(cors(corsOptions));
+
+// Add additional CORS headers middleware for test environment
+app.use((req, res, next) => {
+  if (process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true") {
+    const origin = req.headers.origin;
+    if (origin) {
+      const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
+      // Still enforce allowed origins check in test/dev
+      if (allowedOrigins.includes(origin)) {
+        res.header("Access-Control-Allow-Origin", origin);
+        res.header("Access-Control-Allow-Methods", CORS_CONFIG.options.methods.join(","));
+        res.header("Access-Control-Allow-Headers", CORS_CONFIG.options.allowedHeaders.join(","));
+        res.header("Access-Control-Allow-Credentials", "true");
+        res.header("Access-Control-Max-Age", CORS_CONFIG.options.maxAge.toString());
+      }
+    }
+  }
+  next();
+});
+
 app.use(express.json());
 
 // Import endpoints

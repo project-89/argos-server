@@ -1,350 +1,181 @@
-# Project 89: Argos Server 🔍
+# Argos Server
 
-A sophisticated cloud-based fingerprinting and tracking system built with Firebase Cloud Functions, TypeScript, and Terraform.
-
-## Overview
-
-Argos Server is a secure, scalable fingerprinting and tracking system designed for Project89. It provides comprehensive user tracking, role management, and price monitoring capabilities through a set of well-tested serverless functions. Built with infrastructure as code principles, it ensures consistent deployment and scalability.
-
-## Features
-
-- 🔐 Secure API Key Management
-- 👆 Fingerprint Registration & Tracking
-- 💰 Project89 Token Price Monitoring
-- 📊 Reality Stability Index
-- 👤 Role-based Access Control
-- 🏷️ Dynamic Tag System
-- 📍 Visit & Presence Tracking
-- 🧪 100% Test Coverage
-- ⚡ TypeScript & Firebase
-- 🏗️ Infrastructure as Code with Terraform
-- 📦 Automated Deployments
-- 🔄 CI/CD Integration
+A Firebase Functions-based API server for fingerprinting, visit tracking, and role management.
 
 ## Architecture
 
-The system consists of several key components:
+The server is built using:
+- Firebase Functions
+- Express.js
+- TypeScript
+- Firebase Admin SDK
 
-### Backend Services
-- **Firebase Cloud Functions**: Handles all backend operations
-  - Visit logging and tracking
-  - Role management and assignment
-  - Tag management
-  - Price monitoring
-  - Reality stability calculations
+### Key Components
 
-### Data Storage
-- **Firestore**: NoSQL database for storing
-  - Fingerprints
-  - Visit history
-  - Role assignments
-  - API keys
-  - Price cache
-  - Custom security rules
+1. **Authentication**
+   - API key-based authentication
+   - One API key per fingerprint
+   - Public endpoints for registration and basic operations
 
-### Infrastructure
-- **Terraform**: Infrastructure as Code
-  - Firebase project configuration
-  - Service account management
-  - Security rules deployment
-  - Function deployment settings
-  - Environment configuration
+2. **Rate Limiting**
+   - Per IP and API key rate limiting
+   - Configurable windows and limits
+   - Rate limit stats tracking
 
-### Security
-- **Firebase Auth**: Authentication and authorization
-- **Custom Middleware**: Rate limiting and API key validation
-- **Security Rules**: Custom Firestore rules for data protection
+3. **Endpoints**
+   - `/fingerprint/*` - Fingerprint registration and management
+   - `/api-key/*` - API key operations
+   - `/visit/*` - Visit tracking and presence management
+   - `/role/*` - Role assignment and management
+   - `/tag/*` - Tag tracking and role-based rules
+   - `/price/*` - Price tracking operations
+   - `/debug/*` - Debug operations (protected)
+
+4. **Data Model**
+   - Fingerprints collection
+   - Visits collection
+   - Presence collection
+   - Roles collection
+   - Tags collection
+   - Cache collection
+
+## Setup
+
+1. **Prerequisites**
+   ```bash
+   npm install -g firebase-tools
+   ```
+
+2. **Installation**
+   ```bash
+   cd functions
+   npm install
+   ```
+
+3. **Local Development**
+   ```bash
+   npm run serve
+   ```
+
+4. **Testing**
+   ```bash
+   npm test
+   ```
+
+5. **Build**
+   ```bash
+   npm run build
+   ```
 
 ## API Documentation
 
-### Authentication
-All endpoints except those marked as public require an API key in the `x-api-key` header.
-
 ### Public Endpoints
-The following endpoints are publicly accessible:
-- `/fingerprint/register`
-- `/apiKey/register`
-- `/price/current`
-- `/price/history`
-- `/reality-stability`
 
-### API Key Management
-#### POST /apiKey/register
-Register a new API key.
-- Body: `{ fingerprintId: string }`
-- Returns: `{ success: true, data: { key: string, fingerprintId: string } }`
+- `POST /fingerprint/register` - Register a new fingerprint
+- `POST /api-key/register` - Register a new API key
+- `POST /api-key/validate` - Validate an API key
+- `POST /api-key/revoke` - Revoke an API key
+- `GET /role/available` - Get available roles
+- `GET /price/current` - Get current price
+- `GET /price/history/:tokenId` - Get price history
+- `GET /reality-stability` - Get reality stability index
+- `POST /visit/log` - Log a visit
 
-#### POST /apiKey/validate
-Validate an API key.
-- Body: `{ key: string }`
-- Returns: `{ success: true, data: { isValid: boolean, fingerprintId?: string } }`
+### Protected Endpoints (Require API Key)
 
-#### POST /apiKey/revoke
-Revoke an existing API key.
-- Body: `{ key: string }`
-- Returns: `{ success: true, data: { message: string } }`
+- `GET /fingerprint/:id` - Get fingerprint details
+- `POST /visit/presence` - Update presence status
+- `POST /visit/site/remove` - Remove a site visit
+- `GET /visit/history/:fingerprintId` - Get visit history
+- `POST /role/assign` - Assign a role
+- `POST /role/remove` - Remove a role
+- `POST /tag/update` - Update tags
+- `POST /tag/roles/update` - Update roles based on tags
+- `POST /debug/cleanup` - Clean up data (protected)
 
-### Fingerprint Management
-#### POST /fingerprint/register
-Register a new fingerprint.
-- Body: `{ fingerprint: string, metadata?: object }`
-- Returns: `{ success: true, data: { id: string, fingerprint: string, ... } }`
+## Security
 
-#### GET /fingerprint/:id
-Get fingerprint details.
-- Returns: `{ success: true, data: { id: string, fingerprint: string, ... } }`
+- All protected endpoints require a valid API key
+- API keys are bound to specific fingerprints
+- Rate limiting prevents abuse
+- Role-based access control
+- Request validation and sanitization
 
-### Price Information
-#### GET /price/current
-Get current Project89 token price.
-- Query: `?symbols=Project89` (optional)
-- Returns: `{ success: true, data: { Project89: { usd: number, usd_24h_change: number } } }`
+### CORS Configuration
 
-#### GET /price/history/:tokenId
-Get price history for Project89 token.
-- Returns: Array of price data points with timestamps
+The server implements a secure CORS policy that can be configured through environment variables:
 
-### Reality Stability
-#### GET /reality-stability
-Get the current reality stability index.
-- Returns: `{ success: true, data: { stabilityIndex: number, currentPrice: number, ... } }`
+```bash
+# Comma-separated list of allowed origins
+ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
+```
 
-### Role Management
-#### POST /role/assign
-Assign a role to a fingerprint.
-- Body: `{ fingerprintId: string, role: string }`
-- Returns: `{ success: true, data: { fingerprintId: string, role: string, roles: string[] } }`
+Default development origins are:
+- http://localhost:5173 (Vite dev server)
+- http://localhost:3000 (React dev server)
+- http://localhost:5000 (Firebase hosting emulator)
 
-#### POST /role/remove
-Remove a role from a fingerprint.
-- Body: `{ fingerprintId: string, role: string }`
-- Returns: `{ success: true, data: { fingerprintId: string, role: string, roles: string[] } }`
+CORS security features:
+- Origin validation
+- Configurable allowed methods
+- Explicit allowed headers
+- Credentials support
+- Preflight request caching
+- Proper OPTIONS handling
 
-#### GET /role/available
-Get list of available roles.
-- Returns: `{ success: true, data: string[] }`
+For development, the default origins are automatically allowed. For production, you must set the `ALLOWED_ORIGINS` environment variable.
 
-### Tag Management
-#### POST /tag/update
-Update tags for a fingerprint.
-- Body: `{ fingerprintId: string, tags: object }`
-- Returns: `{ success: true, data: { fingerprintId: string, tags: object } }`
+### CORS Security
 
-#### POST /tag/roles/update
-Update roles based on tag rules.
-- Body: `{ fingerprintId: string, tagRules: object }`
-- Returns: `{ success: true, data: { fingerprintId: string, roles: string[] } }`
+The server implements a strict CORS policy with environment-specific configurations:
 
-### Visit Tracking
-#### POST /visit/log
-Log a new visit.
-- Body: `{ fingerprintId: string, url: string }`
-- Returns: `{ success: true, data: { id: string, ... } }`
+#### Production
+- Strict origin validation against allowlist
+- No wildcard origins allowed
+- Origins configured through:
+  - Environment variables (`ALLOWED_ORIGINS`)
+  - Production configuration
+- Credentials support for authenticated requests
 
-#### POST /visit/presence
-Update presence status.
-- Body: `{ fingerprintId: string, status: string }`
-- Returns: `{ success: true, data: { fingerprintId: string, status: string } }`
+#### Development/Testing
+- Controlled development environment access
+- Local development servers allowed
+- Test origins for integration testing
+- Environment-based validation
 
-#### POST /visit/site/remove
-Remove a site from tracking.
-- Body: `{ fingerprintId: string, siteId: string }`
-- Returns: `{ success: true, data: { message: string } }`
+For detailed CORS configuration and security measures, see [DEVELOPMENT.md](DEVELOPMENT.md).
 
-#### GET /visit/history/:fingerprintId
-Get visit history for a fingerprint.
-- Returns: `{ success: true, data: Visit[] }`
+### Environment Variables
 
-### Debug Endpoints
-#### POST /debug/cleanup
-Run cleanup operations (protected endpoint).
-- Returns: `{ success: true, data: { total: number, ... } }`
+Required environment variables for CORS security:
 
-## Development Setup
+```bash
+# Production origins (comma-separated)
+ALLOWED_ORIGINS=https://oneirocom.ai,https://other-allowed-domain.com
 
-### Prerequisites
-- Node.js 18.x or higher
-- Firebase CLI
-- Terraform >= 1.0
-- Google Cloud SDK
-- Firebase Project
-- Access to Google Cloud Console
+# Environment control
+NODE_ENV=production  # or "development" or "test"
+```
 
-### Local Development Setup
+### Security Best Practices
 
-1. Clone the repository:
-\`\`\`bash
-git clone <repository-url>
-cd argos-server
-\`\`\`
+1. **CORS Protection**
+   - Strict origin validation
+   - No wildcard origins in production
+   - Environment-specific configurations
+   - Proper preflight handling
 
-2. Install dependencies:
-\`\`\`bash
-cd functions
-npm install
-\`\`\`
+2. **Request Security**
+   - API key validation
+   - Rate limiting
+   - Request validation
+   - Error handling
 
-3. Set up environment:
-\`\`\`bash
-cp .env.example .env
-# Edit .env with your configuration
-\`\`\`
+3. **Monitoring**
+   - Unauthorized access logging
+   - CORS violation tracking
+   - Security event monitoring
 
-### Infrastructure Setup
+## Development
 
-1. Initialize Terraform:
-\`\`\`bash
-cd terraform
-terraform init
-\`\`\`
-
-2. Configure Google Cloud credentials:
-\`\`\`bash
-# Set up application default credentials
-gcloud auth application-default login
-
-# Or use a service account key
-export GOOGLE_APPLICATION_CREDENTIALS="path/to/service-account.json"
-\`\`\`
-
-3. Plan and apply infrastructure:
-\`\`\`bash
-terraform plan    # Review changes
-terraform apply   # Apply infrastructure changes
-\`\`\`
-
-### Running Locally
-\`\`\`bash
-npm run serve
-\`\`\`
-
-### Testing
-All endpoints have comprehensive test coverage:
-\`\`\`bash
-npm test                     # Run all tests
-npm run test:coverage        # Run tests with coverage
-npm test <pattern>          # Run specific tests
-\`\`\`
-
-Current test status:
-- ✅ API Key Endpoints (9 tests)
-- ✅ Fingerprint Endpoints (5 tests)
-- ✅ Price Endpoints (6 tests)
-- ✅ Reality Stability Endpoints (2 tests)
-- ✅ Role Endpoints (6 tests)
-- ✅ Tag Endpoints (6 tests)
-- ✅ Visit Endpoints (8 tests)
-- ✅ Debug Endpoints (2 tests)
-
-Total: 46 tests passing
-
-### Deployment
-
-1. Deploy infrastructure:
-\`\`\`bash
-cd terraform
-terraform apply
-\`\`\`
-
-2. Deploy functions:
-\`\`\`bash
-cd functions
-npm run deploy              # Deploy all functions
-npm run deploy:function <name>  # Deploy specific function
-\`\`\`
-
-## Security Features
-
-- 🔒 API Key Authentication
-- 🚦 Rate Limiting
-- 🔐 Role-Based Access Control
-- 🛡️ Request Validation
-- 📝 Comprehensive Logging
-- 🧹 Automated Cleanup
-- 🔐 Secure Infrastructure Configuration
-- 📜 Audit Logging
-
-## Error Handling
-
-All endpoints follow a consistent error response format:
-\`\`\`json
-{
-  "success": false,
-  "error": "Descriptive error message"
-}
-\`\`\`
-
-Common HTTP status codes:
-- 400: Bad Request (invalid input)
-- 401: Unauthorized (invalid/missing API key)
-- 404: Not Found
-- 429: Too Many Requests (rate limit)
-- 500: Internal Server Error
-
-## Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (\`git checkout -b feature/amazing-feature\`)
-3. Make your changes
-4. Run tests (\`npm test\`)
-5. Commit your changes (\`git commit -m 'Add amazing feature'\`)
-6. Push to the branch (\`git push origin feature/amazing-feature\`)
-7. Open a Pull Request
-
-### Development Guidelines
-
-- Write tests for new features
-- Follow TypeScript best practices
-- Use consistent error handling
-- Document new endpoints
-- Update infrastructure code as needed
-
-## Required Firestore Indexes
-
-\`\`\`
-Collection: visits
-Fields: 
-  - fingerprintId (ASC)
-  - timestamp (DESC)
-
-Collection: fingerprints
-Fields:
-  - enabled (ASC)
-  - createdAt (DESC)
-\`\`\`
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Security Considerations
-
-When deploying this project:
-- Never commit service account keys
-- Rotate API keys regularly
-- Monitor rate limits
-- Review security rules
-- Keep dependencies updated
-- Enable audit logging
-- Use secure communication
-
-## Support
-
-For support:
-1. Check the documentation
-2. Search existing issues
-3. Open a new issue with:
-   - Clear description
-   - Steps to reproduce
-   - Expected vs actual behavior
-   - Environment details
-
-## Project Status
-
-🟢 Active Development
-
----
-
-Built with ❤️ by ONEIROCOM
+See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed development guidelines and best practices.
