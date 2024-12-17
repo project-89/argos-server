@@ -184,21 +184,22 @@ Creates a new API key for a fingerprint.
 **Request:**
 ```json
 {
-  "name": "string",
   "fingerprintId": "string",
-  "metadata": {
+  "name?": "string",
+  "metadata?": {
     "key": "value"
-  },
-  "agentType": "string"
+  }
 }
 ```
 
 **Response:**
 ```json
 {
-  "apiKey": "string",
-  "fingerprintId": "string",
-  "message": "Store this API key safely - it won't be shown again"
+  "success": true,
+  "data": {
+    "key": "string",
+    "fingerprintId": "string"
+  }
 }
 ```
 
