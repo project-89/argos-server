@@ -48,6 +48,15 @@ export const register = async (req: Request, res: Response): Promise<Response> =
 export const get = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;
+    const fingerprintId = req.fingerprintId;
+
+    // Verify ownership
+    if (id !== fingerprintId) {
+      return res.status(403).json({
+        success: false,
+        error: "API key does not match fingerprint",
+      });
+    }
 
     // Get fingerprint document
     const db = getFirestore();

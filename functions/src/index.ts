@@ -25,18 +25,17 @@ import * as price from "./endpoints/price.endpoint";
 import * as debug from "./endpoints/debug.endpoint";
 import * as realityStability from "./endpoints/realityStability.endpoint";
 
-// Register public routes first (these bypass auth)
+// Register routes directly on the app
+// Public routes
 app.post("/fingerprint/register", fingerprint.register);
-app.post("/apiKey/register", apiKey.register);
-app.post("/apiKey/validate", apiKey.validate);
+app.post("/api-key/register", apiKey.register);
+app.post("/api-key/validate", apiKey.validate);
+app.post("/api-key/revoke", apiKey.revoke);
 app.get("/role/available", role.getAvailable);
 app.get("/price/current", price.getCurrent);
 app.get("/price/history/:tokenId", price.getHistory);
 app.get("/reality-stability", realityStability.getRealityStabilityIndex);
 app.post("/visit/log", visit.log);
-app.post("/visit/presence", visit.updatePresence);
-app.post("/visit/site/remove", visit.removeSite);
-app.get("/visit/history/:fingerprintId", visit.getHistory);
 
 // Auth middleware for protected routes
 app.use(auth);
@@ -46,13 +45,15 @@ if (process.env.NODE_ENV !== "test") {
   app.use(rateLimit());
 }
 
-// Register protected routes
+// Protected routes
 app.get("/fingerprint/:id", fingerprint.get);
+app.post("/visit/presence", visit.updatePresence);
+app.post("/visit/site/remove", visit.removeSite);
+app.get("/visit/history/:fingerprintId", visit.getHistory);
 app.post("/role/assign", role.assign);
 app.post("/role/remove", role.remove);
 app.post("/tag/update", tag.addOrUpdateTags);
 app.post("/tag/roles/update", tag.updateRolesBasedOnTags);
-app.post("/apiKey/revoke", apiKey.revoke);
 app.post("/debug/cleanup", debug.cleanup);
 
 // Export the Express app as a Firebase Cloud Function

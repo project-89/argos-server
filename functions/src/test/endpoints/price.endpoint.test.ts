@@ -1,13 +1,24 @@
-import { describe, it, expect, beforeAll } from "@jest/globals";
+import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, initializeTestEnvironment, createTestData } from "../utils/testUtils";
+import {
+  makeRequest,
+  initializeTestEnvironment,
+  createTestData,
+  cleanDatabase,
+} from "../utils/testUtils";
 
 describe("Price Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
+  let validApiKey: string;
 
   beforeAll(async () => {
     await initializeTestEnvironment();
-    await createTestData();
+  });
+
+  beforeEach(async () => {
+    await cleanDatabase();
+    const { apiKey } = await createTestData();
+    validApiKey = apiKey;
   });
 
   describe("GET /price/current", () => {
@@ -23,7 +34,9 @@ describe("Price Endpoint", () => {
     });
 
     it("should return current prices for default tokens", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/current`);
+      const response = await makeRequest("get", `${API_URL}/price/current`, null, {
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -32,7 +45,14 @@ describe("Price Endpoint", () => {
     });
 
     it("should return prices for specified tokens", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/current?symbols=Project89`);
+      const response = await makeRequest(
+        "get",
+        `${API_URL}/price/current?symbols=Project89`,
+        null,
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -47,6 +67,7 @@ describe("Price Endpoint", () => {
         `${API_URL}/price/current?symbols=invalid-token`,
         null,
         {
+          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         },
       );
@@ -70,7 +91,9 @@ describe("Price Endpoint", () => {
     });
 
     it("should return price history for a token", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history/Project89`);
+      const response = await makeRequest("get", `${API_URL}/price/history/Project89`, null, {
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -81,15 +104,18 @@ describe("Price Endpoint", () => {
     });
 
     it("should handle missing tokenId", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history/`, null, {
+      const response = await makeRequest("get", `${API_URL}/price/history`, null, {
         validateStatus: () => true,
       });
 
-      expect(response.data).toEqual(expect.stringContaining("Cannot GET /price/history/"));
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
     });
 
     it("should handle invalid token", async () => {
       const response = await makeRequest("get", `${API_URL}/price/history/invalid-token`, null, {
+        headers: { "x-api-key": validApiKey },
         validateStatus: () => true,
       });
 

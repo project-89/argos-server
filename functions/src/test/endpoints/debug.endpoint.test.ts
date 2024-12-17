@@ -1,13 +1,22 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest } from "../utils/testUtils";
+import { makeRequest, initializeTestEnvironment, createTestData } from "../utils/testUtils";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants";
 
 describe("Debug Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
+  let validApiKey: string;
+
+  beforeAll(async () => {
+    await initializeTestEnvironment();
+  });
 
   beforeEach(async () => {
+    // Create test data and get API key
+    const { apiKey } = await createTestData();
+    validApiKey = apiKey;
+
     // Create some test data to clean up
     const db = getFirestore();
     const now = Date.now();
@@ -51,7 +60,9 @@ describe("Debug Endpoint", () => {
 
   describe("POST /debug/cleanup", () => {
     it("should perform cleanup operation", async () => {
-      const response = await makeRequest("post", `${API_URL}/debug/cleanup`);
+      const response = await makeRequest("post", `${API_URL}/debug/cleanup`, null, {
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -66,12 +77,34 @@ describe("Debug Endpoint", () => {
 
     it("should handle cleanup errors gracefully", async () => {
       const response = await makeRequest("post", `${API_URL}/debug/cleanup?error=true`, null, {
+        headers: { "x-api-key": validApiKey },
         validateStatus: () => true,
       });
 
       expect(response.status).toBe(500);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("Simulated error for testing");
+    });
+
+    it("should reject request without API key", async () => {
+      const response = await makeRequest("post", `${API_URL}/debug/cleanup`, null, {
+        validateStatus: () => true,
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
+    });
+
+    it("should reject request with invalid API key", async () => {
+      const response = await makeRequest("post", `${API_URL}/debug/cleanup`, null, {
+        headers: { "x-api-key": "invalid-key" },
+        validateStatus: () => true,
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Invalid API key");
     });
   });
 });

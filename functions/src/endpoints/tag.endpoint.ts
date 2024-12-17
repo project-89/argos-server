@@ -1,30 +1,20 @@
 import { Request, Response } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS, ROLES } from "../constants";
-
-interface TagValue {
-  [key: string]: number;
-}
+import { COLLECTIONS } from "../constants";
+import { PREDEFINED_ROLES, PredefinedRole } from "../constants/roles";
 
 interface TagRule {
   min: number;
-  role: string;
+  role: PredefinedRole;
 }
 
-interface TagRules {
-  [tag: string]: TagRule;
-}
-
-// Helper to check if a role is valid
-const isValidRole = (role: string): boolean => {
-  return Object.values(ROLES).includes(role as (typeof ROLES)[keyof typeof ROLES]);
-};
+type TagRules = Record<string, TagRule>;
 
 export const addOrUpdateTags = async (req: Request, res: Response): Promise<Response> => {
   try {
-    const { fingerprintId, tags } = req.body as { fingerprintId: string; tags: TagValue };
+    const { fingerprintId, tags } = req.body;
 
-    // Check fields one by one for better error messages
+    // Validate required fields
     if (!fingerprintId) {
       return res.status(400).json({
         success: false,
@@ -49,23 +39,24 @@ export const addOrUpdateTags = async (req: Request, res: Response): Promise<Resp
       }
     }
 
+    // Get fingerprint document
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const doc = await fingerprintRef.get();
+    const fingerprintDoc = await fingerprintRef.get();
 
-    if (!doc.exists) {
+    // Check if fingerprint exists
+    if (!fingerprintDoc.exists) {
       return res.status(404).json({
         success: false,
         error: "Fingerprint not found",
       });
     }
 
-    const currentTags = doc.data()?.tags || {};
-    const updatedTags = {
-      ...currentTags,
-      ...tags,
-    };
+    // Merge with existing tags
+    const existingTags = fingerprintDoc.data()?.tags || {};
+    const updatedTags = { ...existingTags, ...tags };
 
+    // Update fingerprint document
     await fingerprintRef.update({
       tags: updatedTags,
     });
@@ -77,11 +68,11 @@ export const addOrUpdateTags = async (req: Request, res: Response): Promise<Resp
         tags: updatedTags,
       },
     });
-  } catch (error: any) {
-    console.error("Error in update tags:", error);
+  } catch (error) {
+    console.error("Error updating tags:", error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Failed to update tags",
+      error: "Internal server error",
     });
   }
 };
@@ -90,7 +81,7 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
   try {
     const { fingerprintId, tagRules } = req.body as { fingerprintId: string; tagRules: TagRules };
 
-    // Check fields one by one for better error messages
+    // Validate required fields
     if (!fingerprintId) {
       return res.status(400).json({
         success: false,
@@ -107,13 +98,6 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
 
     // Validate tag rule format
     for (const [tag, rule] of Object.entries(tagRules)) {
-      if (!rule || typeof rule !== "object") {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid rule format for tag '${tag}'`,
-        });
-      }
-
       if (typeof rule.min !== "number") {
         return res.status(400).json({
           success: false,
@@ -121,15 +105,7 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
         });
       }
 
-      if (typeof rule.role !== "string") {
-        return res.status(400).json({
-          success: false,
-          error: `Invalid role value for tag '${tag}': must be a string`,
-        });
-      }
-
-      // Validate role name
-      if (!isValidRole(rule.role)) {
+      if (!PREDEFINED_ROLES.includes(rule.role)) {
         return res.status(400).json({
           success: false,
           error: `Invalid role: ${rule.role}`,
@@ -137,29 +113,42 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
       }
     }
 
+    // Get fingerprint document
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const doc = await fingerprintRef.get();
+    const fingerprintDoc = await fingerprintRef.get();
 
-    if (!doc.exists) {
+    // Check if fingerprint exists
+    if (!fingerprintDoc.exists) {
       return res.status(404).json({
         success: false,
         error: "Fingerprint not found",
       });
     }
 
-    const data = doc.data();
+    const data = fingerprintDoc.data();
     const currentTags = data?.tags || {};
     const currentRoles = new Set(data?.roles || ["user"]);
 
-    // Apply tag rules
-    Object.entries(tagRules).forEach(([tag, rule]) => {
+    // Always ensure user role is present
+    currentRoles.add("user");
+
+    // First preserve existing roles
+    if (data?.roles) {
+      for (const role of data.roles) {
+        currentRoles.add(role);
+      }
+    }
+
+    // Then add new roles based on tag rules
+    for (const [tag, rule] of Object.entries(tagRules)) {
       const tagValue = currentTags[tag] || 0;
       if (tagValue >= rule.min) {
         currentRoles.add(rule.role);
       }
-    });
+    }
 
+    // Update fingerprint document
     const updatedRoles = Array.from(currentRoles);
     await fingerprintRef.update({
       roles: updatedRoles,
@@ -172,11 +161,11 @@ export const updateRolesBasedOnTags = async (req: Request, res: Response): Promi
         roles: updatedRoles,
       },
     });
-  } catch (error: any) {
-    console.error("Error in update roles based on tags:", error);
+  } catch (error) {
+    console.error("Error updating roles based on tags:", error);
     return res.status(500).json({
       success: false,
-      error: error.message || "Failed to update roles",
+      error: "Internal server error",
     });
   }
 };

@@ -36,12 +36,16 @@ export const makeRequest = async (
   const axiosConfig: AxiosRequestConfig = {
     method,
     url,
-    data,
     headers,
     validateStatus: config.validateStatus ?? null, // Use provided validateStatus or default to null
     httpAgent: agent, // Use the shared agent
     ...config,
   };
+
+  // Only add data for non-GET requests
+  if (method.toLowerCase() !== "get" && data !== null) {
+    axiosConfig.data = data;
+  }
 
   try {
     const response = await axios(axiosConfig);
@@ -122,12 +126,15 @@ export const createTestData = async () => {
       await initializeTestEnvironment();
     }
 
+    // Generate a unique fingerprint value
+    const uniqueFingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+
     // Register fingerprint through the actual endpoint
     const fingerprintResponse = await makeRequest(
       "post",
       `${TEST_CONFIG.apiUrl}/fingerprint/register`,
       {
-        fingerprint: TEST_CONFIG.testFingerprint.fingerprint,
+        fingerprint: uniqueFingerprint,
         metadata: TEST_CONFIG.testFingerprint.metadata,
       },
     );
@@ -139,7 +146,7 @@ export const createTestData = async () => {
     const fingerprintId = fingerprintResponse.data.data.id;
 
     // Register API key through the actual endpoint
-    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/apiKey/register`, {
+    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/register`, {
       fingerprintId,
     });
 
@@ -150,7 +157,7 @@ export const createTestData = async () => {
     const apiKey = apiKeyResponse.data.data.key;
 
     console.log("Test data created successfully");
-    return { fingerprintId, apiKey };
+    return { fingerprintId, apiKey, fingerprint: uniqueFingerprint };
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;

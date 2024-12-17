@@ -16,16 +16,14 @@ export const COLLECTIONS = {
 // Public endpoints that should not require API key authentication
 export const PUBLIC_ENDPOINTS: readonly string[] = [
   "/fingerprint/register",
-  "/apiKey/register",
-  "/apiKey/validate",
+  "/api-key/register",
+  "/api-key/validate",
+  "/api-key/revoke",
   "/role/available",
   "/price/current",
-  "/price/history",
+  "/price/history/:tokenId",
   "/reality-stability",
   "/visit/log",
-  "/visit/presence",
-  "/visit/site/remove",
-  "/visit/history",
 ];
 
 export const ROLES = {
