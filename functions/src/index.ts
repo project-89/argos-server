@@ -24,14 +24,9 @@ const corsOptions = {
       return;
     }
 
-    // In development/test, use the more permissive configuration
-    if (process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true") {
-      callback(null, true);
-      return;
-    }
-
-    // In production, strictly check against allowed origins
+    // Get allowed origins dynamically
     const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
+
     if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
@@ -49,25 +44,6 @@ const corsOptions = {
 
 // Apply CORS middleware with options
 app.use(cors(corsOptions));
-
-// Add additional CORS headers middleware for test environment
-app.use((req, res, next) => {
-  if (process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true") {
-    const origin = req.headers.origin;
-    if (origin) {
-      const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-      // Still enforce allowed origins check in test/dev
-      if (allowedOrigins.includes(origin)) {
-        res.header("Access-Control-Allow-Origin", origin);
-        res.header("Access-Control-Allow-Methods", CORS_CONFIG.options.methods.join(","));
-        res.header("Access-Control-Allow-Headers", CORS_CONFIG.options.allowedHeaders.join(","));
-        res.header("Access-Control-Allow-Credentials", "true");
-        res.header("Access-Control-Max-Age", CORS_CONFIG.options.maxAge.toString());
-      }
-    }
-  }
-  next();
-});
 
 app.use(express.json());
 

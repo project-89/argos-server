@@ -6,7 +6,7 @@ interface Visit {
   fingerprintId: string;
   timestamp: number;
   url: string;
-  title?: string;
+  title: string | undefined;
   siteId: string;
 }
 
@@ -126,18 +126,23 @@ export const log = async (req: Request, res: Response): Promise<Response> => {
     const visitData: Visit = {
       fingerprintId,
       url,
-      title,
+      title: title || null,
       siteId,
       timestamp: now,
     };
 
-    const visitRef = await db.collection(COLLECTIONS.VISITS).add(visitData);
+    // Remove any undefined values
+    const sanitizedVisitData = Object.fromEntries(
+      Object.entries(visitData).filter(([_, value]) => value !== undefined),
+    ) as Visit;
+
+    const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
 
     return res.status(200).json({
       success: true,
       data: {
         id: visitRef.id,
-        ...visitData,
+        ...sanitizedVisitData,
         site,
       },
     });

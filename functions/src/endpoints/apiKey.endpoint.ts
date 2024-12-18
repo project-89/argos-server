@@ -9,6 +9,8 @@ export const validateApiKey = async (
 ): Promise<{ isValid: boolean; fingerprintId?: string }> => {
   try {
     const db = getFirestore();
+
+    // Query for the API key
     const snapshot = await db
       .collection(COLLECTIONS.API_KEYS)
       .where("key", "==", apiKey)
@@ -16,16 +18,28 @@ export const validateApiKey = async (
       .get();
 
     if (snapshot.empty) {
+      console.warn("API key not found or not enabled:", apiKey);
       return { isValid: false };
     }
 
     const doc = snapshot.docs[0];
+    const data = doc.data();
+    console.log("API key data found:", {
+      fingerprintId: data.fingerprintId,
+      enabled: data.enabled,
+      createdAt: data.createdAt?.toDate?.(),
+      metadata: data.metadata,
+    });
+
     return {
       isValid: true,
-      fingerprintId: doc.data().fingerprintId,
+      fingerprintId: data.fingerprintId,
     };
   } catch (error) {
-    console.error("Error validating API key:", error);
+    console.error("Error validating API key:", {
+      error,
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return { isValid: false };
   }
 };
@@ -106,6 +120,7 @@ export const validate = async (req: Request, res: Response): Promise<Response> =
     const { key } = req.body;
 
     if (!key) {
+      console.warn("API key validation failed: Missing key in request body");
       return res.status(400).json({
         success: false,
         error: "Missing required field: key",
@@ -119,7 +134,12 @@ export const validate = async (req: Request, res: Response): Promise<Response> =
       data: result,
     });
   } catch (error: any) {
-    console.error("Error in validate API key:", error);
+    console.error("Error in validate API key endpoint:", {
+      error,
+      message: error.message,
+      stack: error.stack,
+      body: req.body,
+    });
     return res.status(500).json({
       success: false,
       error: error.message || "Failed to validate API key",

@@ -68,9 +68,6 @@ export const CORS_CONFIG = {
       console.error("SECURITY WARNING: No CORS origins configured in production!");
     }
 
-    // Log final allowed origins for debugging
-    console.log("Final allowed origins:", [...new Set(origins)]);
-
     return [...new Set(origins)];
   },
 
