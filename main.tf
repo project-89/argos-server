@@ -139,3 +139,40 @@ resource "google_cloudfunctions_function" "getAvailableRoles" {
   }
 }
 
+# Cloud Function: Scheduled Cleanup
+resource "google_cloudfunctions_function" "scheduledCleanup" {
+  name        = "argos-scheduled-cleanup"
+  description = "Performs scheduled cleanup of old data"
+  runtime     = "nodejs18"
+  entry_point = "scheduledCleanup"
+  source_archive_bucket = google_storage_bucket.functions_bucket.name
+  source_archive_object = google_storage_bucket_object.functions_zip.name
+
+  environment_variables = {
+    FIRESTORE_PROJECT_ID = var.project_id
+  }
+
+  event_trigger {
+    event_type = "google.pubsub.topic.publish"
+    resource   = google_pubsub_topic.cleanup_trigger.name
+  }
+}
+
+# PubSub topic for cleanup trigger
+resource "google_pubsub_topic" "cleanup_trigger" {
+  name = "argos-cleanup-trigger"
+}
+
+# Cloud Scheduler job to trigger cleanup
+resource "google_cloud_scheduler_job" "cleanup_scheduler" {
+  name        = "argos-cleanup-scheduler"
+  description = "Triggers cleanup function every 24 hours"
+  schedule    = "0 0 * * *"  # Run at midnight every day
+  time_zone   = "UTC"
+
+  pubsub_target {
+    topic_name = google_pubsub_topic.cleanup_trigger.id
+    data       = base64encode("{}")
+  }
+}
+

@@ -62,12 +62,10 @@ import * as realityStability from "./endpoints/realityStability.endpoint";
 app.post("/fingerprint/register", fingerprint.register);
 app.post("/api-key/register", apiKey.register);
 app.post("/api-key/validate", apiKey.validate);
-app.post("/api-key/revoke", apiKey.revoke);
 app.get("/role/available", role.getAvailable);
 app.get("/price/current", price.getCurrent);
 app.get("/price/history/:tokenId", price.getHistory);
 app.get("/reality-stability", realityStability.getRealityStabilityIndex);
-app.post("/visit/log", visit.log);
 
 // Auth middleware for protected routes
 app.use(auth);
@@ -79,6 +77,7 @@ if (process.env.NODE_ENV !== "test") {
 
 // Protected routes
 app.get("/fingerprint/:id", fingerprint.get);
+app.post("/visit/log", visit.log);
 app.post("/visit/presence", visit.updatePresence);
 app.post("/visit/site/remove", visit.removeSite);
 app.get("/visit/history/:fingerprintId", visit.getHistory);
@@ -87,6 +86,7 @@ app.post("/role/remove", role.remove);
 app.post("/tag/update", tag.addOrUpdateTags);
 app.post("/tag/roles/update", tag.updateRolesBasedOnTags);
 app.post("/debug/cleanup", debug.cleanup);
+app.post("/api-key/revoke", apiKey.revoke);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = functions.https.onRequest(app);

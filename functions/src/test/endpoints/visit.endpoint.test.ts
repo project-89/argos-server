@@ -26,14 +26,16 @@ describe("Visit Endpoint", () => {
   });
 
   describe("POST /visit/log", () => {
-    it("should log a visit", async () => {
+    it("should log a visit with valid API key", async () => {
       const visitData = {
         fingerprintId,
         url: "https://test.com",
         title: "Test Site",
       };
 
-      const response = await makeRequest("post", `${API_URL}/visit/log`, visitData);
+      const response = await makeRequest("post", `${API_URL}/visit/log`, visitData, {
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -51,12 +53,78 @@ describe("Visit Endpoint", () => {
       expect(response.data.data.site.settings).toHaveProperty("privacy", "private");
     });
 
+    it("should reject request without API key", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+        },
+        {
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
+    });
+
+    it("should reject request with invalid API key", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+        },
+        {
+          headers: { "x-api-key": "invalid-key" },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Invalid API key");
+    });
+
+    it("should reject request when API key does not match fingerprint", async () => {
+      // Create another fingerprint with a different API key
+      const { apiKey: otherApiKey } = await createTestData();
+
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+        },
+        {
+          headers: { "x-api-key": otherApiKey },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key does not match fingerprint");
+    });
+
     it("should require fingerprintId and url", async () => {
       await expect(
-        makeRequest("post", `${API_URL}/visit/log`, {
-          fingerprintId,
-          // missing url
-        }),
+        makeRequest(
+          "post",
+          `${API_URL}/visit/log`,
+          {
+            fingerprintId,
+            // missing url
+          },
+          {
+            headers: { "x-api-key": validApiKey },
+          },
+        ),
       ).rejects.toMatchObject({
         response: {
           status: 400,
@@ -70,10 +138,17 @@ describe("Visit Endpoint", () => {
 
     it("should handle non-existent fingerprint", async () => {
       await expect(
-        makeRequest("post", `${API_URL}/visit/log`, {
-          fingerprintId: "non-existent-id",
-          url: "https://test.com",
-        }),
+        makeRequest(
+          "post",
+          `${API_URL}/visit/log`,
+          {
+            fingerprintId: "non-existent-id",
+            url: "https://test.com",
+          },
+          {
+            headers: { "x-api-key": validApiKey },
+          },
+        ),
       ).rejects.toMatchObject({
         response: {
           status: 404,
@@ -83,6 +158,41 @@ describe("Visit Endpoint", () => {
           },
         },
       });
+    });
+
+    it("should increment visit count for existing site", async () => {
+      // First visit
+      await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+          title: "Test Site",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      // Second visit
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+          title: "Updated Title",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.site).toHaveProperty("visits", 2);
+      expect(response.data.data.site).toHaveProperty("title", "Updated Title");
     });
   });
 
@@ -221,7 +331,9 @@ describe("Visit Endpoint", () => {
         title: "Test Site",
       };
 
-      const createResponse = await makeRequest("post", `${API_URL}/visit/log`, visitData);
+      const createResponse = await makeRequest("post", `${API_URL}/visit/log`, visitData, {
+        headers: { "x-api-key": validApiKey },
+      });
       expect(createResponse.status).toBe(200);
       expect(createResponse.data.success).toBe(true);
       expect(createResponse.data.data.site).toBeDefined();
@@ -253,34 +365,79 @@ describe("Visit Endpoint", () => {
       expect(siteDoc.exists).toBe(false);
     });
 
-    it("should require fingerprintId and siteId", async () => {
+    it("should require valid API key for site removal", async () => {
       const response = await makeRequest(
         "post",
         `${API_URL}/visit/site/remove`,
         {
           fingerprintId,
-          // missing siteId
+          siteId: "test-site-id",
         },
         {
-          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         },
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: siteId");
+      expect(response.data.error).toBe("API key is required");
+    });
+
+    it("should prevent removing site with mismatched fingerprint", async () => {
+      // Create a visit first
+      const visitResponse = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+          title: "Test Site",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      const siteId = visitResponse.data.data.site.id;
+
+      // Create another fingerprint
+      const { fingerprintId: otherFingerprintId, apiKey: otherApiKey } = await createTestData();
+
+      // Try to remove the site with different fingerprint
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/site/remove`,
+        {
+          fingerprintId: otherFingerprintId,
+          siteId,
+        },
+        {
+          headers: { "x-api-key": otherApiKey },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Not authorized to remove this site");
     });
   });
 
   describe("GET /visit/history/:fingerprintId", () => {
     it("should get visit history", async () => {
       // First create a visit
-      await makeRequest("post", `${API_URL}/visit/log`, {
-        fingerprintId,
-        url: "https://test.com",
-        title: "Test Site",
-      });
+      await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+          title: "Test Site",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
 
       const response = await makeRequest("get", `${API_URL}/visit/history/${fingerprintId}`, null, {
         headers: { "x-api-key": validApiKey },
@@ -309,6 +466,159 @@ describe("Visit Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data).toMatch(/Cannot GET \/visit\/history\//);
+    });
+  });
+
+  describe("GET /visit/history", () => {
+    it("should get visit history for fingerprint", async () => {
+      // Create some visits
+      await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test1.com",
+          title: "Test Site 1",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test2.com",
+          title: "Test Site 2",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      const response = await makeRequest("get", `${API_URL}/visit/history/${fingerprintId}`, null, {
+        headers: { "x-api-key": validApiKey },
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(Array.isArray(response.data.data)).toBe(true);
+      expect(response.data.data).toHaveLength(2);
+      expect(response.data.data[0]).toHaveProperty("url", "https://test2.com");
+      expect(response.data.data[1]).toHaveProperty("url", "https://test1.com");
+    });
+
+    it("should require valid API key for history", async () => {
+      const response = await makeRequest("get", `${API_URL}/visit/history/${fingerprintId}`, null, {
+        validateStatus: () => true,
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
+    });
+  });
+
+  describe("POST /visit/remove-site", () => {
+    it("should remove site and associated visits", async () => {
+      // First create a site by logging a visit
+      const visitData = {
+        fingerprintId,
+        url: "https://test.com",
+        title: "Test Site",
+      };
+
+      const createResponse = await makeRequest("post", `${API_URL}/visit/log`, visitData, {
+        headers: { "x-api-key": validApiKey },
+      });
+      expect(createResponse.status).toBe(200);
+      expect(createResponse.data.success).toBe(true);
+      expect(createResponse.data.data.site).toBeDefined();
+
+      const siteId = createResponse.data.data.site.id;
+      expect(siteId).toBeDefined();
+
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/site/remove`,
+        {
+          fingerprintId,
+          siteId,
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
+      expect(response.data.data).toHaveProperty("siteId", siteId);
+      expect(response.data.data).toHaveProperty("timestamp");
+
+      // Verify site is removed
+      const db = admin.firestore();
+      const siteDoc = await db.collection(COLLECTIONS.SITES).doc(siteId).get();
+      expect(siteDoc.exists).toBe(false);
+    });
+
+    it("should require valid API key for site removal", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/site/remove`,
+        {
+          fingerprintId,
+          siteId: "test-site-id",
+        },
+        {
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
+    });
+
+    it("should prevent removing site with mismatched fingerprint", async () => {
+      // Create a visit first
+      const visitResponse = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
+          url: "https://test.com",
+          title: "Test Site",
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      const siteId = visitResponse.data.data.site.id;
+
+      // Create another fingerprint
+      const { fingerprintId: otherFingerprintId, apiKey: otherApiKey } = await createTestData();
+
+      // Try to remove the site with different fingerprint
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/site/remove`,
+        {
+          fingerprintId: otherFingerprintId,
+          siteId,
+        },
+        {
+          headers: { "x-api-key": otherApiKey },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Not authorized to remove this site");
     });
   });
 });

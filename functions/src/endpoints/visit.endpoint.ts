@@ -215,6 +215,39 @@ export const removeSite = async (req: Request, res: Response): Promise<Response>
   try {
     const { fingerprintId, siteId } = req.body;
 
+    // Get API key from header
+    const apiKey = req.header("x-api-key");
+    if (!apiKey) {
+      return res.status(401).json({
+        success: false,
+        error: "API key is required",
+      });
+    }
+
+    // Validate API key
+    const db = getFirestore();
+    const apiKeySnapshot = await db
+      .collection(COLLECTIONS.API_KEYS)
+      .where("key", "==", apiKey)
+      .where("enabled", "==", true)
+      .get();
+
+    if (apiKeySnapshot.empty) {
+      return res.status(401).json({
+        success: false,
+        error: "Invalid API key",
+      });
+    }
+
+    // Check if API key matches fingerprint
+    const apiKeyData = apiKeySnapshot.docs[0].data();
+    if (apiKeyData.fingerprintId !== fingerprintId) {
+      return res.status(403).json({
+        success: false,
+        error: "API key does not match fingerprint",
+      });
+    }
+
     if (!fingerprintId) {
       return res.status(400).json({
         success: false,
@@ -228,8 +261,6 @@ export const removeSite = async (req: Request, res: Response): Promise<Response>
         error: "Missing required field: siteId",
       });
     }
-
-    const db = getFirestore();
 
     // Verify fingerprint exists
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);

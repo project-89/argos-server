@@ -1,181 +1,144 @@
 # Argos Server
 
-A Firebase Functions-based API server for fingerprinting, visit tracking, and role management.
+Argos Server is a Firebase Functions-based API server that handles fingerprinting, visit tracking, and pricing operations. The server is designed to be secure, scalable, and maintainable with a strong emphasis on authentication and data integrity.
 
-## Architecture
-
-The server is built using:
-- Firebase Functions
-- Express.js
-- TypeScript
-- Firebase Admin SDK
-
-### Key Components
-
-1. **Authentication**
-   - API key-based authentication
-   - One API key per fingerprint
-   - Public endpoints for registration and basic operations
-
-2. **Rate Limiting**
-   - Per IP and API key rate limiting
-   - Configurable windows and limits
-   - Rate limit stats tracking
-
-3. **Endpoints**
-   - `/fingerprint/*` - Fingerprint registration and management
-   - `/api-key/*` - API key operations
-   - `/visit/*` - Visit tracking and presence management
-   - `/role/*` - Role assignment and management
-   - `/tag/*` - Tag tracking and role-based rules
-   - `/price/*` - Price tracking operations
-   - `/debug/*` - Debug operations (protected)
-
-4. **Data Model**
-   - Fingerprints collection
-   - Visits collection
-   - Presence collection
-   - Roles collection
-   - Tags collection
-   - Cache collection
-
-## Setup
-
-1. **Prerequisites**
-   ```bash
-   npm install -g firebase-tools
-   ```
-
-2. **Installation**
-   ```bash
-   cd functions
-   npm install
-   ```
-
-3. **Local Development**
-   ```bash
-   npm run serve
-   ```
-
-4. **Testing**
-   ```bash
-   npm test
-   ```
-
-5. **Build**
-   ```bash
-   npm run build
-   ```
-
-## API Documentation
+## API Structure
 
 ### Public Endpoints
+These endpoints do not require API key authentication:
+- `/fingerprint/register` - Register a new fingerprint
+- `/api-key/register` - Register a new API key for a fingerprint
+- `/api-key/validate` - Validate an API key
+- `/role/available` - Get available roles
+- `/price/current` - Get current token prices
+- `/price/history/:tokenId` - Get historical price data
+- `/reality-stability` - Get reality stability index
 
-- `POST /fingerprint/register` - Register a new fingerprint
-- `POST /api-key/register` - Register a new API key
-- `POST /api-key/validate` - Validate an API key
-- `POST /api-key/revoke` - Revoke an API key
-- `GET /role/available` - Get available roles
-- `GET /price/current` - Get current price
-- `GET /price/history/:tokenId` - Get price history
-- `GET /reality-stability` - Get reality stability index
-- `POST /visit/log` - Log a visit
+### Protected Endpoints
+These endpoints require a valid API key in the `x-api-key` header:
+- `/api-key/revoke` - Revoke an API key
+- `/fingerprint/:id` - Get fingerprint details
+- `/visit/log` - Log a visit
+- `/visit/presence` - Update presence status
+- `/visit/site/remove` - Remove a site
+- `/visit/history/:fingerprintId` - Get visit history
+- `/role/assign` - Assign a role
+- `/role/remove` - Remove a role
+- `/tag/update` - Add or update tags
+- `/tag/roles/update` - Update roles based on tags
+- `/debug/cleanup` - Manual cleanup trigger (admin only)
 
-### Protected Endpoints (Require API Key)
-
-- `GET /fingerprint/:id` - Get fingerprint details
-- `POST /visit/presence` - Update presence status
-- `POST /visit/site/remove` - Remove a site visit
-- `GET /visit/history/:fingerprintId` - Get visit history
-- `POST /role/assign` - Assign a role
-- `POST /role/remove` - Remove a role
-- `POST /tag/update` - Update tags
-- `POST /tag/roles/update` - Update roles based on tags
-- `POST /debug/cleanup` - Clean up data (protected)
-
-## Security
-
-- All protected endpoints require a valid API key
-- API keys are bound to specific fingerprints
-- Rate limiting prevents abuse
-- Role-based access control
-- Request validation and sanitization
-
-### CORS Configuration
-
-The server implements a secure CORS policy that can be configured through environment variables:
-
-```bash
-# Comma-separated list of allowed origins
-ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
-```
-
-Default development origins are:
-- http://localhost:5173 (Vite dev server)
-- http://localhost:3000 (React dev server)
-- http://localhost:5000 (Firebase hosting emulator)
-
-CORS security features:
-- Origin validation
-- Configurable allowed methods
-- Explicit allowed headers
-- Credentials support
-- Preflight request caching
-- Proper OPTIONS handling
-
-For development, the default origins are automatically allowed. For production, you must set the `ALLOWED_ORIGINS` environment variable.
-
-### CORS Security
-
-The server implements a strict CORS policy with environment-specific configurations:
-
-#### Production
-- Strict origin validation against allowlist
-- No wildcard origins allowed
-- Origins configured through:
-  - Environment variables (`ALLOWED_ORIGINS`)
-  - Production configuration
-- Credentials support for authenticated requests
-
-#### Development/Testing
-- Controlled development environment access
-- Local development servers allowed
-- Test origins for integration testing
-- Environment-based validation
-
-For detailed CORS configuration and security measures, see [DEVELOPMENT.md](DEVELOPMENT.md).
-
-### Environment Variables
-
-Required environment variables for CORS security:
-
-```bash
-# Production origins (comma-separated)
-ALLOWED_ORIGINS=https://oneirocom.ai,https://other-allowed-domain.com
-
-# Environment control
-NODE_ENV=production  # or "development" or "test"
-```
-
-### Security Best Practices
-
-1. **CORS Protection**
-   - Strict origin validation
-   - No wildcard origins in production
-   - Environment-specific configurations
-   - Proper preflight handling
-
-2. **Request Security**
-   - API key validation
-   - Rate limiting
-   - Request validation
-   - Error handling
-
-3. **Monitoring**
-   - Unauthorized access logging
-   - CORS violation tracking
-   - Security event monitoring
+### Automated Services
+- **Price Cache**: Caches price data for 5 minutes to respect CoinGecko API rate limits
+- **Scheduled Cleanup**: Daily cleanup job that removes:
+  - Price cache entries (older than 24 hours)
+  - Rate limit stats (older than 30 days)
+  - Rate limit requests (older than 30 days)
+  - Visit records (older than 30 days)
+  - Presence records (older than 30 days)
 
 ## Development
 
-See [DEVELOPMENT.md](./DEVELOPMENT.md) for detailed development guidelines and best practices.
+### Prerequisites
+- Node.js 18+
+- Firebase CLI
+- Google Cloud SDK
+- Terraform
+
+### Setup
+1. Clone the repository
+```bash
+git clone https://github.com/Oneirocom/argos-server.git
+cd argos-server
+```
+
+2. Install dependencies
+```bash
+npm install
+cd functions
+npm install
+```
+
+3. Copy environment templates
+```bash
+cp .env.template .env
+cp terraform.tfvars.template terraform.tfvars
+```
+
+4. Configure environment variables
+```bash
+# .env
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_REGION=us-central1
+COINGECKO_API_KEY=your-api-key
+ALLOWED_ORIGINS=https://yourdomain.com,http://localhost:5173
+```
+
+### Development Workflow
+1. Start emulators
+```bash
+firebase emulators:start
+```
+
+2. Run tests
+```bash
+cd functions
+npm test
+```
+
+3. Deploy
+```bash
+# Deploy infrastructure
+terraform init
+terraform plan
+terraform apply
+
+# Deploy functions
+firebase deploy --only functions
+```
+
+## Infrastructure
+
+The server uses the following Google Cloud services:
+- Firebase Functions
+- Firestore
+- Cloud Scheduler
+- Cloud Pub/Sub
+- Cloud Storage
+
+### Cleanup Service
+A scheduled cleanup service runs daily to maintain database performance and stay within quotas:
+```hcl
+# Cloud Function: Scheduled Cleanup
+resource "google_cloudfunctions_function" "scheduledCleanup" {
+  name        = "argos-scheduled-cleanup"
+  description = "Performs scheduled cleanup of old data"
+  runtime     = "nodejs18"
+  entry_point = "scheduledCleanup"
+  # ... configuration ...
+}
+```
+
+## Security
+
+### API Key Authentication
+- All protected endpoints require a valid API key
+- API keys are tied to fingerprints
+- Keys can be revoked and are automatically disabled on re-registration
+
+### CORS Protection
+- Environment-specific origin validation
+- No wildcard origins in production
+- Proper preflight handling
+- Configurable headers and methods
+
+### Rate Limiting
+- Per-minute request limits
+- Monthly quota tracking
+- Automatic cleanup of old rate limit data
+
+## Documentation
+- [Development Guide](DEVELOPMENT.md)
+- [Functions README](functions/README.md)
+- [Contributing Guide](CONTRIBUTING.md)
+- [License](LICENSE)

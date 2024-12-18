@@ -172,6 +172,15 @@ export const revoke = async (req: Request, res: Response): Promise<Response> => 
       });
     }
 
+    // Check if the API key belongs to the authenticated user
+    const apiKeyData = snapshot.docs[0].data();
+    if (apiKeyData.fingerprintId !== req.fingerprintId) {
+      return res.status(403).json({
+        success: false,
+        error: "Not authorized to revoke this API key",
+      });
+    }
+
     // Disable the API key instead of deleting it
     await snapshot.docs[0].ref.update({
       enabled: false,

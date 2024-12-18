@@ -142,9 +142,16 @@ describe("API Key Endpoint", () => {
 
   describe("POST /api-key/revoke", () => {
     it("should revoke an existing API key", async () => {
-      const response = await makeRequest("post", `${API_URL}/api-key/revoke`, {
-        key: validApiKey,
-      });
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -160,6 +167,62 @@ describe("API Key Endpoint", () => {
       expect(validateResponse.data.data).toHaveProperty("isValid", false);
     });
 
+    it("should reject request without API key", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key is required");
+    });
+
+    it("should reject request with invalid API key", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          headers: { "x-api-key": "invalid-key" },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Invalid API key");
+    });
+
+    it("should reject request when API key does not match fingerprint", async () => {
+      // Create another fingerprint with a different API key
+      const { apiKey: otherApiKey } = await createTestData();
+
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          headers: { "x-api-key": otherApiKey },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("API key does not match fingerprint");
+    });
+
     it("should handle non-existent API key", async () => {
       const response = await makeRequest(
         "post",
@@ -168,6 +231,7 @@ describe("API Key Endpoint", () => {
           key: "non-existent-key",
         },
         {
+          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         },
       );
@@ -183,6 +247,7 @@ describe("API Key Endpoint", () => {
         `${API_URL}/api-key/revoke`,
         {},
         {
+          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         },
       );

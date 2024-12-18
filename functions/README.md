@@ -1,371 +1,169 @@
 # Project 89: Argos Server Functions
 
-Backend serverless functions that power the Argos fingerprinting and tracking system.
-
 ## Overview
 
-This package contains several core Cloud Functions that handle:
-- Visit tracking and presence management
-- Role-based access control
-- Dynamic tag management
-- Reality stability monitoring
-- Cryptocurrency price tracking
-- API key management
-- CORS security and origin validation
+This directory contains the Firebase Functions that power the Argos Server. The functions are written in TypeScript and use Express.js for routing.
 
-## Security and CORS Configuration
+## API Structure
 
-### Environment Setup
+### Authentication
+All protected endpoints require an API key passed in the `x-api-key` header. API keys are tied to fingerprints and can be revoked.
 
-1. **Development/Test Environment**
-```bash
-# Default development origins are automatically allowed:
-http://localhost:5173  # Vite dev server
-http://localhost:3000  # React dev server
-http://localhost:5000  # Firebase emulator
-```
+### Public Endpoints
 
-2. **Production Environment**
-```bash
-# Set allowed origins in environment:
-firebase functions:config:set cors.allowed_origins="https://oneirocom.ai,https://other-domain.com"
+#### Fingerprint Management
+- `POST /fingerprint/register`
+  - Register a new fingerprint
+  - Body: `{ fingerprint: string, metadata?: object }`
 
-# Or use ALLOWED_ORIGINS environment variable:
-ALLOWED_ORIGINS=https://oneirocom.ai,https://other-domain.com
-```
+#### API Key Management
+- `POST /api-key/register`
+  - Register a new API key for a fingerprint
+  - Body: `{ fingerprintId: string }`
+- `POST /api-key/validate`
+  - Validate an API key
+  - Body: `{ key: string }`
 
-### Security Features
+#### Price Data
+- `GET /price/current`
+  - Get current token prices
+  - Query: `?symbols=token1,token2`
+  - Uses 5-minute cache to respect CoinGecko API limits
+- `GET /price/history/:tokenId`
+  - Get historical price data
+  - Params: `tokenId` (e.g., "project89")
+  - Query: `?timeframe=7d&interval=1h`
 
-1. **CORS Protection**
-   - Environment-specific origin validation
-   - No wildcard origins in production
-   - Proper preflight handling
-   - Credentials support
-   - Configurable headers and methods
+#### Role Management
+- `GET /role/available`
+  - Get list of available roles
+  - Returns: `{ roles: string[] }`
 
-2. **Request Security**
-   - API key validation
-   - Rate limiting
-   - Request validation
-   - Error handling
+#### Reality Stability
+- `GET /reality-stability`
+  - Get current reality stability index
+  - Returns stability metrics and matrix integrity
 
-3. **Testing**
-```bash
-# Run CORS tests
-npm test src/test/middleware/cors.test.ts
+### Protected Endpoints
 
-# Test specific origin
-curl -H "Origin: https://yourdomain.com" http://localhost:5001/your-project/us-central1/api/role/available
-```
+#### API Key Management
+- `POST /api-key/revoke`
+  - Revoke an API key
+  - Body: `{ key: string }`
+  - Requires: API key must match fingerprint
 
-For detailed CORS configuration and security measures, see [DEVELOPMENT.md](../DEVELOPMENT.md).
+#### Fingerprint Operations
+- `GET /fingerprint/:id`
+  - Get fingerprint details
+  - Params: `id` (fingerprint ID)
 
-## Functions
+#### Visit Tracking
+- `POST /visit/log`
+  - Log a visit
+  - Body: `{ fingerprintId: string, url: string, title?: string }`
+- `POST /visit/presence`
+  - Update presence status
+  - Body: `{ fingerprintId: string, status: "online" | "offline" }`
+- `POST /visit/site/remove`
+  - Remove a site
+  - Body: `{ fingerprintId: string, siteId: string }`
+- `GET /visit/history/:fingerprintId`
+  - Get visit history
+  - Params: `fingerprintId`
 
-### Price and Reality Stability
+#### Role Management
+- `POST /role/assign`
+  - Assign a role
+  - Body: `{ fingerprintId: string, role: string }`
+- `POST /role/remove`
+  - Remove a role
+  - Body: `{ fingerprintId: string, role: string }`
 
-#### `getTokenPrice`
-Get historical price data for a specific token.
+#### Tag Management
+- `POST /tag/update`
+  - Add or update tags
+  - Body: `{ fingerprintId: string, tags: string[] }`
+- `POST /tag/roles/update`
+  - Update roles based on tags
+  - Body: `{ fingerprintId: string }`
 
-**Request:**
-```
-GET /price/:tokenId?timeframe=24h&interval=15m
-```
+#### Debug Operations
+- `POST /debug/cleanup`
+  - Manual trigger for cleanup operation
+  - Protected admin endpoint
 
-**Response:**
-```json
-{
-  "prices": [
-    {
-      "timestamp": "number",
-      "price": "number"
-    }
-  ]
+## Automated Services
+
+### Price Cache
+- Caches price data from CoinGecko API
+- Cache duration: 5 minutes
+- Helps stay within API rate limits
+- Automatically cleaned up after 24 hours
+
+### Scheduled Cleanup
+The cleanup service runs daily at midnight UTC and removes:
+- Price cache entries older than 24 hours
+- Rate limit stats older than 30 days
+- Rate limit requests older than 30 days
+- Visit records older than 30 days
+- Presence records older than 30 days
+
+Configuration:
+```hcl
+# Cloud Scheduler job
+resource "google_cloud_scheduler_job" "cleanup_scheduler" {
+  name        = "argos-cleanup-scheduler"
+  schedule    = "0 0 * * *"  # Midnight UTC
+  time_zone   = "UTC"
+  # ... configuration ...
 }
 ```
-
-#### `fetchCryptoPrices`
-Get current prices for multiple tokens.
-
-**Request:**
-```
-GET /prices?symbols=project89,solana
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "prices": {
-    "project89": {
-      "usd": "number"
-    }
-  }
-}
-```
-
-#### `calculateRealityStabilityIndex`
-Calculate the current reality stability index.
-
-**Request:**
-```
-GET /reality-stability
-```
-
-**Response:**
-```json
-{
-  "realityStabilityIndex": "number",
-  "resistanceLevel": "number",
-  "metadata": {
-    "currentPrice": "number",
-    "shortTermChange": "number",
-    "mediumTermChange": "number",
-    "recentVolatility": "number",
-    "resistanceImpact": "number",
-    "simulationResponse": "number",
-    "matrixIntegrity": "string",
-    "timestamp": "number"
-  }
-}
-```
-
-### Visit Management
-
-#### `logVisit`
-Records site visits with fingerprint tracking.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string",
-  "timestamp": "number"
-}
-```
-
-#### `updatePresence`
-Updates presence status for a fingerprint.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string",
-  "timestamp": "number"
-}
-```
-
-#### `removeSite`
-Removes a site from presence tracking.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string",
-  "siteId": "string",
-  "timestamp": "number"
-}
-```
-
-### Role Management
-
-#### `assignRole`
-Manages role assignments from predefined roles:
-- user
-- agent-initiate
-- agent-field
-- agent-senior
-- agent-master
-
-**Request:**
-```json
-{
-  "fingerprintId": "string"
-}
-```
-
-#### `getAvailableRoles`
-Retrieves all available roles from the system.
-
-**Response:**
-```json
-{
-  "roles": [
-    {
-      "id": "string",
-      "permissions": ["array"],
-      "metadata": {}
-    }
-  ]
-}
-```
-
-### Tag Management
-
-#### `addOrUpdateTags`
-Updates tags for a fingerprint.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string",
-  "tags": {
-    "key": "value"
-  }
-}
-```
-
-#### `updateRolesBasedOnTags`
-Automatically updates roles based on tag conditions.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string"
-}
-```
-
-### API Key Management
-
-#### `createApiKey`
-Creates a new API key for a fingerprint.
-
-**Request:**
-```json
-{
-  "fingerprintId": "string",
-  "name?": "string",
-  "metadata?": {
-    "key": "value"
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "data": {
-    "key": "string",
-    "fingerprintId": "string"
-  }
-}
-```
-
-#### `validateApiKey`
-Validates an API key and updates usage statistics.
 
 ## Development
 
-### Prerequisites
-- Node.js 22 (required by package.json engines)
-- Firebase CLI
-- Google Cloud credentials
-- Access to Firebase project
-
-### Environment Setup
-1. Copy the environment template:
+### Local Testing
 ```bash
-cp ../.env.template ../.env
+# Start emulators
+firebase emulators:start
+
+# Run tests
+npm test
+
+# Test specific endpoint
+npm test src/test/endpoints/price.endpoint.test.ts
 ```
 
-2. Update the .env file with your credentials and CORS settings:
+### Environment Variables
 ```bash
-# API credentials
-API_KEY=your-api-key
-PROJECT_ID=your-project-id
+# Required
+FIREBASE_PROJECT_ID=your-project-id
+COINGECKO_API_KEY=your-api-key
+ALLOWED_ORIGINS=https://yourdomain.com,http://localhost:5173
 
-# CORS configuration
+# Optional
 NODE_ENV=development  # or "production" or "test"
-ALLOWED_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
-
-# For local development, these are automatically allowed:
-# - http://localhost:5173 (Vite)
-# - http://localhost:3000 (React)
-# - http://localhost:5000 (Firebase)
 ```
 
-3. For production deployment, set Firebase config:
-```bash
-# Set CORS configuration
-firebase functions:config:set cors.allowed_origins="https://oneirocom.ai,https://other-domain.com"
-
-# Verify configuration
-firebase functions:config:get
-```
-
-### Installation
-```bash
-npm install
-```
-
-### Available Scripts
-- `npm run serve` - Start local emulator
-- `npm run deploy` - Deploy functions
-- `npm run logs` - View function logs
-- `npm run logs:watch` - Watch function logs
-- `npm run env:sync` - Sync environment variables
-- `npm run generate-key` - Generate new API key
-
-### Local Development
-1. Start the emulator:
-```bash
-npm run serve
-```
-
-2. Test endpoints:
-```bash
-../test-endpoints.sh
-```
-
-### Code Style
-ESLint and Prettier configuration provided:
-- `eslint.config.js`
-- `.prettierrc.js`
-
-## Security
-
-- API key authentication required for most endpoints
-- Firestore security rules
-- Role-based access control
-- Input validation on all endpoints
-- Rate limiting on price endpoints
-
-## Error Handling
-
-Standard error response format:
-```json
-{
-  "error": "Error message description"
-}
-```
-
-Common errors:
-- Missing or invalid API key
-- Invalid fingerprintId
-- Rate limit exceeded
-- Invalid input data
-- Resource not found
-
-## Deployment
-
+### Deployment
 ```bash
 # Deploy all functions
-npm run deploy
+firebase deploy --only functions
 
 # Deploy specific function
 firebase deploy --only functions:functionName
 ```
 
-## Monitoring
+## Security
 
-```bash
-# View logs
-npm run logs
+### Rate Limiting
+- Per-minute request limits
+- Monthly quota tracking
+- Automatic cleanup of old rate limit data
 
-# Watch logs
-npm run logs:watch
-```
+### CORS Protection
+- Environment-specific origin validation
+- No wildcard origins in production
+- Proper preflight handling
+- Configurable headers and methods
 
----
-
-For more information about the overall project, see the main [README](../README.md).
+For more details on development guidelines and best practices, see [DEVELOPMENT.md](../DEVELOPMENT.md).

@@ -18,12 +18,10 @@ export const PUBLIC_ENDPOINTS: readonly string[] = [
   "/fingerprint/register",
   "/api-key/register",
   "/api-key/validate",
-  "/api-key/revoke",
   "/role/available",
   "/price/current",
   "/price/history/:tokenId",
   "/reality-stability",
-  "/visit/log",
 ];
 
 export const ROLES = {
