@@ -44,12 +44,15 @@ export interface TestConfig {
 }
 
 // Set test environment
-process.env.NODE_ENV = "test";
 process.env.FUNCTIONS_EMULATOR = "true";
 process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: "argos-434718",
 });
+
+// Set rate limit environment variables for testing
+process.env.RATE_LIMIT_ENABLED = "true";
+process.env.IP_RATE_LIMIT_ENABLED = "false";
 
 // Set CORS environment variables for testing
 process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";

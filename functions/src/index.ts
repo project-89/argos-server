@@ -3,8 +3,8 @@ import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
 import { auth } from "./middleware/auth.middleware";
-import { rateLimit } from "./middleware/rateLimit.middleware";
-import { CORS_CONFIG } from "./constants/config";
+import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
+import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -12,40 +12,10 @@ admin.initializeApp();
 // Create Express app
 const app = express();
 
-// CORS configuration
-const corsOptions = {
-  origin: (
-    origin: string | undefined,
-    callback: (error: Error | null, allow?: boolean) => void,
-  ) => {
-    // Allow requests with no origin (like mobile apps, curl, etc.)
-    if (!origin) {
-      callback(null, true);
-      return;
-    }
-
-    // Get allowed origins dynamically
-    const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      console.warn(`Blocked request from unauthorized origin: ${origin}`);
-      callback(new Error("Not allowed by CORS"));
-    }
-  },
-  credentials: CORS_CONFIG.options.credentials,
-  methods: CORS_CONFIG.options.methods,
-  allowedHeaders: CORS_CONFIG.options.allowedHeaders,
-  maxAge: CORS_CONFIG.options.maxAge,
-  preflightContinue: CORS_CONFIG.options.preflightContinue,
-  optionsSuccessStatus: CORS_CONFIG.options.optionsSuccessStatus,
-};
-
-// Apply CORS middleware with options
-app.use(cors(corsOptions));
-
+// Apply middleware
+app.use(cors());
 app.use(express.json());
+app.use(ipRateLimit());
 
 // Import endpoints
 import * as fingerprint from "./endpoints/fingerprint.endpoint";
@@ -67,13 +37,11 @@ app.get("/price/current", price.getCurrent);
 app.get("/price/history/:tokenId", price.getHistory);
 app.get("/reality-stability", realityStability.getRealityStabilityIndex);
 
+// Apply fingerprint rate limit to all routes that need it
+app.use("/visit/*", fingerprintRateLimit());
+
 // Auth middleware for protected routes
 app.use(auth);
-
-// Skip rate limiting in test mode
-if (process.env.NODE_ENV !== "test") {
-  app.use(rateLimit());
-}
 
 // Protected routes
 app.get("/fingerprint/:id", fingerprint.get);

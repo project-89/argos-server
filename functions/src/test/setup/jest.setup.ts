@@ -14,12 +14,14 @@ declare global {
 }
 
 // Set test environment
-process.env.NODE_ENV = "test";
 process.env.FUNCTIONS_EMULATOR = "true";
 process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
 process.env.FIREBASE_CONFIG = JSON.stringify({
   projectId: TEST_CONFIG.projectId,
 });
+
+// Set rate limiting to enabled by default for tests
+process.env.RATE_LIMIT_ENABLED = "true";
 
 // Initialize CORS environment variables for testing
 process.env.DEV_ORIGIN_VITE = "http://localhost:5173";
