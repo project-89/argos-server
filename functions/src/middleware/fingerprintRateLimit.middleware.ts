@@ -12,46 +12,40 @@ const DEFAULT_CONFIG: RateLimitConfig = {
   max: 100, // limit each fingerprint to 100 requests per windowMs
 };
 
-const getRateLimitKey = (fingerprintId: string, endpoint: string): string => {
-  // Replace slashes with underscores and remove any other invalid characters
-  const sanitizedEndpoint = endpoint.replace(/[/\\]/g, "_").replace(/[^a-zA-Z0-9-_]/g, "");
-  return `fingerprint_${fingerprintId}_${sanitizedEndpoint}`;
-};
-
-const getEndpointPath = (req: Request): string => {
-  // Get the full path to properly track rate limits per endpoint
-  return req.path;
-};
-
 export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
-  const { windowMs, max } = { ...DEFAULT_CONFIG, ...config };
+  const { windowMs } = { ...DEFAULT_CONFIG, ...config };
+  // Use environment variable for max if set, otherwise use config or default
+  const max = process.env.FINGERPRINT_RATE_LIMIT_MAX
+    ? parseInt(process.env.FINGERPRINT_RATE_LIMIT_MAX, 10)
+    : config.max || DEFAULT_CONFIG.max;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    if (process.env.RATE_LIMIT_ENABLED === "false") {
+    // Check if rate limiting is explicitly disabled
+    if (
+      process.env.RATE_LIMIT_DISABLED === "true" ||
+      process.env.FINGERPRINT_RATE_LIMIT_DISABLED === "true"
+    ) {
       console.log("[Fingerprint Rate Limit] Rate limiting is disabled");
       next();
       return;
     }
 
+    console.log(`[Fingerprint Rate Limit] Using max limit of ${max} requests per ${windowMs}ms`);
+
     try {
       const db = getFirestore();
-      const fingerprintId = req.body.fingerprintId;
-      const endpoint = getEndpointPath(req);
+      // Only use the validated fingerprintId from auth middleware
+      const fingerprint = req.fingerprintId;
 
-      if (!fingerprintId) {
-        console.log("[Fingerprint Rate Limit] No fingerprintId in request body");
-        res.status(400).json({
-          success: false,
-          error: "fingerprintId is required",
-        });
+      if (!fingerprint) {
+        // Skip rate limiting if no fingerprint is available (for public routes)
+        console.log("[Fingerprint Rate Limit] No fingerprint available, skipping rate limit check");
+        next();
         return;
       }
 
-      const now = Date.now();
-      const rateLimitKey = getRateLimitKey(fingerprintId, endpoint);
-
       console.log(
-        `[Fingerprint Rate Limit] Processing request for fingerprint: ${fingerprintId}, endpoint: ${endpoint}`,
+        `[Fingerprint Rate Limit] Processing request for fingerprint: ${fingerprint}, path: ${req.path}`,
       );
 
       // Use a transaction to ensure atomic updates
@@ -61,91 +55,61 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
       while (retries < maxRetries) {
         try {
           const result = await db.runTransaction(async (transaction) => {
-            const rateLimitRef = db.collection(COLLECTIONS.RATE_LIMITS).doc(rateLimitKey);
+            const rateLimitRef = db
+              .collection(COLLECTIONS.RATE_LIMITS)
+              .doc(`fingerprint:${fingerprint}`);
             const doc = await transaction.get(rateLimitRef);
 
             if (!doc.exists) {
               console.log(
-                `[Fingerprint Rate Limit] First request for fingerprint: ${fingerprintId} at endpoint: ${endpoint}`,
+                `[Fingerprint Rate Limit] First request from fingerprint: ${fingerprint}`,
               );
-              // Initialize with the current request
-              const initialData = {
-                requests: [now],
+              transaction.set(rateLimitRef, {
+                requests: [Date.now()],
                 createdAt: FieldValue.serverTimestamp(),
-                lastUpdated: FieldValue.serverTimestamp(),
                 type: "fingerprint",
-                fingerprintId,
-                endpoint,
-                windowMs,
-                max,
-              };
-              transaction.set(rateLimitRef, initialData);
-              console.log(`[Fingerprint Rate Limit] Initialized rate limit data:`, initialData);
+              });
               return { limited: false, count: 1 };
             }
 
             const data = doc.data();
             if (!data) {
-              console.error(
-                `[Fingerprint Rate Limit] Rate limit data is missing for key: ${rateLimitKey}`,
-              );
               throw new Error("Rate limit data is missing");
             }
 
             // Get requests within the current window
             const requests = (data.requests as number[]) || [];
-            const windowStart = now - windowMs;
+            const windowStart = Date.now() - windowMs;
             const recentRequests = requests.filter((time) => time > windowStart);
 
-            console.log(`[Fingerprint Rate Limit] Current state for ${fingerprintId}:`, {
-              totalRequests: requests.length,
-              recentRequests: recentRequests.length,
-              windowStart: new Date(windowStart).toISOString(),
-              now: new Date(now).toISOString(),
-              max,
-            });
+            console.log(
+              `[Fingerprint Rate Limit] Fingerprint: ${fingerprint}, Recent requests: ${recentRequests.length}, Max: ${max}`,
+            );
 
+            // Check if we've hit the limit
             if (recentRequests.length >= max) {
               const oldestRequest = Math.min(...recentRequests);
-              const retryAfter = Math.ceil((oldestRequest + windowMs - now) / 1000);
-              console.log(`[Fingerprint Rate Limit] Rate limit exceeded:`, {
-                fingerprintId,
-                endpoint,
-                recentRequests: recentRequests.length,
-                max,
-                retryAfter,
-                oldestRequest: new Date(oldestRequest).toISOString(),
-              });
+              const retryAfter = Math.ceil((oldestRequest + windowMs - Date.now()) / 1000);
+              console.log(
+                `[Fingerprint Rate Limit] Rate limit exceeded for fingerprint: ${fingerprint}, retry after: ${retryAfter}s`,
+              );
               return { limited: true, retryAfter, count: recentRequests.length };
             }
 
-            // Clean up old requests and add the new one atomically
-            const updatedRequests = [...recentRequests, now];
-            const updateData = {
+            // Add current request and update
+            const updatedRequests = [...recentRequests, Date.now()];
+            transaction.update(rateLimitRef, {
               requests: updatedRequests,
               lastUpdated: FieldValue.serverTimestamp(),
-              windowMs,
-              max,
-            };
-
-            transaction.update(rateLimitRef, updateData);
-            console.log(`[Fingerprint Rate Limit] Updated rate limit data:`, {
-              fingerprintId,
-              endpoint,
-              requestCount: updatedRequests.length,
-              max,
-              remaining: max - updatedRequests.length,
             });
 
+            console.log(
+              `[Fingerprint Rate Limit] Updated request count for fingerprint: ${fingerprint}, new count: ${updatedRequests.length}`,
+            );
             return { limited: false, count: updatedRequests.length };
           });
 
           if (result.limited) {
-            console.log(`[Fingerprint Rate Limit] Sending rate limit response:`, {
-              fingerprintId,
-              endpoint,
-              retryAfter: result.retryAfter,
-            });
             res.status(429).json({
               success: false,
               error: "Too many requests, please try again later",
@@ -165,7 +129,7 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
           if (retries === maxRetries) {
             throw error;
           }
-          // Wait before retrying with exponential backoff
+          // Wait before retrying
           await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, retries)));
         }
       }

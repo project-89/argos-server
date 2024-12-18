@@ -16,42 +16,23 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 describe("Fingerprint Rate Limit Test Suite", () => {
   const API_URL = TEST_CONFIG.apiUrl;
-  let originalRateLimitEnabled: string | undefined;
-  let originalIpRateLimitEnabled: string | undefined;
+  let originalRateLimitDisabled: string | undefined;
+  let validApiKey: string;
   let fingerprintId: string;
-  let apiKey: string;
 
   beforeAll(async () => {
-    // Store original values
-    originalRateLimitEnabled = process.env.RATE_LIMIT_ENABLED;
-    originalIpRateLimitEnabled = process.env.IP_RATE_LIMIT_ENABLED;
-
-    // Set environment variables for testing
-    process.env.RATE_LIMIT_ENABLED = "true";
-    process.env.IP_RATE_LIMIT_ENABLED = "true";
-    process.env.IP_RATE_LIMIT_MAX = "200";
-
-    // Log all relevant environment variables
-    console.log("[Test Setup] Environment variables:");
-    console.log("  RATE_LIMIT_ENABLED:", process.env.RATE_LIMIT_ENABLED);
-    console.log("  IP_RATE_LIMIT_ENABLED:", process.env.IP_RATE_LIMIT_ENABLED);
-    console.log("  IP_RATE_LIMIT_MAX:", process.env.IP_RATE_LIMIT_MAX);
-    console.log("  FUNCTIONS_EMULATOR:", process.env.FUNCTIONS_EMULATOR);
-    console.log("  FIRESTORE_EMULATOR_HOST:", process.env.FIRESTORE_EMULATOR_HOST);
-
+    originalRateLimitDisabled = process.env.RATE_LIMIT_DISABLED;
+    // Ensure rate limiting is enabled for tests (by not setting RATE_LIMIT_DISABLED)
+    delete process.env.RATE_LIMIT_DISABLED;
+    delete process.env.FINGERPRINT_RATE_LIMIT_DISABLED;
+    console.log("[Test Setup] Rate limiting enabled (RATE_LIMIT_DISABLED not set)");
     await initializeTestEnvironment();
   });
 
   afterAll(async () => {
-    // Restore original values
-    process.env.RATE_LIMIT_ENABLED = originalRateLimitEnabled;
-    process.env.IP_RATE_LIMIT_ENABLED = originalIpRateLimitEnabled;
-    process.env.IP_RATE_LIMIT_MAX = undefined;
-
-    console.log("[Test Cleanup] Environment variables restored:");
-    console.log("  RATE_LIMIT_ENABLED:", process.env.RATE_LIMIT_ENABLED);
-    console.log("  IP_RATE_LIMIT_ENABLED:", process.env.IP_RATE_LIMIT_ENABLED);
-    console.log("  IP_RATE_LIMIT_MAX:", process.env.IP_RATE_LIMIT_MAX);
+    // Restore original environment state
+    process.env.RATE_LIMIT_DISABLED = originalRateLimitDisabled;
+    console.log("[Test Cleanup] RATE_LIMIT_DISABLED restored to:", originalRateLimitDisabled);
 
     // Final cleanup
     const db = getFirestore();
@@ -60,87 +41,51 @@ describe("Fingerprint Rate Limit Test Suite", () => {
 
   beforeEach(async () => {
     console.log("[Test] Starting new test case");
-
-    // Clean up rate limit data before each test
+    // Clean up rate limit data
     const db = getFirestore();
     await cleanupRateLimitData(db);
 
     // Create fresh test data for each test
-    const { fingerprintId: fId, apiKey: key } = await createTestData();
+    const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
-    apiKey = key;
+    validApiKey = apiKey;
     console.log("[Test Setup] Created test fingerprint:", fingerprintId);
-    console.log("[Test Setup] Created test API key:", apiKey);
-
-    // Wait for test data to be fully propagated
-    await wait(1000);
+    console.log("[Test Setup] Created test API key:", validApiKey);
   });
 
   // Helper function to clean up rate limit data
   async function cleanupRateLimitData(db: FirebaseFirestore.Firestore) {
     console.log("[Cleanup] Starting rate limit data cleanup");
-
-    // Clean up fingerprint rate limits
-    const fingerprintSnapshot = await db
-      .collection(COLLECTIONS.RATE_LIMITS)
-      .where("type", "==", "fingerprint")
-      .get();
-
-    // Clean up IP rate limits
-    const ipSnapshot = await db.collection(COLLECTIONS.RATE_LIMITS).where("type", "==", "ip").get();
-
-    const batch = db.batch();
-    let deletedCount = 0;
-
-    if (!fingerprintSnapshot.empty) {
-      fingerprintSnapshot.docs.forEach((doc) => {
-        console.log(`[Cleanup] Deleting fingerprint rate limit document: ${doc.id}`);
-        batch.delete(doc.ref);
-        deletedCount++;
-      });
-    }
-
-    if (!ipSnapshot.empty) {
-      ipSnapshot.docs.forEach((doc) => {
-        console.log(`[Cleanup] Deleting IP rate limit document: ${doc.id}`);
-        batch.delete(doc.ref);
-        deletedCount++;
-      });
-    }
-
-    if (deletedCount > 0) {
+    const snapshot = await db.collection(COLLECTIONS.RATE_LIMITS).get();
+    if (!snapshot.empty) {
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => batch.delete(doc.ref));
       await batch.commit();
-      console.log(`[Cleanup] Deleted ${deletedCount} rate limit documents`);
-      // Wait longer after cleanup to ensure propagation
-      await wait(2000);
+      console.log(`[Cleanup] Deleted ${snapshot.docs.length} rate limit documents`);
     } else {
       console.log("[Cleanup] No rate limit documents to delete");
-      await wait(1000);
     }
+    await wait(1000); // Wait for cleanup to propagate
   }
 
   it("should enforce fingerprint-based rate limits", async () => {
     const responses: AxiosResponse<ApiResponse>[] = [];
     console.log(`[Test] Starting rate limit test for fingerprint: ${fingerprintId}`);
-    console.log("[Test] Current environment variables:");
-    console.log("  RATE_LIMIT_ENABLED:", process.env.RATE_LIMIT_ENABLED);
-    console.log("  IP_RATE_LIMIT_ENABLED:", process.env.IP_RATE_LIMIT_ENABLED);
 
-    // Make requests in smaller batches to avoid timing issues
+    // Make 102 requests (should get 100 successes and 2 rate limits)
     for (let i = 0; i < 102; i++) {
       try {
         console.log(`[Test] Making request ${i + 1}/102`);
         const response = await makeRequest(
           "post",
           `${API_URL}/visit/log`,
-          {
-            fingerprintId,
-            url: `https://test.com/page-${i}`,
-          },
+          { fingerprintId, url: `test-url-${i}` },
           {
             validateStatus: () => true,
             headers: {
-              "x-api-key": apiKey,
+              "x-api-key": validApiKey,
+              // Use different IPs to bypass IP rate limit
+              "X-Forwarded-For": `192.168.1.${Math.floor(i / 50) + 1}`,
             },
           },
         );
@@ -168,7 +113,7 @@ describe("Fingerprint Rate Limit Test Suite", () => {
         }
 
         // Increase wait time between requests to avoid race conditions
-        await wait(150); // Increased from 100ms to 150ms
+        await wait(150); // Increased from 50ms to 150ms
       } catch (error) {
         console.error(`[Test] Error making request ${i}:`, error);
         throw error;
@@ -202,7 +147,7 @@ describe("Fingerprint Rate Limit Test Suite", () => {
     expect(limitedResponse.data.success).toBe(false);
     expect(limitedResponse.data.error).toBe("Too many requests, please try again later");
     expect(typeof limitedResponse.data.retryAfter).toBe("number");
-  }, 60000);
+  }, 60000); // Increased timeout
 
   it("should track rate limits separately for different fingerprints", async () => {
     // Create another test fingerprint and API key
@@ -210,53 +155,40 @@ describe("Fingerprint Rate Limit Test Suite", () => {
     console.log("[Test] Created second fingerprint:", otherFingerprintId);
     console.log("[Test] Created second API key:", otherApiKey);
 
-    // Wait for the second test data to be fully propagated
-    await wait(1000);
+    // Make 50 requests from first fingerprint
+    for (let i = 0; i < 50; i++) {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        { fingerprintId, url: `test-url-${i}` },
+        {
+          validateStatus: () => true,
+          headers: {
+            "x-api-key": validApiKey,
+            "X-Forwarded-For": "192.168.1.1",
+          },
+        },
+      );
+      expect(response.status).toBe(200);
+      await wait(50);
+    }
 
-    // Make requests in parallel for both fingerprints
-    const makeRequestsForFingerprint = async (fId: string, key: string, prefix: string) => {
-      const responses: AxiosResponse<ApiResponse>[] = [];
-      for (let i = 0; i < 50; i++) {
-        try {
-          const response = await makeRequest(
-            "post",
-            `${API_URL}/visit/log`,
-            {
-              fingerprintId: fId,
-              url: `https://test.com/${prefix}-${i}`,
-            },
-            {
-              validateStatus: () => true,
-              headers: {
-                "x-api-key": key,
-              },
-            },
-          );
-          responses.push(response);
-          await wait(50);
-        } catch (error) {
-          console.error(`[Test] Error making request for ${prefix}:`, error);
-          throw error;
-        }
-      }
-      return responses;
-    };
-
-    // Run requests for both fingerprints concurrently
-    const [firstResponses, secondResponses] = await Promise.all([
-      makeRequestsForFingerprint(fingerprintId, apiKey, "first"),
-      makeRequestsForFingerprint(otherFingerprintId, otherApiKey, "second"),
-    ]);
-
-    console.log(
-      `[Test] First fingerprint results - Successes: ${firstResponses.filter((r) => r.status === 200).length}`,
-    );
-    console.log(
-      `[Test] Second fingerprint results - Successes: ${secondResponses.filter((r) => r.status === 200).length}`,
-    );
-
-    // Verify all responses were successful since each fingerprint is under the limit
-    expect(firstResponses.every((r) => r.status === 200)).toBe(true);
-    expect(secondResponses.every((r) => r.status === 200)).toBe(true);
-  }, 60000); // Increased timeout
+    // Make 50 requests from second fingerprint
+    for (let i = 0; i < 50; i++) {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        { fingerprintId: otherFingerprintId, url: `test-url-${i}` },
+        {
+          validateStatus: () => true,
+          headers: {
+            "x-api-key": otherApiKey,
+            "X-Forwarded-For": "192.168.1.2",
+          },
+        },
+      );
+      expect(response.status).toBe(200);
+      await wait(50);
+    }
+  }, 30000);
 });

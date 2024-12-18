@@ -20,11 +20,10 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
     : config.max || DEFAULT_CONFIG.max;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    // Check both global rate limiting and IP-specific rate limiting
+    // Check if rate limiting is explicitly disabled
     if (
-      process.env.RATE_LIMIT_ENABLED === "false" ||
-      process.env.IP_RATE_LIMIT_ENABLED === "false" ||
-      process.env.IP_RATE_LIMIT_ENABLED === undefined
+      process.env.RATE_LIMIT_DISABLED === "true" ||
+      process.env.IP_RATE_LIMIT_DISABLED === "true"
     ) {
       console.log("[IP Rate Limit] Rate limiting is disabled");
       next();
@@ -39,9 +38,7 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
         (req.headers["x-forwarded-for"] as string)?.split(",")[0].trim() || req.ip || "unknown";
       const now = Date.now();
 
-      console.log(
-        `[IP Rate Limit] Processing request from IP: ${ip}, path: ${req.path}, IP_RATE_LIMIT_ENABLED: ${process.env.IP_RATE_LIMIT_ENABLED}`,
-      );
+      console.log(`[IP Rate Limit] Processing request from IP: ${ip}, path: ${req.path}`);
 
       // Use a transaction to ensure atomic updates
       let retries = 0;
@@ -77,6 +74,7 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
               `[IP Rate Limit] IP: ${ip}, Recent requests: ${recentRequests.length}, Max: ${max}, Window: ${new Date(windowStart).toISOString()} to ${new Date(now).toISOString()}`,
             );
 
+            // Check if we've hit the limit
             if (recentRequests.length >= max) {
               const oldestRequest = Math.min(...recentRequests);
               const retryAfter = Math.ceil((oldestRequest + windowMs - now) / 1000);

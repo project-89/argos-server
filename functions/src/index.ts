@@ -12,7 +12,7 @@ admin.initializeApp();
 // Create Express app
 const app = express();
 
-// Apply middleware
+// Apply global middleware
 app.use(cors());
 app.use(express.json());
 app.use(ipRateLimit());
@@ -37,11 +37,11 @@ app.get("/price/current", price.getCurrent);
 app.get("/price/history/:tokenId", price.getHistory);
 app.get("/reality-stability", realityStability.getRealityStabilityIndex);
 
-// Apply fingerprint rate limit to all routes that need it
-app.use("/visit/*", fingerprintRateLimit());
-
 // Auth middleware for protected routes
 app.use(auth);
+
+// Apply fingerprint rate limit after auth
+app.use(fingerprintRateLimit());
 
 // Protected routes
 app.get("/fingerprint/:id", fingerprint.get);

@@ -32,6 +32,7 @@ curl -s -X GET "$BASE_URL/get-fingerprint/$FINGERPRINT_ID"
 echo -e "\n${GREEN}Testing log visit...${NC}"
 curl -s -X POST "$BASE_URL/log-visit" \
 -H "Content-Type: application/json" \
+-H "x-api-key: $API_KEY" \
 -d "{
   \"fingerprintId\": \"$FINGERPRINT_ID\",
   \"siteId\": \"test-site\"
