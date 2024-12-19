@@ -220,7 +220,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
+      expect(response.data.error).toBe("Not authorized to revoke this API key");
     });
 
     it("should handle non-existent API key", async () => {

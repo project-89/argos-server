@@ -16,7 +16,7 @@ describe("CORS Test Suite", () => {
     await initializeTestEnvironment();
 
     // Verify environment setup
-    console.log("Test environment setup:", {
+    console.log("[CORS Test] Environment setup:", {
       NODE_ENV: process.env.NODE_ENV,
       FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
       ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS,
@@ -24,7 +24,7 @@ describe("CORS Test Suite", () => {
 
     // Verify CORS configuration
     const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-    console.log("Allowed origins from CORS_CONFIG:", allowedOrigins);
+    console.log("[CORS Test] Allowed origins from CORS_CONFIG:", allowedOrigins);
 
     expect(process.env.NODE_ENV).toBe("test");
     expect(process.env.FUNCTIONS_EMULATOR).toBe("true");
@@ -35,40 +35,66 @@ describe("CORS Test Suite", () => {
   });
 
   it("should allow requests from default development origins", async () => {
+    const origin = "http://localhost:5173";
+    console.log("[CORS Test] Testing development origin:", origin);
+
     const response = await makeRequest("get", `${API_URL}/role/available`, null, {
       headers: {
-        Origin: "http://localhost:5173",
+        Origin: origin,
       },
       validateStatus: () => true,
     });
 
-    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    console.log("[CORS Test] Response headers:", response.headers);
+    console.log("[CORS Test] Response status:", response.status);
+    if (response.status !== 200) {
+      console.log("[CORS Test] Response data:", response.data);
+    }
+
+    expect(response.headers["access-control-allow-origin"]).toBe(origin);
     expect(response.status).toBe(200);
   });
 
   it("should allow requests from test origins", async () => {
+    const origin = "https://test.com";
+    console.log("[CORS Test] Testing test origin:", origin);
+
     // Verify the origin is in the allowed list
     const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-    expect(allowedOrigins).toContain("https://test.com");
+    console.log("[CORS Test] Current allowed origins:", allowedOrigins);
+    expect(allowedOrigins).toContain(origin);
 
     const response = await makeRequest("get", `${API_URL}/role/available`, null, {
       headers: {
-        Origin: "https://test.com",
+        Origin: origin,
       },
       validateStatus: () => true,
     });
 
-    expect(response.headers["access-control-allow-origin"]).toBe("https://test.com");
+    console.log("[CORS Test] Response headers:", response.headers);
+    console.log("[CORS Test] Response status:", response.status);
+    if (response.status !== 200) {
+      console.log("[CORS Test] Response data:", response.data);
+    }
+
+    expect(response.headers["access-control-allow-origin"]).toBe(origin);
     expect(response.status).toBe(200);
   });
 
   it("should block requests from unauthorized origins", async () => {
+    const origin = "https://unauthorized.com";
+    console.log("[CORS Test] Testing unauthorized origin:", origin);
+
     const response = await makeRequest("get", `${API_URL}/role/available`, null, {
       headers: {
-        Origin: "https://unauthorized.com",
+        Origin: origin,
       },
       validateStatus: () => true,
     });
+
+    console.log("[CORS Test] Response headers:", response.headers);
+    console.log("[CORS Test] Response status:", response.status);
+    console.log("[CORS Test] Response data:", response.data);
 
     expect(response.status).toBe(500);
     expect(response.data).toContain("Not allowed by CORS");

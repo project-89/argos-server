@@ -44,31 +44,45 @@ export const CORS_CONFIG = {
   // Get allowed origins based on environment
   getAllowedOrigins: (): readonly string[] => {
     const origins: string[] = [];
+    const isTestOrDev =
+      process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true";
+
+    console.log("[CORS Config] Environment:", {
+      NODE_ENV: process.env.NODE_ENV,
+      FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
+      isTestOrDev,
+    });
 
     // Development/Test environment only
-    if (process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true") {
-      console.log("Development/Test environment detected - allowing development origins");
+    if (isTestOrDev) {
+      console.log(
+        "[CORS Config] Development/Test environment detected - allowing development origins",
+      );
       origins.push(...CORS_CONFIG.defaultOrigins);
       origins.push(...CORS_CONFIG.testOrigins);
     } else {
       // Production environment
-      console.log("Production environment detected - strict origin validation enabled");
+      console.log(
+        "[CORS Config] Production environment detected - strict origin validation enabled",
+      );
       origins.push(...CORS_CONFIG.productionOrigins);
     }
 
     // Add additional origins from environment variable (useful for dynamic configuration in production)
     const envOrigins = process.env.ALLOWED_ORIGINS;
     if (envOrigins) {
-      console.log(`Adding origins from ALLOWED_ORIGINS: ${envOrigins}`);
+      console.log(`[CORS Config] Adding origins from ALLOWED_ORIGINS: ${envOrigins}`);
       origins.push(...envOrigins.split(",").map((origin) => origin.trim()));
     }
 
     // Log warning if no origins are configured in production
     if (process.env.NODE_ENV === "production" && origins.length === 0) {
-      console.error("SECURITY WARNING: No CORS origins configured in production!");
+      console.error("[CORS Config] SECURITY WARNING: No CORS origins configured in production!");
     }
 
-    return [...new Set(origins)];
+    const uniqueOrigins = [...new Set(origins)];
+    console.log("[CORS Config] Final allowed origins:", uniqueOrigins);
+    return uniqueOrigins;
   },
 
   // CORS Options with security-focused settings
