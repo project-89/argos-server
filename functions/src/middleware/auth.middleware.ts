@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from "express";
-import { validateApiKey } from "../endpoints/apiKey.endpoint";
 import { PUBLIC_ENDPOINTS } from "../constants";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
@@ -24,9 +23,9 @@ export const auth = async (req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
-    // Get API key from header
-    const apiKey = req.header("x-api-key");
-    if (!apiKey) {
+    // Get encrypted API key from header
+    const encryptedApiKey = req.header("x-api-key");
+    if (!encryptedApiKey) {
       res.status(401).json({
         success: false,
         error: "API key is required",
@@ -34,9 +33,27 @@ export const auth = async (req: Request, res: Response, next: NextFunction): Pro
       return;
     }
 
-    // Validate API key
-    const { isValid, fingerprintId } = await validateApiKey(apiKey);
-    if (!isValid || !fingerprintId) {
+    // For revocation endpoint, we need to validate the key differently
+    // since we want to allow revoking already disabled keys
+    const db = getFirestore();
+    const keySnapshot = await db
+      .collection(COLLECTIONS.API_KEYS)
+      .where("key", "==", encryptedApiKey)
+      .get();
+
+    if (keySnapshot.empty) {
+      res.status(401).json({
+        success: false,
+        error: "Invalid API key",
+      });
+      return;
+    }
+
+    const keyData = keySnapshot.docs[0].data();
+    const fingerprintId = keyData.fingerprintId;
+
+    // For non-revocation endpoints, check if the key is enabled
+    if (path !== "/api-key/revoke" && !keyData.enabled) {
       res.status(401).json({
         success: false,
         error: "Invalid API key",
@@ -47,55 +64,31 @@ export const auth = async (req: Request, res: Response, next: NextFunction): Pro
     // Add fingerprint ID to request
     req.fingerprintId = fingerprintId;
 
-    // Special handling for API key revocation
-    if (path === "/api-key/revoke") {
-      const { key } = req.body;
-      if (key) {
-        const db = getFirestore();
-        const snapshot = await db
-          .collection(COLLECTIONS.API_KEYS)
-          .where("key", "==", key)
-          .where("enabled", "==", true)
-          .get();
+    // Check if the requested fingerprint exists
+    const requestedFingerprintId =
+      req.params.id || req.params.fingerprintId || req.body?.fingerprintId;
+    if (requestedFingerprintId) {
+      const db = getFirestore();
+      const fingerprintDoc = await db
+        .collection(COLLECTIONS.FINGERPRINTS)
+        .doc(requestedFingerprintId)
+        .get();
 
-        if (!snapshot.empty) {
-          const apiKeyData = snapshot.docs[0].data();
-          if (apiKeyData.fingerprintId !== fingerprintId) {
-            res.status(403).json({
-              success: false,
-              error: "Not authorized to revoke this API key",
-            });
-            return;
-          }
-        }
+      if (!fingerprintDoc.exists) {
+        res.status(404).json({
+          success: false,
+          error: "Fingerprint not found",
+        });
+        return;
       }
-    } else {
-      // Check if the requested fingerprint exists
-      const requestedFingerprintId =
-        req.params.id || req.params.fingerprintId || req.body?.fingerprintId;
-      if (requestedFingerprintId) {
-        const db = getFirestore();
-        const fingerprintDoc = await db
-          .collection(COLLECTIONS.FINGERPRINTS)
-          .doc(requestedFingerprintId)
-          .get();
 
-        if (!fingerprintDoc.exists) {
-          res.status(404).json({
-            success: false,
-            error: "Fingerprint not found",
-          });
-          return;
-        }
-
-        // Only verify ownership if the fingerprint exists
-        if (requestedFingerprintId !== fingerprintId) {
-          res.status(403).json({
-            success: false,
-            error: "API key does not match fingerprint",
-          });
-          return;
-        }
+      // Only verify ownership if the fingerprint exists
+      if (requestedFingerprintId !== fingerprintId) {
+        res.status(403).json({
+          success: false,
+          error: "API key does not match fingerprint",
+        });
+        return;
       }
     }
 

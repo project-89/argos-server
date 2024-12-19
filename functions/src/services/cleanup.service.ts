@@ -11,6 +11,8 @@ interface CleanupResult {
   rateLimitRequests: number;
   deletedVisits: number;
   deletedPresence: number;
+  disabledApiKeys: number;
+  deletedApiKeys: number;
   total: number;
   cleanupTime: number;
   itemsCleaned: {
@@ -19,7 +21,33 @@ interface CleanupResult {
     rateLimitRequests: number;
     visits: number;
     presence: number;
+    disabledApiKeys: number;
+    deletedApiKeys: number;
   };
+}
+
+interface VisitData {
+  id: string;
+  fingerprintId: string;
+  siteId: string;
+  timestamp: number;
+  url: string;
+  title?: string;
+}
+
+interface VisitPattern {
+  currentSite: string;
+  nextSite: string;
+  transitionCount: number;
+  averageTimeSpent: number;
+}
+
+interface SiteEngagement {
+  siteId: string;
+  totalVisits: number;
+  averageTimeSpent: number;
+  returnRate: number; // percentage of users who return
+  commonNextSites: string[]; // top 3 next sites visited
 }
 
 export const cleanupData = async (shouldError = false): Promise<CleanupResult> => {
@@ -34,12 +62,6 @@ export const cleanupData = async (shouldError = false): Promise<CleanupResult> =
     const now = Date.now();
     const thirtyDaysAgo = now - THIRTY_DAYS_MS;
     const oneDayAgo = now - ONE_DAY_MS;
-
-    // Delete old visits
-    const visitsSnapshot = await db
-      .collection(COLLECTIONS.VISITS)
-      .where("timestamp", "<", thirtyDaysAgo)
-      .get();
 
     // Delete old presence records
     const presenceSnapshot = await db
@@ -65,14 +87,37 @@ export const cleanupData = async (shouldError = false): Promise<CleanupResult> =
       .where("lastUpdated", "<", thirtyDaysAgo)
       .get();
 
+    // Find expired API keys
+    const expiredKeysSnapshot = await db
+      .collection(COLLECTIONS.API_KEYS)
+      .where("expiresAt", "<", now)
+      .where("enabled", "==", true)
+      .get();
+
+    // Find old disabled API keys
+    const oldDisabledKeysSnapshot = await db
+      .collection(COLLECTIONS.API_KEYS)
+      .where("enabled", "==", false)
+      .where("disabledAt", "<", thirtyDaysAgo)
+      .get();
+
     // Perform all deletions in batches
     const batch = db.batch();
 
-    visitsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
     presenceSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
     priceCacheSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
     rateLimitStatsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
     rateLimitRequestsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+    oldDisabledKeysSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
+
+    // Disable expired keys
+    expiredKeysSnapshot.docs.forEach((doc) => {
+      batch.update(doc.ref, {
+        enabled: false,
+        disabledAt: new Date(),
+        disabledReason: "expired",
+      });
+    });
 
     await batch.commit();
 
@@ -80,21 +125,26 @@ export const cleanupData = async (shouldError = false): Promise<CleanupResult> =
       priceCache: priceCacheSnapshot.size,
       rateLimitStats: rateLimitStatsSnapshot.size,
       rateLimitRequests: rateLimitRequestsSnapshot.size,
-      deletedVisits: visitsSnapshot.size,
+      deletedVisits: 0,
       deletedPresence: presenceSnapshot.size,
+      disabledApiKeys: expiredKeysSnapshot.size,
+      deletedApiKeys: oldDisabledKeysSnapshot.size,
       total:
         priceCacheSnapshot.size +
         rateLimitStatsSnapshot.size +
         rateLimitRequestsSnapshot.size +
-        visitsSnapshot.size +
-        presenceSnapshot.size,
+        presenceSnapshot.size +
+        expiredKeysSnapshot.size +
+        oldDisabledKeysSnapshot.size,
       cleanupTime: Date.now() - startTime,
       itemsCleaned: {
         priceCache: priceCacheSnapshot.size,
         rateLimitStats: rateLimitStatsSnapshot.size,
         rateLimitRequests: rateLimitRequestsSnapshot.size,
-        visits: visitsSnapshot.size,
+        visits: 0,
         presence: presenceSnapshot.size,
+        disabledApiKeys: expiredKeysSnapshot.size,
+        deletedApiKeys: oldDisabledKeysSnapshot.size,
       },
     };
 
@@ -129,4 +179,84 @@ export const cleanupRateLimits = async (identifier: string): Promise<void> => {
     console.error(`Error cleaning up rate limits for ${identifier}:`, error);
     throw error;
   }
+};
+
+export const analyzeVisitPatterns = async (
+  fingerprintId: string,
+): Promise<{
+  patterns: VisitPattern[];
+  engagement: SiteEngagement[];
+}> => {
+  const db = getFirestore();
+
+  // Get all visits for this fingerprint, ordered by timestamp
+  const visitsSnapshot = await db
+    .collection(COLLECTIONS.VISITS)
+    .where("fingerprintId", "==", fingerprintId)
+    .orderBy("timestamp", "asc")
+    .get();
+
+  const visits: VisitData[] = visitsSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as Omit<VisitData, "id">),
+  }));
+
+  // Analyze site transitions
+  const patterns: Map<string, VisitPattern> = new Map();
+  const siteVisits: Map<string, number[]> = new Map();
+
+  for (let i = 0; i < visits.length - 1; i++) {
+    const current = visits[i];
+    const next = visits[i + 1];
+    const timeSpent = next.timestamp - current.timestamp;
+
+    // Track site transitions
+    const key = `${current.siteId}-${next.siteId}`;
+    const existing = patterns.get(key) || {
+      currentSite: current.siteId,
+      nextSite: next.siteId,
+      transitionCount: 0,
+      averageTimeSpent: 0,
+    };
+
+    existing.transitionCount++;
+    existing.averageTimeSpent =
+      (existing.averageTimeSpent * (existing.transitionCount - 1) + timeSpent) /
+      existing.transitionCount;
+    patterns.set(key, existing);
+
+    // Track visits per site
+    const siteVisitTimes = siteVisits.get(current.siteId) || [];
+    siteVisitTimes.push(timeSpent);
+    siteVisits.set(current.siteId, siteVisitTimes);
+  }
+
+  // Calculate site engagement metrics
+  const engagement: SiteEngagement[] = Array.from(siteVisits.entries()).map(([siteId, times]) => {
+    const totalVisits = times.length;
+    const averageTimeSpent = times.reduce((a, b) => a + b, 0) / totalVisits;
+
+    // Find most common next sites
+    const nextSites = Array.from(patterns.values())
+      .filter((p) => p.currentSite === siteId)
+      .sort((a, b) => b.transitionCount - a.transitionCount)
+      .slice(0, 3)
+      .map((p) => p.nextSite);
+
+    // Calculate return rate (visits > 1 indicates returns)
+    const returnRate = totalVisits > 1 ? ((totalVisits - 1) / totalVisits) * 100 : 0;
+
+    return {
+      siteId,
+      totalVisits,
+      averageTimeSpent,
+      returnRate,
+      commonNextSites: nextSites,
+    };
+  });
+
+  return {
+    patterns: Array.from(patterns.values()),
+    engagement: engagement,
+  };
 };

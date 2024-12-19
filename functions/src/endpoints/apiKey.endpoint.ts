@@ -1,35 +1,54 @@
 import { Request, Response } from "express";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
-import { generateApiKey } from "../utils/api-key";
+import { generateApiKey, encryptApiKey } from "../utils/api-key";
 import { validateRequest } from "../middleware/validation.middleware";
 import { schemas } from "../types/schemas";
 
 // Internal validation function
 export const validateApiKey = async (
-  apiKey: string,
+  encryptedApiKey: string,
 ): Promise<{ isValid: boolean; fingerprintId?: string }> => {
   try {
     const db = getFirestore();
 
-    // Query for the API key
+    // Query for the API key using encrypted key
     const snapshot = await db
       .collection(COLLECTIONS.API_KEYS)
-      .where("key", "==", apiKey)
-      .where("enabled", "==", true)
+      .where("key", "==", encryptedApiKey)
       .get();
 
     if (snapshot.empty) {
-      console.warn("API key not found or not enabled:", apiKey);
+      console.warn("API key not found");
       return { isValid: false };
     }
 
     const doc = snapshot.docs[0];
     const data = doc.data();
+
+    // Check if key is enabled and not expired
+    if (!data.enabled) {
+      console.warn("API key is disabled");
+      return { isValid: false };
+    }
+
+    const expiresAt = data.expiresAt?.toDate?.();
+    if (expiresAt && expiresAt < new Date()) {
+      console.warn("API key is expired");
+      // Disable expired key
+      await doc.ref.update({
+        enabled: false,
+        disabledAt: new Date(),
+        disabledReason: "expired",
+      });
+      return { isValid: false };
+    }
+
     console.log("API key data found:", {
       fingerprintId: data.fingerprintId,
       enabled: data.enabled,
       createdAt: data.createdAt?.toDate?.(),
+      expiresAt: data.expiresAt?.toDate?.(),
       metadata: data.metadata,
     });
 
@@ -72,14 +91,16 @@ export const register = [
         .get();
 
       // Generate new API key
-      const apiKey = generateApiKey();
+      const plainApiKey = generateApiKey();
+      const encryptedApiKey = encryptApiKey(plainApiKey);
 
-      // Save API key
+      // Save encrypted API key (server-side)
       const apiKeyRef = db.collection(COLLECTIONS.API_KEYS).doc();
       await apiKeyRef.set({
-        key: apiKey,
+        key: encryptedApiKey, // Store encrypted key in database
         fingerprintId,
         createdAt: new Date(),
+        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
         enabled: true,
         metadata: {
           name: "Generated API Key",
@@ -95,10 +116,11 @@ export const register = [
         await batch.commit();
       }
 
+      // Return encrypted key to client
       return res.status(200).json({
         success: true,
         data: {
-          key: apiKey,
+          key: encryptedApiKey,
           fingerprintId,
         },
       });
@@ -117,8 +139,8 @@ export const validate = [
   validateRequest(schemas.apiKeyValidate),
   async (req: Request, res: Response): Promise<Response> => {
     try {
-      const { key } = req.body;
-      const result = await validateApiKey(key);
+      const { key: encryptedKey } = req.body;
+      const result = await validateApiKey(encryptedKey);
 
       return res.status(200).json({
         success: true,
@@ -143,42 +165,72 @@ export const revoke = [
   validateRequest(schemas.apiKeyRevoke),
   async (req: Request, res: Response): Promise<Response> => {
     try {
-      const { key } = req.body;
+      const { key: encryptedKey } = req.body;
 
       const db = getFirestore();
-      const snapshot = await db
+
+      // First check if the key exists at all
+      const keySnapshot = await db
         .collection(COLLECTIONS.API_KEYS)
-        .where("key", "==", key)
-        .where("enabled", "==", true)
+        .where("key", "==", encryptedKey)
         .get();
 
-      if (snapshot.empty) {
+      if (keySnapshot.empty) {
         return res.status(404).json({
           success: false,
           error: "API key not found",
         });
       }
 
+      const doc = keySnapshot.docs[0];
+      const data = doc.data();
+
+      // Check if key is already disabled
+      if (!data.enabled) {
+        return res.status(404).json({
+          success: false,
+          error: "API key not found or already revoked",
+        });
+      }
+
       // Check if the API key belongs to the authenticated user
-      const apiKeyData = snapshot.docs[0].data();
-      if (apiKeyData.fingerprintId !== req.fingerprintId) {
+      if (data.fingerprintId !== req.fingerprintId) {
         return res.status(403).json({
           success: false,
           error: "Not authorized to revoke this API key",
         });
       }
 
-      // Disable the API key instead of deleting it
-      await snapshot.docs[0].ref.update({
+      // Disable the API key
+      await doc.ref.update({
         enabled: false,
         revokedAt: new Date(),
       });
 
+      // Wait for write to be committed and verify the key was actually disabled
+      const updatedDoc = await doc.ref.get();
+      const updatedData = updatedDoc.data();
+
+      if (updatedData?.enabled) {
+        throw new Error("Failed to disable API key");
+      }
+
+      // Double check the key is actually disabled in a new query
+      const verifySnapshot = await db
+        .collection(COLLECTIONS.API_KEYS)
+        .where("key", "==", encryptedKey)
+        .get();
+
+      if (!verifySnapshot.empty) {
+        const verifyData = verifySnapshot.docs[0].data();
+        if (verifyData.enabled) {
+          throw new Error("Failed to persist API key disabled state");
+        }
+      }
+
       return res.status(200).json({
         success: true,
-        data: {
-          message: "API key revoked successfully",
-        },
+        message: "API key revoked successfully",
       });
     } catch (error: any) {
       console.error("Error in revoke API key:", error);

@@ -173,7 +173,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("message", "API key revoked successfully");
+      expect(response.data.message).toBe("API key revoked successfully");
 
       // Verify the key is no longer valid
       const validateResponse = await makeRequest("post", `${API_URL}/api-key/validate`, {
@@ -242,11 +242,51 @@ describe("API Key Endpoint", () => {
     });
 
     it("should handle non-existent API key", async () => {
+      // Register a new API key to get a valid encrypted key format
+      const { fingerprintId: newFpId } = await createTestData();
+      const response = await makeRequest("post", `${API_URL}/api-key/register`, {
+        fingerprintId: newFpId,
+      });
+      const encryptedKey = response.data.data.key;
+
+      // Try to revoke this key using a different fingerprint's API key
+      const revokeResponse = await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: encryptedKey,
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(revokeResponse.status).toBe(403);
+      expect(revokeResponse.data.success).toBe(false);
+      expect(revokeResponse.data.error).toBe("Not authorized to revoke this API key");
+    });
+
+    // Add a new test for already revoked keys
+    it("should handle already revoked API key", async () => {
+      // First revoke the key
+      await makeRequest(
+        "post",
+        `${API_URL}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      // Try to revoke it again
       const response = await makeRequest(
         "post",
         `${API_URL}/api-key/revoke`,
         {
-          key: "non-existent-key",
+          key: validApiKey,
         },
         {
           headers: { "x-api-key": validApiKey },
@@ -256,7 +296,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key not found");
+      expect(response.data.error).toBe("API key not found or already revoked");
     });
 
     it("should require key field", async () => {

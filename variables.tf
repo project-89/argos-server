@@ -15,3 +15,15 @@ variable "region" {
   type        = string
   default     = "us-central1"
 }
+
+variable "api_key_encryption_key" {
+  description = "Base64-encoded 32-byte key for API key encryption"
+  type        = string
+  sensitive   = true
+}
+
+variable "api_key_encryption_iv" {
+  description = "Base64-encoded 16-byte initialization vector for API key encryption"
+  type        = string
+  sensitive   = true
+}
