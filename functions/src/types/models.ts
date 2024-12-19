@@ -5,6 +5,13 @@ export interface Fingerprint {
   roles: string[];
   tags: Record<string, any>;
   createdAt: FirebaseFirestore.Timestamp;
+  ipAddresses: string[];
+  ipMetadata: {
+    primaryIp?: string; // Most frequently used IP
+    ipFrequency: Record<string, number>; // Count of requests per IP
+    lastSeenAt: Record<string, FirebaseFirestore.Timestamp>; // Last time each IP was seen
+    suspiciousIps: string[]; // IPs flagged as potentially suspicious
+  };
 }
 
 export interface ApiKey {

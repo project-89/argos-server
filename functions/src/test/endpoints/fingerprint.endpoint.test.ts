@@ -28,11 +28,21 @@ describe("Fingerprint Endpoint", () => {
   });
 
   describe("POST /fingerprint/register", () => {
-    it("should register a new fingerprint", async () => {
-      const response = await makeRequest("post", `${API_URL}/fingerprint/register`, {
-        fingerprint: "test-fingerprint-2",
-        metadata: { test: true },
-      });
+    it("should register a new fingerprint with IP metadata", async () => {
+      const testIp = "127.0.0.1";
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/fingerprint/register`,
+        {
+          fingerprint: "test-fingerprint-2",
+          metadata: { test: true },
+        },
+        {
+          headers: {
+            "x-forwarded-for": testIp,
+          },
+        },
+      );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -43,6 +53,124 @@ describe("Fingerprint Endpoint", () => {
       expect(response.data.data).toHaveProperty("metadata");
       expect(response.data.data.metadata).toHaveProperty("test", true);
       expect(response.data.data).toHaveProperty("tags", {});
+
+      // Verify IP tracking data
+      expect(response.data.data).toHaveProperty("ipAddresses");
+      expect(Array.isArray(response.data.data.ipAddresses)).toBe(true);
+      expect(response.data.data.ipAddresses).toContain(testIp);
+
+      expect(response.data.data).toHaveProperty("ipMetadata");
+      expect(response.data.data.ipMetadata).toHaveProperty("primaryIp", testIp);
+      expect(response.data.data.ipMetadata.ipFrequency[testIp]).toBe(1);
+      expect(response.data.data.ipMetadata).toHaveProperty("lastSeenAt");
+      expect(response.data.data.ipMetadata.suspiciousIps).toEqual([]);
+    });
+
+    it("should track IP frequency and update primary IP", async () => {
+      const testIp = "127.0.0.1";
+      // First request with initial IP
+      const response1 = await makeRequest(
+        "post",
+        `${API_URL}/fingerprint/register`,
+        {
+          fingerprint: "test-fingerprint-3",
+          metadata: { test: true },
+        },
+        {
+          headers: {
+            "x-forwarded-for": testIp,
+          },
+        },
+      );
+
+      expect(response1.status).toBe(200);
+      expect(response1.data.data).toHaveProperty("ipAddresses");
+      expect(response1.data.data.ipAddresses).toContain(testIp);
+
+      const fingerprintId = response1.data.data.id;
+
+      // Create an API key for this fingerprint
+      const apiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
+        fingerprintId,
+      });
+      const apiKey = apiKeyResponse.data.data.key;
+
+      // Make multiple requests with the first IP to establish it as primary
+      for (let i = 0; i < 15; i++) {
+        await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+          headers: {
+            "x-api-key": apiKey,
+            "x-forwarded-for": testIp,
+          },
+        });
+      }
+
+      // Verify the first IP is now primary
+      const response2 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+        headers: {
+          "x-api-key": apiKey,
+          "x-forwarded-for": testIp,
+        },
+      });
+
+      expect(response2.data.data.ipMetadata.primaryIp).toBe(testIp);
+      expect(response2.data.data.ipMetadata.ipFrequency[testIp]).toBe(17); // Initial + 16 requests
+
+      // Wait for the initial time window to pass
+      await new Promise((resolve) => setTimeout(resolve, 150)); // Wait longer than the test time window (100ms)
+
+      // Make request with a new IP
+      const newIp = "1.2.3.4";
+      const response3 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+        headers: {
+          "x-api-key": apiKey,
+          "x-forwarded-for": newIp,
+        },
+      });
+
+      // Verify the new IP is tracked and marked as suspicious
+      expect(response3.data).toHaveProperty("warning", "Suspicious IP activity detected");
+      expect(response3.data.data.ipMetadata.suspiciousIps).toContain(newIp);
+      expect(response3.data.data.ipMetadata.primaryIp).toBe(testIp); // First IP should still be primary
+    });
+
+    it("should not mark new IPs as suspicious within initial time window", async () => {
+      const testIp = "127.0.0.1";
+      // Register a new fingerprint
+      const response1 = await makeRequest(
+        "post",
+        `${API_URL}/fingerprint/register`,
+        {
+          fingerprint: "test-fingerprint-4",
+          metadata: { test: true },
+        },
+        {
+          headers: {
+            "x-forwarded-for": testIp,
+          },
+        },
+      );
+
+      const fingerprintId = response1.data.data.id;
+
+      // Create an API key
+      const apiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
+        fingerprintId,
+      });
+      const apiKey = apiKeyResponse.data.data.key;
+
+      // Make request with a different IP within the time window
+      const newIp = "5.6.7.8";
+      const response2 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+        headers: {
+          "x-api-key": apiKey,
+          "x-forwarded-for": newIp,
+        },
+      });
+
+      // Verify the new IP is not marked as suspicious
+      expect(response2.data).not.toHaveProperty("warning");
+      expect(response2.data.data.ipMetadata.suspiciousIps).not.toContain(newIp);
     });
 
     it("should require fingerprint field", async () => {
