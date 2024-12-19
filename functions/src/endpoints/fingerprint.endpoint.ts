@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ROLES } from "../constants";
 import { Fingerprint } from "../types/models";
+import { validateRequest } from "../middleware/validation.middleware";
+import { schemas } from "../types/schemas";
 
 const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed from an IP to establish it as trusted
 const SUSPICIOUS_TIME_WINDOW =
@@ -32,57 +34,54 @@ const getClientIp = (req: Request): string => {
   return req.ip || req.socket.remoteAddress || "unknown";
 };
 
-export const register = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { fingerprint, metadata } = req.body;
-    const ip = getClientIp(req);
+// Register endpoint with validation middleware
+export const register = [
+  validateRequest(schemas.fingerprintRegister),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { fingerprint, metadata } = req.body;
+      const ip = getClientIp(req);
 
-    // Validate required fields
-    if (!fingerprint) {
-      return res.status(400).json({
+      // Create initial document data
+      const now = Timestamp.now();
+      const docData: Omit<FingerprintDocData, "id"> = {
+        fingerprint,
+        roles: [ROLES.USER], // Default role
+        createdAt: now,
+        metadata: metadata || {},
+        tags: {},
+        ipAddresses: [ip],
+        ipMetadata: {
+          primaryIp: ip,
+          ipFrequency: { [ip]: 1 },
+          lastSeenAt: { [ip]: now },
+          suspiciousIps: [],
+        },
+      };
+
+      // Create fingerprint document
+      const db = getFirestore();
+      const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add(docData);
+
+      // Return success response
+      return res.status(200).json({
+        success: true,
+        data: {
+          id: fingerprintRef.id,
+          ...docData,
+        },
+      });
+    } catch (error) {
+      console.error("Error registering fingerprint:", error);
+      return res.status(500).json({
         success: false,
-        error: "Missing required field: fingerprint",
+        error: "Internal server error",
       });
     }
+  },
+];
 
-    // Create initial document data
-    const now = Timestamp.now();
-    const docData: Omit<FingerprintDocData, "id"> = {
-      fingerprint,
-      roles: [ROLES.USER], // Default role
-      createdAt: now,
-      metadata: metadata || {},
-      tags: {},
-      ipAddresses: [ip],
-      ipMetadata: {
-        primaryIp: ip,
-        ipFrequency: { [ip]: 1 },
-        lastSeenAt: { [ip]: now },
-        suspiciousIps: [],
-      },
-    };
-
-    // Create fingerprint document
-    const db = getFirestore();
-    const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add(docData);
-
-    // Return success response
-    return res.status(200).json({
-      success: true,
-      data: {
-        id: fingerprintRef.id,
-        ...docData,
-      },
-    });
-  } catch (error) {
-    console.error("Error registering fingerprint:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error",
-    });
-  }
-};
-
+// Get endpoint with validation middleware for params
 export const get = async (req: Request, res: Response): Promise<Response> => {
   try {
     const { id } = req.params;

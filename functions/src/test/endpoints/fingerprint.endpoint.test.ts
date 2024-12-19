@@ -177,9 +177,7 @@ describe("Fingerprint Endpoint", () => {
       const response = await makeRequest(
         "post",
         `${API_URL}/fingerprint/register`,
-        {
-          metadata: { test: true },
-        },
+        {},
         {
           validateStatus: () => true,
         },
@@ -187,7 +185,16 @@ describe("Fingerprint Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: fingerprint");
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["fingerprint"],
+          message: "Required",
+        },
+      ]);
     });
   });
 

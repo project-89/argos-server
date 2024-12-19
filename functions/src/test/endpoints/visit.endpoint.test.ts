@@ -113,27 +113,32 @@ describe("Visit Endpoint", () => {
     });
 
     it("should require fingerprintId and url", async () => {
-      await expect(
-        makeRequest(
-          "post",
-          `${API_URL}/visit/log`,
-          {
-            fingerprintId,
-            // missing url
-          },
-          {
-            headers: { "x-api-key": validApiKey },
-          },
-        ),
-      ).rejects.toMatchObject({
-        response: {
-          status: 400,
-          data: {
-            success: false,
-            error: "Missing required field: url",
-          },
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId,
         },
-      });
+        {
+          headers: {
+            "x-api-key": validApiKey,
+          },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["url"],
+          message: "Required",
+        },
+      ]);
     });
 
     it("should handle non-existent fingerprint", async () => {
@@ -223,17 +228,27 @@ describe("Visit Endpoint", () => {
         `${API_URL}/visit/presence`,
         {
           fingerprintId,
-          // missing status
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: status");
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["status"],
+          message: "Required",
+        },
+      ]);
     });
 
     it("should reject request without API key", async () => {

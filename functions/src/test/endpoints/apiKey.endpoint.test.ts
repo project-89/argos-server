@@ -80,7 +80,16 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: fingerprintId");
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["fingerprintId"],
+          message: "Required",
+        },
+      ]);
     });
 
     it("should validate fingerprintId exists", async () => {
@@ -136,7 +145,16 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: key");
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["key"],
+          message: "Required",
+        },
+      ]);
     });
   });
 
@@ -247,14 +265,25 @@ describe("API Key Endpoint", () => {
         `${API_URL}/api-key/revoke`,
         {},
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: key");
+      expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["key"],
+          message: "Required",
+        },
+      ]);
     });
   });
 });

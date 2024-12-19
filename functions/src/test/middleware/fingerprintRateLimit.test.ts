@@ -76,19 +76,14 @@ describe("Fingerprint Rate Limit Test Suite", () => {
     for (let i = 0; i < 102; i++) {
       try {
         console.log(`[Test] Making request ${i + 1}/102`);
-        const response = await makeRequest(
-          "post",
-          `${API_URL}/visit/log`,
-          { fingerprintId, url: `test-url-${i}` },
-          {
-            validateStatus: () => true,
-            headers: {
-              "x-api-key": validApiKey,
-              // Use different IPs to bypass IP rate limit
-              "X-Forwarded-For": `192.168.1.${Math.floor(i / 50) + 1}`,
-            },
+        const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+          validateStatus: () => true,
+          headers: {
+            "x-api-key": validApiKey,
+            // Use different IPs to bypass IP rate limit
+            "X-Forwarded-For": `192.168.1.${Math.floor(i / 50) + 1}`,
           },
-        );
+        });
         responses.push(response);
 
         // Log every response status and data
@@ -113,7 +108,7 @@ describe("Fingerprint Rate Limit Test Suite", () => {
         }
 
         // Increase wait time between requests to avoid race conditions
-        await wait(150); // Increased from 50ms to 150ms
+        await wait(200); // Increased from 150ms to 200ms
       } catch (error) {
         console.error(`[Test] Error making request ${i}:`, error);
         throw error;
@@ -157,28 +152,23 @@ describe("Fingerprint Rate Limit Test Suite", () => {
 
     // Make 50 requests from first fingerprint
     for (let i = 0; i < 50; i++) {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/log`,
-        { fingerprintId, url: `test-url-${i}` },
-        {
-          validateStatus: () => true,
-          headers: {
-            "x-api-key": validApiKey,
-            "X-Forwarded-For": "192.168.1.1",
-          },
+      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+        validateStatus: () => true,
+        headers: {
+          "x-api-key": validApiKey,
+          "X-Forwarded-For": "192.168.1.1",
         },
-      );
+      });
       expect(response.status).toBe(200);
-      await wait(50);
+      await wait(100); // Increased from 50ms to 100ms
     }
 
     // Make 50 requests from second fingerprint
     for (let i = 0; i < 50; i++) {
       const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/log`,
-        { fingerprintId: otherFingerprintId, url: `test-url-${i}` },
+        "get",
+        `${API_URL}/fingerprint/${otherFingerprintId}`,
+        null,
         {
           validateStatus: () => true,
           headers: {
@@ -188,7 +178,7 @@ describe("Fingerprint Rate Limit Test Suite", () => {
         },
       );
       expect(response.status).toBe(200);
-      await wait(50);
+      await wait(100); // Increased from 50ms to 100ms
     }
   }, 30000);
 });

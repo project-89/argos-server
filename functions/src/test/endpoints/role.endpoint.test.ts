@@ -1,23 +1,14 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  createTestData,
-  cleanDatabase,
-} from "../utils/testUtils";
+import { makeRequest, createTestData } from "../utils/testUtils";
+import { PREDEFINED_ROLES } from "../../constants/roles";
 
 describe("Role Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
 
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
-
   beforeEach(async () => {
-    await cleanDatabase();
     const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
     validApiKey = apiKey;
@@ -30,19 +21,19 @@ describe("Role Endpoint", () => {
         `${API_URL}/role/assign`,
         {
           fingerprintId,
-          role: "premium",
+          role: "agent-initiate",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
-      expect(response.data.data).toHaveProperty("role", "premium");
+      expect(response.data.data.roles).toContain("agent-initiate");
       expect(response.data.data.roles).toContain("user");
-      expect(response.data.data.roles).toContain("premium");
     });
 
     it("should validate required fields", async () => {
@@ -51,17 +42,18 @@ describe("Role Endpoint", () => {
         `${API_URL}/role/assign`,
         {
           fingerprintId,
-          // missing role
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: role");
+      expect(response.data.error).toBe("Role is required");
     });
 
     it("should validate role value", async () => {
@@ -73,14 +65,18 @@ describe("Role Endpoint", () => {
           role: "invalid-role",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid role");
+      expect(response.data.error).toBe(
+        "Invalid enum value. Expected 'user' | 'agent-initiate' | 'agent-field' | 'agent-senior' | 'agent-master', received 'invalid-role'",
+      );
     });
   });
 
@@ -92,31 +88,34 @@ describe("Role Endpoint", () => {
         `${API_URL}/role/assign`,
         {
           fingerprintId,
-          role: "premium",
+          role: "agent-initiate",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
+      // Then remove it
       const response = await makeRequest(
         "post",
         `${API_URL}/role/remove`,
         {
           fingerprintId,
-          role: "premium",
+          role: "agent-initiate",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
-      expect(response.data.data).toHaveProperty("role", "premium");
+      expect(response.data.data.roles).not.toContain("agent-initiate");
       expect(response.data.data.roles).toContain("user");
-      expect(response.data.data.roles).not.toContain("premium");
     });
 
     it("should validate required fields", async () => {
@@ -125,17 +124,18 @@ describe("Role Endpoint", () => {
         `${API_URL}/role/remove`,
         {
           fingerprintId,
-          // missing role
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: role");
+      expect(response.data.error).toBe("Role is required");
     });
 
     it("should not allow removing user role", async () => {
@@ -147,7 +147,9 @@ describe("Role Endpoint", () => {
           role: "user",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
@@ -165,8 +167,7 @@ describe("Role Endpoint", () => {
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(Array.isArray(response.data.data)).toBe(true);
-      expect(response.data.data).toContain("user");
-      expect(response.data.data).toContain("premium");
+      expect(response.data.data).toEqual(expect.arrayContaining([...PREDEFINED_ROLES]));
     });
   });
 });

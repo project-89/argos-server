@@ -126,6 +126,13 @@ resource "google_cloudfunctions_function" "scheduledCleanup" {
 - API keys are tied to fingerprints
 - Keys can be revoked and are automatically disabled on re-registration
 
+### Request Validation
+- Zod-based schema validation for all endpoints
+- Type-safe request validation
+- Consistent error messages
+- Automatic type inference from schemas
+- Validation middleware for all routes
+
 ### CORS Protection
 - Environment-specific origin validation
 - No wildcard origins in production

@@ -1,6 +1,10 @@
 import { Request, Response } from "express";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
+import { validateRequest } from "../middleware/validation.middleware";
+import { schemas } from "../types/schemas";
+import { validateParams } from "../middleware/validation.middleware";
+import { z } from "zod";
 
 interface Visit {
   fingerprintId: string;
@@ -41,347 +45,275 @@ const extractDomain = (url: string): string => {
   }
 };
 
-export const log = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { fingerprintId, url, title } = req.body;
+export const log = [
+  validateRequest(schemas.visitLog),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { fingerprintId, url, title } = req.body;
+      const db = getFirestore();
 
-    if (!fingerprintId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: fingerprintId",
-      });
-    }
+      // Verify fingerprint exists
+      const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+      const fingerprintDoc = await fingerprintRef.get();
+      if (!fingerprintDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Fingerprint not found",
+        });
+      }
 
-    if (!url) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: url",
-      });
-    }
+      const domain = extractDomain(url);
 
-    const db = getFirestore();
+      // Find or create site
+      const sitesSnapshot = await db
+        .collection(COLLECTIONS.SITES)
+        .where("domain", "==", domain)
+        .where("fingerprintId", "==", fingerprintId)
+        .limit(1)
+        .get();
 
-    // Verify fingerprint exists
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-    if (!fingerprintDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: "Fingerprint not found",
-      });
-    }
+      let siteId: string;
+      let site: Site & { id: string };
+      const now = Date.now();
 
-    const domain = extractDomain(url);
-
-    // Find or create site
-    const sitesSnapshot = await db
-      .collection(COLLECTIONS.SITES)
-      .where("domain", "==", domain)
-      .where("fingerprintId", "==", fingerprintId)
-      .limit(1)
-      .get();
-
-    let siteId: string;
-    let site: Site & { id: string };
-    const now = Date.now();
-
-    if (sitesSnapshot.empty) {
-      // Create new site
-      const newSite: Site = {
-        domain,
-        fingerprintId,
-        lastVisited: now,
-        title: title || domain,
-        visits: 1,
-        settings: {
-          notifications: true,
-          privacy: "private",
-        },
-      };
-
-      const siteRef = await db.collection(COLLECTIONS.SITES).add(newSite);
-      siteId = siteRef.id;
-      site = { id: siteId, ...newSite };
-    } else {
-      // Update existing site
-      const siteDoc = sitesSnapshot.docs[0];
-      siteId = siteDoc.id;
-      const siteData = siteDoc.data() as Site;
-      site = {
-        id: siteId,
-        ...siteData,
-        lastVisited: now,
-        visits: (siteData.visits || 0) + 1,
-        title: title || siteData.title,
-      };
-
-      await siteDoc.ref.update({
-        lastVisited: now,
-        visits: site.visits,
-        title: site.title,
-      });
-    }
-
-    // Log the visit
-    const visitData: Visit = {
-      fingerprintId,
-      url,
-      title: title || null,
-      siteId,
-      timestamp: now,
-    };
-
-    // Remove any undefined values
-    const sanitizedVisitData = Object.fromEntries(
-      Object.entries(visitData).filter(([_, value]) => value !== undefined),
-    ) as Visit;
-
-    const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        id: visitRef.id,
-        ...sanitizedVisitData,
-        site,
-      },
-    });
-  } catch (error: any) {
-    console.error("Error in log visit:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Failed to log visit",
-    });
-  }
-};
-
-export const updatePresence = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { fingerprintId, status } = req.body;
-
-    if (!fingerprintId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: fingerprintId",
-      });
-    }
-
-    if (!status) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: status",
-      });
-    }
-
-    const db = getFirestore();
-
-    // Verify fingerprint exists
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-    if (!fingerprintDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: "Fingerprint not found",
-      });
-    }
-
-    const presenceRef = await db.collection(COLLECTIONS.PRESENCE).doc(fingerprintId);
-    await presenceRef.set(
-      {
-        status,
-        lastUpdated: Date.now(),
-      },
-      { merge: true },
-    );
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        fingerprintId,
-        status,
-        timestamp: Date.now(),
-      },
-    });
-  } catch (error: any) {
-    console.error("Error in update presence:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Failed to update presence",
-    });
-  }
-};
-
-export const removeSite = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { fingerprintId, siteId } = req.body;
-
-    // Get API key from header
-    const apiKey = req.header("x-api-key");
-    if (!apiKey) {
-      return res.status(401).json({
-        success: false,
-        error: "API key is required",
-      });
-    }
-
-    // Validate API key
-    const db = getFirestore();
-    const apiKeySnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("key", "==", apiKey)
-      .where("enabled", "==", true)
-      .get();
-
-    if (apiKeySnapshot.empty) {
-      return res.status(401).json({
-        success: false,
-        error: "Invalid API key",
-      });
-    }
-
-    // Check if API key matches fingerprint
-    const apiKeyData = apiKeySnapshot.docs[0].data();
-    if (apiKeyData.fingerprintId !== fingerprintId) {
-      return res.status(403).json({
-        success: false,
-        error: "API key does not match fingerprint",
-      });
-    }
-
-    if (!fingerprintId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: fingerprintId",
-      });
-    }
-
-    if (!siteId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: siteId",
-      });
-    }
-
-    // Verify fingerprint exists
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-    if (!fingerprintDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: "Fingerprint not found",
-      });
-    }
-
-    const siteRef = db.collection(COLLECTIONS.SITES).doc(siteId);
-    const siteDoc = await siteRef.get();
-
-    if (!siteDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: "Site not found",
-      });
-    }
-
-    if (siteDoc.data()?.fingerprintId !== fingerprintId) {
-      return res.status(403).json({
-        success: false,
-        error: "Not authorized to remove this site",
-      });
-    }
-
-    // Delete all visits for this site
-    const visitsSnapshot = await db
-      .collection(COLLECTIONS.VISITS)
-      .where("siteId", "==", siteId)
-      .get();
-
-    const batch = db.batch();
-    visitsSnapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-    batch.delete(siteRef);
-    await batch.commit();
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        fingerprintId,
-        siteId,
-        timestamp: Date.now(),
-      },
-    });
-  } catch (error: any) {
-    console.error("Error in remove site:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Failed to remove site",
-    });
-  }
-};
-
-export const getHistory = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    const { fingerprintId } = req.params;
-
-    if (!fingerprintId) {
-      return res.status(400).json({
-        success: false,
-        error: "Missing required field: fingerprintId",
-      });
-    }
-
-    const db = getFirestore();
-
-    // Verify fingerprint exists
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-    if (!fingerprintDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        error: "Fingerprint not found",
-      });
-    }
-
-    const snapshot = await db
-      .collection(COLLECTIONS.VISITS)
-      .where("fingerprintId", "==", fingerprintId)
-      .orderBy("timestamp", "desc")
-      .get();
-
-    // Get site information for each visit
-    const visits: VisitHistoryResponse[] = await Promise.all(
-      snapshot.docs.map(async (doc) => {
-        const visitData = doc.data() as Visit;
-        const siteDoc = await db.collection(COLLECTIONS.SITES).doc(visitData.siteId).get();
-        const response: VisitHistoryResponse = {
-          ...visitData,
-          id: doc.id,
+      if (sitesSnapshot.empty) {
+        // Create new site
+        const newSite: Site = {
+          domain,
+          fingerprintId,
+          lastVisited: now,
+          title: title || domain,
+          visits: 1,
+          settings: {
+            notifications: true,
+            privacy: "private",
+          },
         };
-        if (siteDoc.exists) {
-          response.site = { id: siteDoc.id, ...(siteDoc.data() as Site) };
-        }
-        return response;
-      }),
-    );
 
-    return res.status(200).json({
-      success: true,
-      data: visits,
-    });
-  } catch (error: any) {
-    if (error.code === 9 && error.message.includes("requires an index")) {
-      console.error("Index required for this query. Please create the following index:");
-      console.error(`Collection: ${COLLECTIONS.VISITS}`);
-      console.error("Fields: fingerprintId (ASC), timestamp (DESC)");
+        const siteRef = await db.collection(COLLECTIONS.SITES).add(newSite);
+        siteId = siteRef.id;
+        site = { id: siteId, ...newSite };
+      } else {
+        // Update existing site
+        const siteDoc = sitesSnapshot.docs[0];
+        siteId = siteDoc.id;
+        const siteData = siteDoc.data() as Site;
+        site = {
+          id: siteId,
+          ...siteData,
+          lastVisited: now,
+          visits: (siteData.visits || 0) + 1,
+          title: title || siteData.title,
+        };
+
+        await siteDoc.ref.update({
+          lastVisited: now,
+          visits: site.visits,
+          title: site.title,
+        });
+      }
+
+      // Log the visit
+      const visitData: Visit = {
+        fingerprintId,
+        url,
+        title: title || null,
+        siteId,
+        timestamp: now,
+      };
+
+      // Remove any undefined values
+      const sanitizedVisitData = Object.fromEntries(
+        Object.entries(visitData).filter(([_, value]) => value !== undefined),
+      ) as Visit;
+
+      const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          id: visitRef.id,
+          ...sanitizedVisitData,
+          site,
+        },
+      });
+    } catch (error: any) {
+      console.error("Error in log visit:", error);
       return res.status(500).json({
         success: false,
-        error: "Database index not ready. Please try again in a few minutes.",
+        error: error.message || "Failed to log visit",
       });
     }
-    console.error("Error in get visit history:", error);
-    return res.status(500).json({
-      success: false,
-      error: error.message || "Failed to get visit history",
-    });
-  }
-};
+  },
+];
+
+export const updatePresence = [
+  validateRequest(schemas.updatePresence),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { fingerprintId, status } = req.body;
+      const db = getFirestore();
+
+      // Verify fingerprint exists
+      const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+      const fingerprintDoc = await fingerprintRef.get();
+      if (!fingerprintDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Fingerprint not found",
+        });
+      }
+
+      const presenceRef = await db.collection(COLLECTIONS.PRESENCE).doc(fingerprintId);
+      await presenceRef.set(
+        {
+          status,
+          lastUpdated: Date.now(),
+        },
+        { merge: true },
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          fingerprintId,
+          status,
+          timestamp: Date.now(),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error in update presence:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to update presence",
+      });
+    }
+  },
+];
+
+export const removeSite = [
+  validateRequest(schemas.removeSite),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { fingerprintId, siteId } = req.body;
+      const db = getFirestore();
+
+      // Verify fingerprint exists
+      const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+      const fingerprintDoc = await fingerprintRef.get();
+      if (!fingerprintDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Fingerprint not found",
+        });
+      }
+
+      const siteRef = db.collection(COLLECTIONS.SITES).doc(siteId);
+      const siteDoc = await siteRef.get();
+
+      if (!siteDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Site not found",
+        });
+      }
+
+      if (siteDoc.data()?.fingerprintId !== fingerprintId) {
+        return res.status(403).json({
+          success: false,
+          error: "Not authorized to remove this site",
+        });
+      }
+
+      // Delete all visits for this site
+      const visitsSnapshot = await db
+        .collection(COLLECTIONS.VISITS)
+        .where("siteId", "==", siteId)
+        .get();
+
+      const batch = db.batch();
+      visitsSnapshot.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+      batch.delete(siteRef);
+      await batch.commit();
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          fingerprintId,
+          siteId,
+          timestamp: Date.now(),
+        },
+      });
+    } catch (error: any) {
+      console.error("Error in remove site:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to remove site",
+      });
+    }
+  },
+];
+
+export const getHistory = [
+  validateParams(z.object({ fingerprintId: z.string() })),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      const { fingerprintId } = req.params;
+      const db = getFirestore();
+
+      // Verify fingerprint exists
+      const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+      const fingerprintDoc = await fingerprintRef.get();
+      if (!fingerprintDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          error: "Fingerprint not found",
+        });
+      }
+
+      const snapshot = await db
+        .collection(COLLECTIONS.VISITS)
+        .where("fingerprintId", "==", fingerprintId)
+        .orderBy("timestamp", "desc")
+        .get();
+
+      // Get site information for each visit
+      const visits: VisitHistoryResponse[] = await Promise.all(
+        snapshot.docs.map(async (doc) => {
+          const visitData = doc.data() as Visit;
+          const siteDoc = await db.collection(COLLECTIONS.SITES).doc(visitData.siteId).get();
+          const response: VisitHistoryResponse = {
+            ...visitData,
+            id: doc.id,
+          };
+          if (siteDoc.exists) {
+            response.site = { id: siteDoc.id, ...(siteDoc.data() as Site) };
+          }
+          return response;
+        }),
+      );
+
+      return res.status(200).json({
+        success: true,
+        data: visits,
+      });
+    } catch (error: any) {
+      if (error.code === 9 && error.message.includes("requires an index")) {
+        console.error("Index required for this query. Please create the following index:");
+        console.error(`Collection: ${COLLECTIONS.VISITS}`);
+        console.error("Fields: fingerprintId (ASC), timestamp (DESC)");
+        return res.status(500).json({
+          success: false,
+          error: "Database index not ready. Please try again in a few minutes.",
+        });
+      }
+      console.error("Error in get visit history:", error);
+      return res.status(500).json({
+        success: false,
+        error: error.message || "Failed to get visit history",
+      });
+    }
+  },
+];

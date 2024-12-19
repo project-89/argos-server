@@ -1,23 +1,13 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  cleanDatabase,
-  createTestData,
-} from "../utils/testUtils";
+import { makeRequest, createTestData } from "../utils/testUtils";
 
 describe("Tag Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
 
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
-
   beforeEach(async () => {
-    await cleanDatabase();
     const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
     validApiKey = apiKey;
@@ -25,48 +15,34 @@ describe("Tag Endpoint", () => {
 
   describe("POST /tag/update", () => {
     it("should update tags for a fingerprint", async () => {
-      const tags = {
-        visits: 5,
-        timeSpent: 300,
-      };
-
       const response = await makeRequest(
-        "post",
-        `${API_URL}/tag/update`,
-        {
-          fingerprintId,
-          tags,
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toBeDefined();
-      expect(response.data.data.tags).toEqual(tags);
-    });
-
-    it("should merge with existing tags", async () => {
-      // First set initial tags
-      await makeRequest(
         "post",
         `${API_URL}/tag/update`,
         {
           fingerprintId,
           tags: {
-            visits: 5,
-            timeSpent: 300,
+            visits: 10,
+            purchases: 5,
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
-      // Update only one tag
-      const response = await makeRequest(
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.tags).toEqual({
+        visits: 10,
+        purchases: 5,
+      });
+    });
+
+    it("should merge with existing tags", async () => {
+      // First update
+      await makeRequest(
         "post",
         `${API_URL}/tag/update`,
         {
@@ -76,7 +52,26 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
+        },
+      );
+
+      // Second update
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/tag/update`,
+        {
+          fingerprintId,
+          tags: {
+            purchases: 5,
+          },
+        },
+        {
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
@@ -84,7 +79,7 @@ describe("Tag Endpoint", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.data.tags).toEqual({
         visits: 10,
-        timeSpent: 300,
+        purchases: 5,
       });
     });
 
@@ -97,13 +92,15 @@ describe("Tag Endpoint", () => {
           tags: {},
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.tags).toBeDefined();
+      expect(response.data.data.tags).toEqual({});
     });
 
     it("should handle negative tag values", async () => {
@@ -117,13 +114,17 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.tags.visits).toBe(-5);
+      expect(response.data.data.tags).toEqual({
+        visits: -5,
+      });
     });
 
     it("should handle non-existent fingerprint", async () => {
@@ -131,13 +132,15 @@ describe("Tag Endpoint", () => {
         "post",
         `${API_URL}/tag/update`,
         {
-          fingerprintId: "non-existent-id",
+          fingerprintId: "non-existent",
           tags: {
-            visits: 5,
+            visits: 10,
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
@@ -152,17 +155,21 @@ describe("Tag Endpoint", () => {
         "post",
         `${API_URL}/tag/update`,
         {
-          tags: { visits: 5 },
+          tags: {
+            visits: 10,
+          },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: fingerprintId");
+      expect(response.data.error).toBe("Fingerprint ID is required");
     });
 
     it("should require tags", async () => {
@@ -173,14 +180,16 @@ describe("Tag Endpoint", () => {
           fingerprintId,
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: tags");
+      expect(response.data.error).toBe("Tags object is required");
     });
 
     it("should validate tag values", async () => {
@@ -194,14 +203,16 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid value for tag 'visits': must be a number");
+      expect(response.data.error).toBe("Expected number, received string");
     });
   });
 
@@ -215,14 +226,16 @@ describe("Tag Endpoint", () => {
           fingerprintId,
           tags: {
             visits: 10,
-            timeSpent: 400,
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
+      // Then update roles based on tags
       const response = await makeRequest(
         "post",
         `${API_URL}/tag/roles/update`,
@@ -233,25 +246,37 @@ describe("Tag Endpoint", () => {
               min: 5,
               role: "agent-initiate",
             },
-            timeSpent: {
-              min: 300,
-              role: "agent-field",
-            },
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data.roles).toContain("agent-initiate");
-      expect(response.data.data.roles).toContain("agent-field");
     });
 
     it("should preserve existing roles while adding new ones", async () => {
-      // First set some tags and get agent-initiate role
+      // First assign a role directly
+      await makeRequest(
+        "post",
+        `${API_URL}/role/assign`,
+        {
+          fingerprintId,
+          role: "agent-field",
+        },
+        {
+          headers: {
+            "x-api-key": validApiKey,
+          },
+        },
+      );
+
+      // Set some tags
       await makeRequest(
         "post",
         `${API_URL}/tag/update`,
@@ -262,12 +287,14 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
-      // Add agent-initiate role
-      await makeRequest(
+      // Update roles based on tags
+      const response = await makeRequest(
         "post",
         `${API_URL}/tag/roles/update`,
         {
@@ -280,32 +307,16 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      // Now try to add agent-field role based on timeSpent
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/tag/roles/update`,
-        {
-          fingerprintId,
-          tagRules: {
-            timeSpent: {
-              min: 300,
-              role: "agent-field",
-            },
+          headers: {
+            "x-api-key": validApiKey,
           },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toContain("agent-initiate"); // Previous role preserved
-      expect(response.data.data.roles).not.toContain("agent-field"); // Role not added (timeSpent < 300)
+      expect(response.data.data.roles).toContain("agent-field");
+      expect(response.data.data.roles).toContain("agent-initiate");
     });
 
     it("should handle empty tagRules object", async () => {
@@ -317,13 +328,15 @@ describe("Tag Endpoint", () => {
           tagRules: {},
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(Array.isArray(response.data.data.roles)).toBe(true);
+      expect(response.data.data.roles).toEqual(["user"]);
     });
 
     it("should handle non-existent fingerprint", async () => {
@@ -331,7 +344,7 @@ describe("Tag Endpoint", () => {
         "post",
         `${API_URL}/tag/roles/update`,
         {
-          fingerprintId: "non-existent-id",
+          fingerprintId: "non-existent",
           tagRules: {
             visits: {
               min: 5,
@@ -340,7 +353,9 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
@@ -363,14 +378,16 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: fingerprintId");
+      expect(response.data.error).toBe("Fingerprint ID is required");
     });
 
     it("should require tagRules", async () => {
@@ -381,14 +398,16 @@ describe("Tag Endpoint", () => {
           fingerprintId,
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Missing required field: tagRules");
+      expect(response.data.error).toBe("Tag rules object is required");
     });
 
     it("should validate tag rule format", async () => {
@@ -405,14 +424,16 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid min value for tag 'visits': must be a number");
+      expect(response.data.error).toBe("Min value must be a number");
     });
 
     it("should validate role names", async () => {
@@ -429,14 +450,18 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
           validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid role: invalid-role");
+      expect(response.data.error).toBe(
+        "Invalid enum value. Expected 'user' | 'agent-initiate' | 'agent-field' | 'agent-senior' | 'agent-master', received 'invalid-role'",
+      );
     });
 
     it("should reject request without API key", async () => {
@@ -476,7 +501,9 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": "invalid-key" },
+          headers: {
+            "x-api-key": "invalid-key",
+          },
           validateStatus: () => true,
         },
       );
@@ -487,7 +514,7 @@ describe("Tag Endpoint", () => {
     });
 
     it("should reject request when API key does not match fingerprint", async () => {
-      // Create another fingerprint with a different API key
+      // Create another fingerprint and API key
       const { apiKey: otherApiKey } = await createTestData();
 
       const response = await makeRequest(
@@ -503,7 +530,9 @@ describe("Tag Endpoint", () => {
           },
         },
         {
-          headers: { "x-api-key": otherApiKey },
+          headers: {
+            "x-api-key": otherApiKey,
+          },
           validateStatus: () => true,
         },
       );

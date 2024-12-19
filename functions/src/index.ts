@@ -63,12 +63,12 @@ import * as realityStability from "./endpoints/realityStability.endpoint";
 
 // Register routes directly on the app
 // Public routes
-app.post("/fingerprint/register", fingerprint.register);
-app.post("/api-key/register", apiKey.register);
-app.post("/api-key/validate", apiKey.validate);
-app.get("/role/available", role.getAvailable);
-app.get("/price/current", price.getCurrent);
-app.get("/price/history/:tokenId", price.getHistory);
+app.post("/fingerprint/register", ...fingerprint.register);
+app.post("/api-key/register", ...apiKey.register);
+app.post("/api-key/validate", ...apiKey.validate);
+app.get("/role/available", role.getAvailableRoles);
+app.get("/price/current", ...price.getCurrent);
+app.get("/price/history/:tokenId", ...price.getHistory);
 app.get("/reality-stability", realityStability.getRealityStabilityIndex);
 
 // Auth middleware for protected routes
@@ -79,16 +79,16 @@ app.use(fingerprintRateLimit());
 
 // Protected routes
 app.get("/fingerprint/:id", fingerprint.get);
-app.post("/visit/log", visit.log);
-app.post("/visit/presence", visit.updatePresence);
-app.post("/visit/site/remove", visit.removeSite);
-app.get("/visit/history/:fingerprintId", visit.getHistory);
-app.post("/role/assign", role.assign);
-app.post("/role/remove", role.remove);
-app.post("/tag/update", tag.addOrUpdateTags);
-app.post("/tag/roles/update", tag.updateRolesBasedOnTags);
+app.post("/visit/log", ...visit.log);
+app.post("/visit/presence", ...visit.updatePresence);
+app.post("/visit/site/remove", ...visit.removeSite);
+app.get("/visit/history/:fingerprintId", ...visit.getHistory);
+app.post("/role/assign", ...role.assignRole);
+app.post("/role/remove", ...role.removeRole);
+app.post("/tag/update", ...tag.addOrUpdateTags);
+app.post("/tag/roles/update", ...tag.updateRolesBasedOnTags);
 app.post("/debug/cleanup", debug.cleanup);
-app.post("/api-key/revoke", apiKey.revoke);
+app.post("/api-key/revoke", ...apiKey.revoke);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = functions.https.onRequest(app);
