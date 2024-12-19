@@ -1,44 +1,141 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/fingerprints/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/fingerprints/$(request.auth.uid)).data.roles.hasAny(['admin']);
+    }
+
+    function isOwner(fingerprintId) {
+      return fingerprintId == request.auth.uid;
+    }
+
+    function isValidTimestamp() {
+      return request.time.toMillis() <= (request.resource.data.timestamp + 60000) // Within 1 minute
+             && request.time.toMillis() >= (request.resource.data.timestamp - 60000);
+    }
+
     // Rules for fingerprints collection
     match /fingerprints/{fingerprintId} {
       allow read: if true;  // Allow public read for fingerprints
       allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate fingerprint data structure
+      function isValidFingerprint() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['fingerprint', 'roles', 'metadata'])
+               && data.fingerprint is string
+               && data.roles is list
+               && data.metadata is map;
+      }
     }
 
     // Rules for visits collection
     match /visits/{visitId} {
       allow read: if true;  // Allow public read for visits
       allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate visit data structure
+      function isValidVisit() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['fingerprintId', 'timestamp', 'url'])
+               && data.fingerprintId is string
+               && data.timestamp is number
+               && data.url is string
+               && isValidTimestamp();
+      }
     }
 
     // Rules for presence tracking
     match /presence/{fingerprintId} {
       allow read: if true;  // Allow public read for presence
       allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate presence data structure
+      function isValidPresence() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['status', 'lastUpdated'])
+               && data.status in ['online', 'offline']
+               && data.lastUpdated is string;
+      }
     }
 
     // Rules for API keys
     match /apiKeys/{keyId} {
       allow read, write: if false;  // Only Cloud Functions can access
+      
+      // Validate API key data structure
+      function isValidApiKey() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['key', 'fingerprintId', 'createdAt'])
+               && data.key is string
+               && data.fingerprintId is string
+               && data.createdAt is timestamp;
+      }
     }
 
     // Rules for price history
     match /price-history/{docId} {
       allow read: if true;  // Allow public read for price history
       allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate price history data structure
+      function isValidPriceHistory() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['price', 'timestamp', 'token'])
+               && data.price is number
+               && data.timestamp is number
+               && data.token is string;
+      }
     }
 
     // Rules for stability metrics
     match /stability-metrics/{docId} {
       allow read: if true;  // Allow public read for stability metrics
       allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate stability metrics data structure
+      function isValidStabilityMetric() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['value', 'timestamp'])
+               && data.value is number
+               && data.value >= 0
+               && data.value <= 1
+               && data.timestamp is number;
+      }
     }
 
     // Rules for rate limits
     match /rate-limits/{docId} {
       allow read, write: if false;  // Only Cloud Functions should access
+      
+      // Validate rate limit data structure
+      function isValidRateLimit() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['count', 'timestamp', 'type'])
+               && data.count is number
+               && data.timestamp is number
+               && data.type in ['ip', 'fingerprint'];
+      }
+    }
+
+    // Rules for tags
+    match /tags/{tagId} {
+      allow read: if true;
+      allow write: if false;  // Only Cloud Functions can write
+      
+      // Validate tag data structure
+      function isValidTag() {
+        let data = request.resource.data;
+        return data.keys().hasAll(['fingerprintId', 'tags'])
+               && data.fingerprintId is string
+               && data.tags is map;
+      }
     }
   }
 }

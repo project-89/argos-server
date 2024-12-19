@@ -90,24 +90,35 @@ argos-server/           # Repository root
    - Define interfaces for all data structures
    - Use enums for constants
    - Proper error typing
+   - Use Zod schemas for runtime validation
 
-2. **Authentication**
+2. **Request Validation**
+   - Use validation middleware for all endpoints
+   - Define Zod schemas in route files
+   - Consistent error message format
+   - Type inference from schemas
+   - Validate request body, params, and query
+   - Handle validation errors uniformly
+
+3. **Authentication**
    - Validate API keys
    - Check fingerprint ownership
    - Use proper error codes
    - Rate limit requests
 
-3. **Error Handling**
+4. **Error Handling**
    - Consistent error format
    - Proper HTTP status codes
    - Detailed error messages
    - Error logging
+   - Validation error handling
 
-4. **Code Style**
+5. **Code Style**
    - Follow ESLint rules
    - Use Prettier for formatting
    - Clear function names
    - Descriptive variables
+   - Document validation schemas
 
 ### 5. Database
 
@@ -200,6 +211,76 @@ argos-server/           # Repository root
    - Clean test data
 
 ## Development Progress
+
+### Request Validation Implementation
+
+#### Validation Middleware
+- [x] Created Zod-based validation middleware
+- [x] Implemented request schema validation
+- [x] Added type inference from schemas
+- [x] Updated all endpoints to use validation
+- [x] Added comprehensive validation tests
+- [x] Fixed validation error messages
+- [x] Resolved linter errors
+
+#### Endpoint Updates
+- [x] Updated fingerprint endpoints
+- [x] Updated API key endpoints
+- [x] Updated visit endpoints
+- [x] Updated role endpoints
+- [x] Updated tag endpoints
+- [x] Updated price endpoints
+- [x] Updated reality stability endpoint
+- [x] Updated debug endpoint
+
+#### Testing and Documentation
+- [x] Updated test suites for validation
+- [x] Fixed failing tests
+- [x] Updated documentation
+- [x] Added validation patterns to guidelines
+- [x] Verified all tests passing
+
+### Recent Updates
+
+#### Security Improvements
+- [x] Enhanced Firestore security rules
+- [x] Implemented suspicious IP detection
+- [x] Added detailed logging for security events
+- [x] Updated environment detection logic
+
+#### Infrastructure Updates
+- [x] Updated TypeScript configuration
+- [x] Improved build process
+- [x] Enhanced deployment scripts
+- [x] Fixed Terraform state management
+
+#### Testing and Validation
+- [x] Fixed test environment detection
+- [x] Updated test cases for security features
+- [x] Improved error message consistency
+- [x] Enhanced validation schemas
+
+## Issues and Solutions
+- Problem: Inconsistent validation across endpoints
+- Solution: Implemented centralized validation middleware using Zod
+
+- Problem: Type safety in request handling
+- Solution: Added type inference from Zod schemas
+
+- Problem: Test failures after validation changes
+- Solution: Updated test cases with proper validation error handling
+
+- Problem: Environment detection in tests
+- Solution: Added comprehensive environment checks using both NODE_ENV and FUNCTIONS_EMULATOR
+
+- Problem: Build process inconsistencies
+- Solution: Updated prepare-functions.sh with improved TypeScript compilation and dependency handling
+
+- Problem: Terraform state locks
+- Solution: Implemented proper state management and lock handling procedures
+
+- Problem: Cloud Functions deployment issues
+- Solution: Updated service account permissions and build configuration
 
 ### CORS Configuration and Security
 
@@ -298,3 +379,22 @@ argos-server/           # Repository root
    - Verify environment-specific behavior
    - Check error handling
    - Validate security measures
+
+### Rate Limiting
+
+The server implements rate limiting to protect against abuse:
+
+- Rate limits are enforced per API key or IP address
+- Default limit: 100 requests per hour
+- Rate limiting is automatically bypassed in test environment (`NODE_ENV === "test"`)
+- Rate limit data is stored in Firestore
+- Automatic cleanup of old rate limit data
+- Rate limit stats are logged for monitoring
+
+Rate limit responses include:
+- 429 status code
+- Error message
+- Retry-After header
+- Time remaining until reset
+
+Rate limiting cannot be bypassed in production, ensuring robust protection against abuse.

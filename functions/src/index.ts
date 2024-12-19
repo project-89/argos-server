@@ -1,4 +1,4 @@
-import * as functions from "firebase-functions";
+import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
@@ -91,4 +91,13 @@ app.post("/debug/cleanup", debug.cleanup);
 app.post("/api-key/revoke", ...apiKey.revoke);
 
 // Export the Express app as a Firebase Cloud Function
-export const api = functions.https.onRequest(app);
+export const api = onRequest(
+  {
+    memory: "256MiB",
+    timeoutSeconds: 60,
+  },
+  app,
+);
+
+// Export the scheduled cleanup function
+export * from "./scheduled/cleanup.scheduled";

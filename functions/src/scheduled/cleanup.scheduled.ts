@@ -1,21 +1,32 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { cleanupData } from "../services/cleanup.service";
+import * as admin from "firebase-admin";
 
 export const scheduledCleanup = onSchedule(
   {
-    schedule: "every 24 hours",
-    memory: "2GiB",
-    timeoutSeconds: 540,
-    region: "us-central1",
+    schedule: "0 0 * * *", // Run at midnight every day
+    timeZone: "UTC",
+    retryCount: 3,
+    memory: "256MiB",
   },
   async (event) => {
-    console.log(`Starting scheduled cleanup at ${new Date().toISOString()}`);
+    const db = admin.firestore();
+    const now = Date.now();
+    const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
 
     try {
-      await cleanupData();
-      console.log("Scheduled cleanup completed successfully");
+      // Delete visits older than 30 days
+      const visitsRef = db.collection("visits");
+      const oldVisits = await visitsRef.where("timestamp", "<", thirtyDaysAgo).get();
+
+      const batch = db.batch();
+      oldVisits.docs.forEach((doc) => {
+        batch.delete(doc.ref);
+      });
+
+      await batch.commit();
+      console.log(`Successfully cleaned up ${oldVisits.size} old visits`);
     } catch (error) {
-      console.error("Error in scheduled cleanup:", error);
+      console.error("Error during scheduled cleanup:", error);
       throw error;
     }
   },

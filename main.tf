@@ -140,39 +140,39 @@ resource "google_cloudfunctions_function" "getAvailableRoles" {
 }
 
 # Cloud Function: Scheduled Cleanup
-resource "google_cloudfunctions_function" "scheduledCleanup" {
+resource "google_cloudfunctions2_function" "scheduledCleanup" {
   name        = "argos-scheduled-cleanup"
   description = "Performs scheduled cleanup of old data"
-  runtime     = "nodejs18"
-  entry_point = "scheduledCleanup"
-  source_archive_bucket = google_storage_bucket.functions_bucket.name
-  source_archive_object = google_storage_bucket_object.functions_zip.name
+  location    = var.region
 
-  environment_variables = {
-    FIRESTORE_PROJECT_ID = var.project_id
+  build_config {
+    runtime     = "nodejs18"
+    entry_point = "scheduledCleanup"
+    source {
+      storage_source {
+        bucket = google_storage_bucket.functions_bucket.name
+        object = google_storage_bucket_object.functions_source.name
+      }
+    }
   }
 
-  event_trigger {
-    event_type = "google.pubsub.topic.publish"
-    resource   = google_pubsub_topic.cleanup_trigger.name
+  service_config {
+    max_instance_count = 1
+    available_memory   = "256M"
+    timeout_seconds    = 60
+    environment_variables = {
+      FIRESTORE_PROJECT_ID = var.project_id
+      NODE_ENV = "production"
+    }
   }
 }
 
-# PubSub topic for cleanup trigger
-resource "google_pubsub_topic" "cleanup_trigger" {
-  name = "argos-cleanup-trigger"
-}
+# Upload the source code directory for v2 function
+resource "google_storage_bucket_object" "functions_source" {
+  name   = "functions-source-${formatdate("YYYYMMDDhhmmss", timestamp())}.zip"
+  bucket = google_storage_bucket.functions_bucket.name
+  source = "./functions.zip"
 
-# Cloud Scheduler job to trigger cleanup
-resource "google_cloud_scheduler_job" "cleanup_scheduler" {
-  name        = "argos-cleanup-scheduler"
-  description = "Triggers cleanup function every 24 hours"
-  schedule    = "0 0 * * *"  # Run at midnight every day
-  time_zone   = "UTC"
-
-  pubsub_target {
-    topic_name = google_pubsub_topic.cleanup_trigger.id
-    data       = base64encode("{}")
-  }
+  depends_on = [null_resource.prepare_functions]
 }
 

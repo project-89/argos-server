@@ -10,7 +10,7 @@
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "firebase-admin": "^11.11.1",
-    "firebase-functions": "^6.1.1",
+    "firebase-functions": "^4.5.0",
     "module-alias": "^2.2.3",
     "technicalindicators": "^3.1.0",
     "zod": "^3.24.1"
@@ -19,12 +19,13 @@
     "node": "18"
   },
   "scripts": {
-    "build": "rimraf lib && tsc && tsc-alias",
-    "build:watch": "tsc --watch",
+    "build": "rimraf lib && tsc",
+    "build:watch": "tsc -p tsconfig.json --watch",
     "lint": "eslint .",
     "serve": "npm run kill-ports && npm run build && firebase emulators:start --only functions,firestore,pubsub",
     "shell": "npm run build && firebase functions:shell",
     "start": "npm run shell",
+    "predeploy": "npm run build",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
     "test": "jest",
@@ -47,7 +48,6 @@
     "kill-port": "^2.0.1",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.1.1",
-    "tsc-alias": "^1.8.8",
     "typescript": "^5.3.3"
   },
   "private": true

@@ -142,6 +142,7 @@ ALLOWED_ORIGINS=https://yourdomain.com,http://localhost:5173
 
 # Optional
 NODE_ENV=development  # or "production" or "test"
+RATE_LIMIT_ENABLED=true  # Set to "false" to disable rate limiting
 ```
 
 ### Deployment
@@ -156,9 +157,24 @@ firebase deploy --only functions:functionName
 ## Security
 
 ### Rate Limiting
-- Per-minute request limits
-- Monthly quota tracking
+
+The server implements strict rate limiting:
+
+- Default: 100 requests per hour per API key/IP
+- Rate limits are enforced in production and development
+- Can be disabled by setting RATE_LIMIT_ENABLED=false
+- Rate limit data stored in Firestore
 - Automatic cleanup of old rate limit data
+- Rate limit stats logged for monitoring
+
+Rate limit responses:
+```json
+{
+  "success": false,
+  "error": "Too many requests, please try again later",
+  "retryAfter": 3600 // seconds until reset
+}
+```
 
 ### CORS Protection
 - Environment-specific origin validation
