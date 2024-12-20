@@ -72,3 +72,10 @@ export const MOCK_PRICES: PriceData = {
     usd_24h_change: 2.5,
   },
 };
+
+// WARNING: These are test-only encryption keys. DO NOT use these in production!
+// Generate new secure keys for production using:
+// openssl rand -base64 32  # for API key
+// openssl rand -base64 16  # for IV
+process.env.FIREBASE_CONFIG_ENCRYPTION_API_KEY = "a0PJ2Y5qjvkL7LVmer6f1OACff+0kMjMPOJ5YkGS+JM=";
+process.env.FIREBASE_CONFIG_ENCRYPTION_API_IV = "G3z5x+kLY3xFOrfaQUuhnA==";

@@ -150,6 +150,17 @@ argos-server/           # Repository root
    - Unique IV per API key
    - Automatic encryption/decryption handling
 
+   **Generating Production Keys**
+   ```bash
+   # Generate a secure 32-byte key and encode it in base64
+   openssl rand -base64 32 > prod-key.txt
+
+   # Generate a secure 16-byte IV and encode it in base64
+   openssl rand -base64 16 > prod-iv.txt
+   ```
+   
+   Never commit production keys to version control. Store them securely in your production environment variables or secret management system.
+
 2. **Rate Limiting**
    - Per-key limits
    - Per-IP limits
