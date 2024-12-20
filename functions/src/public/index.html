@@ -115,6 +115,25 @@
             border-radius: 4px;
             border: 1px solid rgba(75, 30, 181, 0.3);
             color: #fff;
+            min-width: 200px;
+        }
+        .endpoint-group {
+            margin-bottom: 2rem;
+        }
+        .endpoint-group h3 {
+            color: var(--primary-color);
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            opacity: 0.9;
+        }
+        .endpoint-group ul {
+            display: grid;
+            gap: 1rem;
+        }
+        .endpoint-group li {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         .status-indicator {
             display: inline-block;
@@ -159,33 +178,70 @@
     <div class="container">
         <header>
             <h1>ArgOS</h1>
-            <p class="subtitle">Digital Identity & Analytics Protocol</p>
+            
+            <p class="subtitle">Reality Instance Monitoring & Stability Protocol</p>
             <div class="status-indicator"></div>
             <span style="color: rgba(255, 255, 255, 0.6)">System Status: Operational</span>
         </header>
 
         <section class="card">
             <h2>System Overview</h2>
-            <p>ARGOS provides secure digital identity management through:</p>
+            <p>ARGOS maintains reality coherence through:</p>
             <br />
             <ul>
-                <li>Browser fingerprint generation and validation</li>
-                <li>Visit pattern analysis and tracking</li>
-                <li>Rate-limited API access control</li>
-                <li>Real-time analytics processing</li>
+                <li>Consciousness signature mapping</li>
+                <li>Instance traversal tracking</li>
+                <li>Reality anchor stabilization</li>
+                <li>Quantum variance monitoring</li>
             </ul>
         </section>
 
         <section class="card">
-            <h2>Core Features</h2>
+            <h2>Core Protocols</h2>
             <ul>
-                <li>Secure API key management</li>
-                <li>Cross-origin request protection</li>
-                <li>Visit history aggregation</li>
-                <li>Role-based access control</li>
-                <li>Real-time price data integration</li>
+                <li>Quantum-encrypted authentication matrices</li>
+                <li>Anti-reality-collapse safeguards</li>
+                <li>Cross-dimensional bridging protocols</li>
+                <li>Real-time reality stream processing</li>
             </ul>
         </section>
+
+        <section class="card">
+          <h2>API Endpoints</h2>
+          <div class="endpoint-group">
+              <h3>Identity Management</h3>
+              <ul>
+                  <li><span class="endpoint">/fingerprint/register</span> - Register new browser fingerprint</li>
+                  <li><span class="endpoint">/api-key/register</span> - Generate API access key</li>
+                  <li><span class="endpoint">/api-key/validate</span> - Validate API credentials</li>
+              </ul>
+          </div>
+      
+          <div class="endpoint-group">
+              <h3>Price Data</h3>
+              <ul>
+                  <li><span class="endpoint">/price/current</span> - Get current token prices</li>
+                  <li><span class="endpoint">/price/history/:tokenId</span> - Get historical price data</li>
+              </ul>
+          </div>
+      
+          <div class="endpoint-group">
+              <h3>Visit Tracking</h3>
+              <ul>
+                  <li><span class="endpoint">/visit/log</span> - Record page visit</li>
+                  <li><span class="endpoint">/visit/presence</span> - Update presence status</li>
+                  <li><span class="endpoint">/visit/history/:fingerprintId</span> - Get visit history</li>
+              </ul>
+          </div>
+      
+          <div class="endpoint-group">
+              <h3>System</h3>
+              <ul>
+                  <li><span class="endpoint">/health</span> - System health check</li>
+                  <li><span class="endpoint">/role/available</span> - List available roles</li>
+              </ul>
+          </div>
+      </section>
 
         <p class="restricted">NOTICE: This API requires authentication. Unauthorized access attempts will be rate-limited.</p>
 
