@@ -29,7 +29,7 @@ export const validateApiKey = async (
     // Check if key is enabled and not expired
     if (!data.enabled) {
       console.warn("API key is disabled");
-      return { isValid: false };
+      return { isValid: false, fingerprintId: data.fingerprintId };
     }
 
     const expiresAt = data.expiresAt?.toDate?.();
@@ -41,7 +41,7 @@ export const validateApiKey = async (
         disabledAt: new Date(),
         disabledReason: "expired",
       });
-      return { isValid: false };
+      return { isValid: false, fingerprintId: data.fingerprintId };
     }
 
     console.log("API key data found:", {

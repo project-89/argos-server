@@ -1,15 +1,5 @@
 import { PriceData } from "../../services/priceService";
 
-export interface TestFingerprint {
-  id: string;
-  fingerprint: string;
-  roles: string[];
-  metadata: {
-    testData: boolean;
-    name: string;
-  };
-}
-
 export interface TestConfig {
   projectId: string;
   firestoreEmulator: string;
@@ -42,23 +32,6 @@ export interface TestConfig {
   };
   availableRoles: string[];
 }
-
-// Set test environment
-process.env.FUNCTIONS_EMULATOR = "true";
-process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
-process.env.FIREBASE_CONFIG = JSON.stringify({
-  projectId: "argos-434718",
-});
-
-// Set rate limit environment variables for testing
-process.env.RATE_LIMIT_ENABLED = "true";
-process.env.IP_RATE_LIMIT_ENABLED = "false";
-
-// Set CORS environment variables for testing
-process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";
-process.env.DEV_ORIGIN_VITE = "http://localhost:5173";
-process.env.DEV_ORIGIN_REACT = "http://localhost:3000";
-process.env.DEV_ORIGIN_FIREBASE = "http://localhost:5000";
 
 export const TEST_CONFIG: TestConfig = {
   projectId: "argos-434718",

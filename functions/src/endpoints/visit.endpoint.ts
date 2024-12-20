@@ -62,6 +62,14 @@ export const log = [
         });
       }
 
+      // Verify ownership
+      if (fingerprintId !== req.fingerprintId) {
+        return res.status(403).json({
+          success: false,
+          error: "API key does not match fingerprint",
+        });
+      }
+
       const domain = extractDomain(url);
 
       // Find or create site

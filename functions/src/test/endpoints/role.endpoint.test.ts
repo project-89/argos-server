@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData } from "../utils/testUtils";
 import { PREDEFINED_ROLES } from "../../constants/roles";
+import { getFirestore } from "firebase-admin/firestore";
+import { COLLECTIONS } from "../../constants";
 
 describe("Role Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -12,13 +14,22 @@ describe("Role Endpoint", () => {
     const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
     validApiKey = apiKey;
+
+    // Assign admin role to the test fingerprint
+    const db = getFirestore();
+    await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .doc(fingerprintId)
+      .update({
+        roles: ["user", "admin"],
+      });
   });
 
-  describe("POST /role/assign", () => {
+  describe("POST /admin/role/assign", () => {
     it("should assign a role to a fingerprint", async () => {
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/assign`,
+        `${API_URL}/admin/role/assign`,
         {
           fingerprintId,
           role: "agent-initiate",
@@ -39,7 +50,7 @@ describe("Role Endpoint", () => {
     it("should validate required fields", async () => {
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/assign`,
+        `${API_URL}/admin/role/assign`,
         {
           fingerprintId,
         },
@@ -59,7 +70,7 @@ describe("Role Endpoint", () => {
     it("should validate role value", async () => {
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/assign`,
+        `${API_URL}/admin/role/assign`,
         {
           fingerprintId,
           role: "invalid-role",
@@ -75,17 +86,41 @@ describe("Role Endpoint", () => {
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe(
-        "Invalid enum value. Expected 'user' | 'agent-initiate' | 'agent-field' | 'agent-senior' | 'agent-master', received 'invalid-role'",
+        "Invalid enum value. Expected 'user' | 'agent-initiate' | 'agent-field' | 'agent-senior' | 'agent-master' | 'admin', received 'invalid-role'",
       );
+    });
+
+    it("should reject request from non-admin user", async () => {
+      // Create a new fingerprint without admin role
+      const { apiKey: nonAdminKey, fingerprintId: targetId } = await createTestData();
+
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/role/assign`,
+        {
+          fingerprintId: targetId,
+          role: "agent-initiate",
+        },
+        {
+          headers: {
+            "x-api-key": nonAdminKey,
+          },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("admin role required");
     });
   });
 
-  describe("POST /role/remove", () => {
+  describe("POST /admin/role/remove", () => {
     it("should remove a role from a fingerprint", async () => {
       // First assign a role
       await makeRequest(
         "post",
-        `${API_URL}/role/assign`,
+        `${API_URL}/admin/role/assign`,
         {
           fingerprintId,
           role: "agent-initiate",
@@ -100,7 +135,7 @@ describe("Role Endpoint", () => {
       // Then remove it
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/remove`,
+        `${API_URL}/admin/role/remove`,
         {
           fingerprintId,
           role: "agent-initiate",
@@ -121,7 +156,7 @@ describe("Role Endpoint", () => {
     it("should validate required fields", async () => {
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/remove`,
+        `${API_URL}/admin/role/remove`,
         {
           fingerprintId,
         },
@@ -141,7 +176,7 @@ describe("Role Endpoint", () => {
     it("should not allow removing user role", async () => {
       const response = await makeRequest(
         "post",
-        `${API_URL}/role/remove`,
+        `${API_URL}/admin/role/remove`,
         {
           fingerprintId,
           role: "user",
@@ -157,6 +192,30 @@ describe("Role Endpoint", () => {
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("Cannot remove user role");
+    });
+
+    it("should reject request from non-admin user", async () => {
+      // Create a new fingerprint without admin role
+      const { apiKey: nonAdminKey, fingerprintId: targetId } = await createTestData();
+
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/role/remove`,
+        {
+          fingerprintId: targetId,
+          role: "agent-initiate",
+        },
+        {
+          headers: {
+            "x-api-key": nonAdminKey,
+          },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(403);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("admin role required");
     });
   });
 

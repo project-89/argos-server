@@ -143,6 +143,12 @@ argos-server/           # Repository root
    - Regular key rotation
    - Key validation
    - Ownership verification
+   - AES-256-CBC encryption for stored keys
+   - Environment variables required:
+     - `FIREBASE_CONFIG_ENCRYPTION_API_KEY`: Base64 encoded 32-byte key
+     - `FIREBASE_CONFIG_ENCRYPTION_API_IV`: Base64 encoded 16-byte IV
+   - Unique IV per API key
+   - Automatic encryption/decryption handling
 
 2. **Rate Limiting**
    - Per-key limits
@@ -248,39 +254,22 @@ argos-server/           # Repository root
 - [x] Added detailed logging for security events
 - [x] Updated environment detection logic
 
-#### Infrastructure Updates
-- [x] Updated TypeScript configuration
-- [x] Improved build process
-- [x] Enhanced deployment scripts
-- [x] Fixed Terraform state management
+#### Router Organization
+- [x] Moved admin endpoints to dedicated router
+- [x] Improved role-based access control
+- [x] Consolidated tag and role endpoints under admin routes
+- [x] Removed API key requirement from scheduled cleanup
+- [x] Updated tests to reflect new routing structure
+- [x] Fixed fingerprint tag initialization
+- [x] Standardized error handling across endpoints
 
-#### Testing and Validation
-- [x] Fixed test environment detection
-- [x] Updated test cases for security features
-- [x] Improved error message consistency
-- [x] Enhanced validation schemas
-
-## Issues and Solutions
-- Problem: Inconsistent validation across endpoints
-- Solution: Implemented centralized validation middleware using Zod
-
-- Problem: Type safety in request handling
-- Solution: Added type inference from Zod schemas
-
-- Problem: Test failures after validation changes
-- Solution: Updated test cases with proper validation error handling
-
-- Problem: Environment detection in tests
-- Solution: Added comprehensive environment checks using both NODE_ENV and FUNCTIONS_EMULATOR
-
-- Problem: Build process inconsistencies
-- Solution: Updated prepare-functions.sh with improved TypeScript compilation and dependency handling
-
-- Problem: Terraform state locks
-- Solution: Implemented proper state management and lock handling procedures
-
-- Problem: Cloud Functions deployment issues
-- Solution: Updated service account permissions and build configuration
+#### Test Improvements
+- [x] Added comprehensive admin endpoint tests
+- [x] Updated role validation tests
+- [x] Fixed encryption configuration in tests
+- [x] Improved test data cleanup
+- [x] Added test coverage for new admin routes
+- [x] Fixed tag validation in tests
 
 ### CORS Configuration and Security
 

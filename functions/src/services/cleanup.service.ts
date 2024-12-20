@@ -1,28 +1,14 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
 
-// Constants for cleanup thresholds
-const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
-const ONE_DAY_MS = 24 * 60 * 60 * 1000; // 24 hours
-
 interface CleanupResult {
-  priceCache: number;
-  rateLimitStats: number;
-  rateLimitRequests: number;
-  deletedVisits: number;
-  deletedPresence: number;
-  disabledApiKeys: number;
-  deletedApiKeys: number;
-  total: number;
   cleanupTime: number;
   itemsCleaned: {
+    visits: number;
+    presence: number;
     priceCache: number;
     rateLimitStats: number;
     rateLimitRequests: number;
-    visits: number;
-    presence: number;
-    disabledApiKeys: number;
-    deletedApiKeys: number;
   };
 }
 
@@ -31,8 +17,6 @@ interface VisitData {
   fingerprintId: string;
   siteId: string;
   timestamp: number;
-  url: string;
-  title?: string;
 }
 
 interface VisitPattern {
@@ -46,34 +30,54 @@ interface SiteEngagement {
   siteId: string;
   totalVisits: number;
   averageTimeSpent: number;
-  returnRate: number; // percentage of users who return
-  commonNextSites: string[]; // top 3 next sites visited
+  returnRate: number;
+  commonNextSites: string[];
 }
 
-export const cleanupData = async (shouldError = false): Promise<CleanupResult> => {
+/**
+ * Cleanup service to remove old data from the database
+ * @returns {Promise<CleanupResult>} Result of the cleanup operation
+ */
+export const cleanupService = async (): Promise<CleanupResult> => {
+  const db = getFirestore();
+  const now = Date.now();
+  const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
+  const oneHourAgo = now - 60 * 60 * 1000;
+
+  // Initialize cleanup result
+  const result: CleanupResult = {
+    cleanupTime: now,
+    itemsCleaned: {
+      visits: 0,
+      presence: 0,
+      priceCache: 0,
+      rateLimitStats: 0,
+      rateLimitRequests: 0,
+    },
+  };
+
   try {
-    const startTime = Date.now();
-    // If shouldError is true, throw an error for testing
-    if (shouldError) {
-      throw new Error("Simulated error for testing");
-    }
-
-    const db = getFirestore();
-    const now = Date.now();
-    const thirtyDaysAgo = now - THIRTY_DAYS_MS;
-    const oneDayAgo = now - ONE_DAY_MS;
-
     // Delete old presence records
     const presenceSnapshot = await db
       .collection(COLLECTIONS.PRESENCE)
       .where("lastUpdated", "<", thirtyDaysAgo)
       .get();
 
+    for (const doc of presenceSnapshot.docs) {
+      await doc.ref.delete();
+    }
+    result.itemsCleaned.presence = presenceSnapshot.size;
+
     // Delete old price cache
     const priceCacheSnapshot = await db
       .collection(COLLECTIONS.PRICE_CACHE)
-      .where("timestamp", "<", oneDayAgo)
+      .where("timestamp", "<", thirtyDaysAgo)
       .get();
+
+    for (const doc of priceCacheSnapshot.docs) {
+      await doc.ref.delete();
+    }
+    result.itemsCleaned.priceCache = priceCacheSnapshot.size;
 
     // Delete old rate limit stats
     const rateLimitStatsSnapshot = await db
@@ -81,72 +85,21 @@ export const cleanupData = async (shouldError = false): Promise<CleanupResult> =
       .where("timestamp", "<", thirtyDaysAgo)
       .get();
 
+    for (const doc of rateLimitStatsSnapshot.docs) {
+      await doc.ref.delete();
+    }
+    result.itemsCleaned.rateLimitStats = rateLimitStatsSnapshot.size;
+
     // Delete old rate limit requests
     const rateLimitRequestsSnapshot = await db
       .collection(COLLECTIONS.RATE_LIMITS)
-      .where("lastUpdated", "<", thirtyDaysAgo)
+      .where("lastUpdated", "<", oneHourAgo)
       .get();
 
-    // Find expired API keys
-    const expiredKeysSnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("expiresAt", "<", now)
-      .where("enabled", "==", true)
-      .get();
-
-    // Find old disabled API keys
-    const oldDisabledKeysSnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("enabled", "==", false)
-      .where("disabledAt", "<", thirtyDaysAgo)
-      .get();
-
-    // Perform all deletions in batches
-    const batch = db.batch();
-
-    presenceSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    priceCacheSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    rateLimitStatsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    rateLimitRequestsSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-    oldDisabledKeysSnapshot.docs.forEach((doc) => batch.delete(doc.ref));
-
-    // Disable expired keys
-    expiredKeysSnapshot.docs.forEach((doc) => {
-      batch.update(doc.ref, {
-        enabled: false,
-        disabledAt: new Date(),
-        disabledReason: "expired",
-      });
-    });
-
-    await batch.commit();
-
-    const result: CleanupResult = {
-      priceCache: priceCacheSnapshot.size,
-      rateLimitStats: rateLimitStatsSnapshot.size,
-      rateLimitRequests: rateLimitRequestsSnapshot.size,
-      deletedVisits: 0,
-      deletedPresence: presenceSnapshot.size,
-      disabledApiKeys: expiredKeysSnapshot.size,
-      deletedApiKeys: oldDisabledKeysSnapshot.size,
-      total:
-        priceCacheSnapshot.size +
-        rateLimitStatsSnapshot.size +
-        rateLimitRequestsSnapshot.size +
-        presenceSnapshot.size +
-        expiredKeysSnapshot.size +
-        oldDisabledKeysSnapshot.size,
-      cleanupTime: Date.now() - startTime,
-      itemsCleaned: {
-        priceCache: priceCacheSnapshot.size,
-        rateLimitStats: rateLimitStatsSnapshot.size,
-        rateLimitRequests: rateLimitRequestsSnapshot.size,
-        visits: 0,
-        presence: presenceSnapshot.size,
-        disabledApiKeys: expiredKeysSnapshot.size,
-        deletedApiKeys: oldDisabledKeysSnapshot.size,
-      },
-    };
+    for (const doc of rateLimitRequestsSnapshot.docs) {
+      await doc.ref.delete();
+    }
+    result.itemsCleaned.rateLimitRequests = rateLimitRequestsSnapshot.size;
 
     return result;
   } catch (error) {

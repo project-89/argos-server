@@ -1,101 +1,70 @@
 import { Request, Response, NextFunction } from "express";
-import { PUBLIC_ENDPOINTS } from "../constants";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { ApiError } from "../utils/error";
+import { validateApiKey } from "../endpoints/apiKey.endpoint";
 
-// Middleware to validate API key
-export const auth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+// Extend Express Request type to include fingerprintId
+declare global {
+  namespace Express {
+    interface Request {
+      fingerprintId?: string;
+    }
+  }
+}
+
+/**
+ * Middleware to validate API key and set fingerprintId on request
+ */
+export const validateApiKeyMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void | Response> => {
   try {
-    // Skip validation for public endpoints
-    const path = req.path.replace(/\/$/, ""); // Remove trailing slash if present
-    const isPublicEndpoint = PUBLIC_ENDPOINTS.some((publicPath) => {
-      // If the public path has a parameter (e.g., /price/history/:tokenId)
-      if (publicPath.includes(":")) {
-        const publicPathRegex = new RegExp("^" + publicPath.replace(/:[^/]+/g, "[^/]+") + "$");
-        return publicPathRegex.test(path);
+    const apiKey = req.headers["x-api-key"];
+
+    if (!apiKey) {
+      throw new ApiError(401, "API key is required");
+    }
+
+    if (typeof apiKey !== "string") {
+      throw new ApiError(401, "Invalid API key format");
+    }
+
+    const result = await validateApiKey(apiKey);
+    if (!result.isValid) {
+      // If we have a fingerprintId but the key is invalid, it means the key exists but is disabled
+      if (result.fingerprintId) {
+        throw new ApiError(404, "API key not found or already revoked");
       }
-      // For exact matches
-      return path === publicPath;
-    });
-
-    if (isPublicEndpoint) {
-      next();
-      return;
+      throw new ApiError(401, "Invalid API key");
     }
 
-    // Get encrypted API key from header
-    const encryptedApiKey = req.header("x-api-key");
-    if (!encryptedApiKey) {
-      res.status(401).json({
-        success: false,
-        error: "API key is required",
-      });
-      return;
-    }
+    // Set fingerprintId on request for use in other middleware/routes
+    req.fingerprintId = result.fingerprintId;
 
-    // For revocation endpoint, we need to validate the key differently
-    // since we want to allow revoking already disabled keys
-    const db = getFirestore();
-    const keySnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("key", "==", encryptedApiKey)
-      .get();
+    // Get the relative path from the request
+    const relativePath = req.path;
 
-    if (keySnapshot.empty) {
-      res.status(401).json({
-        success: false,
-        error: "Invalid API key",
-      });
-      return;
-    }
-
-    const keyData = keySnapshot.docs[0].data();
-    const fingerprintId = keyData.fingerprintId;
-
-    // For non-revocation endpoints, check if the key is enabled
-    if (path !== "/api-key/revoke" && !keyData.enabled) {
-      res.status(401).json({
-        success: false,
-        error: "Invalid API key",
-      });
-      return;
-    }
-
-    // Add fingerprint ID to request
-    req.fingerprintId = fingerprintId;
-
-    // Check if the requested fingerprint exists
-    const requestedFingerprintId =
-      req.params.id || req.params.fingerprintId || req.body?.fingerprintId;
-    if (requestedFingerprintId) {
-      const db = getFirestore();
-      const fingerprintDoc = await db
-        .collection(COLLECTIONS.FINGERPRINTS)
-        .doc(requestedFingerprintId)
-        .get();
-
-      if (!fingerprintDoc.exists) {
-        res.status(404).json({
-          success: false,
-          error: "Fingerprint not found",
-        });
-        return;
-      }
-
-      // Only verify ownership if the fingerprint exists
-      if (requestedFingerprintId !== fingerprintId) {
-        res.status(403).json({
-          success: false,
-          error: "API key does not match fingerprint",
-        });
-        return;
-      }
+    // For non-admin routes, check if the request body contains a fingerprintId and if it matches
+    if (
+      !relativePath.startsWith("/admin") &&
+      !relativePath.startsWith("/visit/log") &&
+      req.body?.fingerprintId &&
+      req.body.fingerprintId !== result.fingerprintId
+    ) {
+      throw new ApiError(403, "API key does not match fingerprint");
     }
 
     next();
   } catch (error) {
-    console.error("Error validating API key:", error);
-    res.status(500).json({
+    if (error instanceof ApiError) {
+      return res.status(error.statusCode).json({
+        success: false,
+        error: error.message,
+      });
+    }
+    console.error("Error in auth middleware:", error);
+    return res.status(500).json({
       success: false,
       error: "Internal server error",
     });

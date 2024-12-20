@@ -118,24 +118,25 @@ describe("Presence Endpoint", () => {
     });
 
     it("should handle non-existent fingerprint", async () => {
+      const { apiKey } = await createTestData();
       const response = await makeRequest(
         "post",
         `${API_URL}/visit/presence`,
         {
-          fingerprintId: "non-existent",
+          fingerprintId: "non-existent-id",
           status: "online",
         },
         {
           headers: {
-            "x-api-key": validApiKey,
+            "x-api-key": apiKey,
           },
           validateStatus: () => true,
         },
       );
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
+      expect(response.data.error).toBe("API key does not match fingerprint");
     });
   });
 });

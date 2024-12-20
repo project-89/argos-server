@@ -2,10 +2,15 @@ import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
-import { auth } from "./middleware/auth.middleware";
+import { validateApiKeyMiddleware } from "./middleware/auth.middleware";
 import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
 import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
 import { CORS_CONFIG } from "./constants/config";
+
+// Import routers
+import publicRouter from "./routes/public.router";
+import protectedRouter from "./routes/protected.router";
+import adminRouter from "./routes/admin.router";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -51,44 +56,20 @@ app.use(
 app.use(express.json());
 app.use(ipRateLimit());
 
-// Import endpoints
-import * as fingerprint from "./endpoints/fingerprint.endpoint";
-import * as visit from "./endpoints/visit.endpoint";
-import * as role from "./endpoints/role.endpoint";
-import * as tag from "./endpoints/tag.endpoint";
-import * as apiKey from "./endpoints/apiKey.endpoint";
-import * as price from "./endpoints/price.endpoint";
-import * as debug from "./endpoints/debug.endpoint";
-import * as realityStability from "./endpoints/realityStability.endpoint";
-
-// Register routes directly on the app
-// Public routes
-app.post("/fingerprint/register", ...fingerprint.register);
-app.post("/api-key/register", ...apiKey.register);
-app.post("/api-key/validate", ...apiKey.validate);
-app.get("/role/available", role.getAvailableRoles);
-app.get("/price/current", ...price.getCurrent);
-app.get("/price/history/:tokenId", ...price.getHistory);
-app.get("/reality-stability", realityStability.getRealityStabilityIndex);
+// Public routes (no auth required)
+app.use("/", publicRouter);
 
 // Auth middleware for protected routes
-app.use(auth);
+app.use(validateApiKeyMiddleware);
 
 // Apply fingerprint rate limit after auth
 app.use(fingerprintRateLimit());
 
-// Protected routes
-app.get("/fingerprint/:id", fingerprint.get);
-app.post("/visit/log", ...visit.log);
-app.post("/visit/presence", ...visit.updatePresence);
-app.post("/visit/site/remove", ...visit.removeSite);
-app.get("/visit/history/:fingerprintId", ...visit.getHistory);
-app.post("/role/assign", ...role.assignRole);
-app.post("/role/remove", ...role.removeRole);
-app.post("/tag/update", ...tag.addOrUpdateTags);
-app.post("/tag/roles/update", ...tag.updateRolesBasedOnTags);
-app.post("/debug/cleanup", debug.cleanup);
-app.post("/api-key/revoke", ...apiKey.revoke);
+// Protected routes (require auth)
+app.use("/", protectedRouter);
+
+// Admin routes (require auth + admin role)
+app.use("/admin", adminRouter);
 
 // Export the Express app as a Firebase Cloud Function
 export const api = onRequest(

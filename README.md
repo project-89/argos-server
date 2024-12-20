@@ -22,11 +22,14 @@ These endpoints require a valid API key in the `x-api-key` header:
 - `/visit/presence` - Update presence status
 - `/visit/site/remove` - Remove a site
 - `/visit/history/:fingerprintId` - Get visit history
-- `/role/assign` - Assign a role
-- `/role/remove` - Remove a role
-- `/tag/update` - Add or update tags
-- `/tag/roles/update` - Update roles based on tags
-- `/debug/cleanup` - Manual cleanup trigger (admin only)
+
+### Admin Endpoints
+These endpoints require a valid API key with admin role:
+- `/admin/role/assign` - Assign a role
+- `/admin/role/remove` - Remove a role
+- `/admin/tag/update` - Add or update tags
+- `/admin/tag/roles/update` - Update roles based on tags
+- `/admin/debug/cleanup` - Manual cleanup trigger
 
 ### Automated Services
 - **Price Cache**: Caches price data for 5 minutes to respect CoinGecko API rate limits
@@ -72,6 +75,8 @@ FIREBASE_PROJECT_ID=your-project-id
 FIREBASE_REGION=us-central1
 COINGECKO_API_KEY=your-api-key
 ALLOWED_ORIGINS=https://yourdomain.com,http://localhost:5173
+FIREBASE_CONFIG_ENCRYPTION_API_KEY=your-base64-encoded-32-byte-key
+FIREBASE_CONFIG_ENCRYPTION_API_IV=your-base64-encoded-16-byte-iv
 ```
 
 ### Development Workflow
@@ -125,6 +130,16 @@ resource "google_cloudfunctions_function" "scheduledCleanup" {
 - All protected endpoints require a valid API key
 - API keys are tied to fingerprints
 - Keys can be revoked and are automatically disabled on re-registration
+- API keys are encrypted at rest using AES-256-CBC
+- Each API key is uniquely encrypted with a secure initialization vector
+- Encryption keys and IVs are managed through environment variables
+
+### Role-Based Access Control
+- Admin endpoints require admin role
+- Role management restricted to admin users
+- Tag management restricted to admin users
+- Default user role assigned on registration
+- Role validation middleware for protected routes
 
 ### Request Validation
 - Zod-based schema validation for all endpoints

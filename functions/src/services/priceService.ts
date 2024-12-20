@@ -1,25 +1,51 @@
-import axios from "axios";
 import { getFirestore } from "firebase-admin/firestore";
+import axios from "axios";
 import { COLLECTIONS } from "../constants";
-import { MOCK_PRICE_DATA, DEFAULT_TOKENS, MOCK_PRICE_HISTORY } from "./mockData";
-
-interface CoinGeckoPrice {
-  usd: number;
-  usd_24h_change: number;
-}
+import * as functions from "firebase-functions";
 
 export interface PriceData {
-  [symbol: string]: CoinGeckoPrice;
+  [symbol: string]: {
+    usd: number;
+    usd_24h_change: number;
+  };
 }
 
-const COINGECKO_API = "https://api.coingecko.com/api/v3";
+// Mock data for testing
+const MOCK_PRICE_DATA: PriceData = {
+  bitcoin: { usd: 50000, usd_24h_change: 2.5 },
+  ethereum: { usd: 3000, usd_24h_change: 1.8 },
+  Project89: { usd: 0.15, usd_24h_change: 2.5 },
+};
+
+// Mock price history for testing
+const MOCK_PRICE_HISTORY = [
+  { timestamp: Date.now() - 86400000 * 30, price: 0.15 },
+  { timestamp: Date.now() - 86400000 * 29, price: 0.16 },
+  { timestamp: Date.now() - 86400000 * 28, price: 0.14 },
+  { timestamp: Date.now() - 86400000 * 27, price: 0.15 },
+  { timestamp: Date.now() - 86400000 * 26, price: 0.16 },
+  { timestamp: Date.now(), price: 0.15 },
+];
+
+const DEFAULT_TOKENS = ["bitcoin", "ethereum"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Get Coingecko configuration
+const getCoingeckoConfig = () => {
+  const config = functions.config();
+  return {
+    apiUrl: config.coingecko?.api_url || "https://api.coingecko.com/api/v3",
+    apiKey: config.coingecko?.api_key,
+  };
+};
 
 export const getCurrentPrices = async (
   symbols: string[] = [],
   isTestEnv = false,
 ): Promise<PriceData> => {
   try {
+    const { apiUrl, apiKey } = getCoingeckoConfig();
+
     // Use default symbols if none provided
     const tokenSymbols = symbols.length > 0 ? symbols : DEFAULT_TOKENS;
 
@@ -60,7 +86,14 @@ export const getCurrentPrices = async (
 
         // Fetch from CoinGecko if not in cache or cache expired
         const response = await axios.get(
-          `${COINGECKO_API}/simple/price?ids=${symbol}&vs_currencies=usd&include_24hr_change=true`,
+          `${apiUrl}/simple/price?ids=${symbol}&vs_currencies=usd&include_24hr_change=true`,
+          apiKey
+            ? {
+                headers: {
+                  "x-cg-pro-api-key": apiKey,
+                },
+              }
+            : undefined,
         );
 
         const data = response.data[symbol] as { usd: number; usd_24h_change: number };
@@ -84,8 +117,8 @@ export const getCurrentPrices = async (
       }
     }
 
-    if (Object.keys(prices).length === 0 && errors.length > 0) {
-      throw new Error(errors[0]); // Throw the first error if no prices were found
+    if (Object.keys(prices).length === 0) {
+      throw new Error(errors.join(", "));
     }
 
     return prices;
@@ -105,9 +138,18 @@ export const getPriceHistory = async (tokenId: string, isTestEnv = false): Promi
       return MOCK_PRICE_HISTORY;
     }
 
+    const { apiUrl, apiKey } = getCoingeckoConfig();
+
     try {
       const response = await axios.get(
-        `${COINGECKO_API}/coins/${tokenId}/market_chart?vs_currency=usd&days=30&interval=daily`,
+        `${apiUrl}/coins/${tokenId}/market_chart?vs_currency=usd&days=30&interval=daily`,
+        apiKey
+          ? {
+              headers: {
+                "x-cg-pro-api-key": apiKey,
+              },
+            }
+          : undefined,
       );
 
       if (!response.data || !response.data.prices || !Array.isArray(response.data.prices)) {

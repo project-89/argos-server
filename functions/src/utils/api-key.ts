@@ -1,8 +1,24 @@
 import { randomBytes, createCipheriv, createDecipheriv } from "crypto";
+import * as functions from "firebase-functions";
 
-// Use environment variable for encryption key
-const ENCRYPTION_KEY = process.env.API_KEY_ENCRYPTION_KEY || randomBytes(32);
-const ENCRYPTION_IV = process.env.API_KEY_ENCRYPTION_IV || randomBytes(16);
+// Use Firebase Functions config for encryption keys
+const getEncryptionKey = () => {
+  const config = functions.config();
+  const key = config.encryption?.api_key || "";
+  console.log("Encryption key (base64):", key);
+  const buffer = Buffer.from(key, "base64");
+  console.log("Encryption key (buffer length):", buffer.length);
+  return buffer;
+};
+
+const getEncryptionIv = () => {
+  const config = functions.config();
+  const iv = config.encryption?.api_iv || "";
+  console.log("Encryption IV (base64):", iv);
+  const buffer = Buffer.from(iv, "base64");
+  console.log("Encryption IV (buffer length):", buffer.length);
+  return buffer;
+};
 
 /**
  * Generates a secure API key using cryptographic random bytes
@@ -19,7 +35,7 @@ export const generateApiKey = (): string => {
  * @returns Encrypted API key safe for client storage
  */
 export const encryptApiKey = (apiKey: string): string => {
-  const cipher = createCipheriv("aes-256-cbc", ENCRYPTION_KEY, ENCRYPTION_IV);
+  const cipher = createCipheriv("aes-256-cbc", getEncryptionKey(), getEncryptionIv());
   let encrypted = cipher.update(apiKey, "utf8", "base64");
   encrypted += cipher.final("base64");
   return encrypted;
@@ -31,7 +47,7 @@ export const encryptApiKey = (apiKey: string): string => {
  * @returns Original API key
  */
 export const decryptApiKey = (encryptedKey: string): string => {
-  const decipher = createDecipheriv("aes-256-cbc", ENCRYPTION_KEY, ENCRYPTION_IV);
+  const decipher = createDecipheriv("aes-256-cbc", getEncryptionKey(), getEncryptionIv());
   let decrypted = decipher.update(encryptedKey, "base64", "utf8");
   decrypted += decipher.final("utf8");
   return decrypted;

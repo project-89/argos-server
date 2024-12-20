@@ -48,8 +48,8 @@ export const register = [
         fingerprint,
         roles: [ROLES.USER], // Default role
         createdAt: now,
+        tags: [], // Initialize empty tags array
         metadata: metadata || {},
-        tags: {},
         ipAddresses: [ip],
         ipMetadata: {
           primaryIp: ip,
@@ -116,6 +116,11 @@ export const get = async (req: Request, res: Response): Promise<Response> => {
           lastSeenAt: {},
           suspiciousIps: [],
         };
+
+        // Ensure tags property exists
+        if (!data.tags) {
+          data.tags = [];
+        }
 
         // Update IP frequency and last seen
         const newFrequency = (ipMetadata.ipFrequency[ip] || 0) + 1;

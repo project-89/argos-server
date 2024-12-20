@@ -4,31 +4,26 @@ import { TEST_CONFIG } from "./testConfig";
 import * as admin from "firebase-admin";
 import axios from "axios";
 
-declare global {
-  namespace NodeJS {
-    interface Global {
-      __MONGO_URI__: string;
-      __MONGO_DB_NAME__: string;
-    }
-  }
-}
-
-// Set test environment
+// Set test environment variables
 process.env.FUNCTIONS_EMULATOR = "true";
-process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
+process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 process.env.FIREBASE_CONFIG = JSON.stringify({
-  projectId: TEST_CONFIG.projectId,
+  projectId: "argos-434718",
 });
 
-// Set rate limiting to enabled by default for tests
-process.env.RATE_LIMIT_ENABLED = "true";
+// Set encryption config for testing using production format
+process.env.FIREBASE_CONFIG_ENCRYPTION_API_KEY = "a0PJ2Y5qjvkL7LVmer6f1OACff+0kMjMPOJ5YkGS+JM=";
+process.env.FIREBASE_CONFIG_ENCRYPTION_API_IV = "G3z5x+kLY3xFOrfaQUuhnA=";
 
-// Initialize CORS environment variables for testing
+// Set rate limit environment variables for testing
+process.env.RATE_LIMIT_ENABLED = "true";
+process.env.IP_RATE_LIMIT_ENABLED = "false";
+
+// Set CORS environment variables for testing
+process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";
 process.env.DEV_ORIGIN_VITE = "http://localhost:5173";
 process.env.DEV_ORIGIN_REACT = "http://localhost:3000";
 process.env.DEV_ORIGIN_FIREBASE = "http://localhost:5000";
-// Add newsite.com here to match test expectations
-process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {

@@ -3,6 +3,7 @@ import { TEST_CONFIG } from "../setup/testConfig";
 import { COLLECTIONS } from "../../constants";
 import * as admin from "firebase-admin";
 import { Agent } from "http";
+import { generateApiKey, encryptApiKey } from "../../utils/api-key";
 
 interface TestHeaders extends RawAxiosRequestHeaders {
   "x-api-key"?: string;
@@ -117,7 +118,7 @@ export const initializeTestEnvironment = async () => {
 };
 
 // Helper to create test data
-export const createTestData = async () => {
+export const createTestData = async (options: { roles?: string[] } = {}) => {
   try {
     console.log("Creating test data...");
 
@@ -126,38 +127,38 @@ export const createTestData = async () => {
       await initializeTestEnvironment();
     }
 
+    const db = admin.firestore();
+
     // Generate a unique fingerprint value
     const uniqueFingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).substring(2)}`;
 
-    // Register fingerprint through the actual endpoint
-    const fingerprintResponse = await makeRequest(
-      "post",
-      `${TEST_CONFIG.apiUrl}/fingerprint/register`,
-      {
-        fingerprint: uniqueFingerprint,
-        metadata: TEST_CONFIG.testFingerprint.metadata,
-      },
-    );
-
-    if (!fingerprintResponse.data.success) {
-      throw new Error("Failed to register fingerprint");
-    }
-
-    const fingerprintId = fingerprintResponse.data.data.id;
-
-    // Register API key through the actual endpoint
-    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/register`, {
-      fingerprintId,
+    // Create fingerprint directly in Firestore
+    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc();
+    const fingerprintId = fingerprintRef.id;
+    await fingerprintRef.set({
+      fingerprint: uniqueFingerprint,
+      metadata: TEST_CONFIG.testFingerprint.metadata,
+      roles: options.roles || ["user"],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    if (!apiKeyResponse.data.success) {
-      throw new Error("Failed to register API key");
-    }
-
-    const apiKey = apiKeyResponse.data.data.key;
+    // Generate and store API key directly in Firestore
+    const plainApiKey = generateApiKey();
+    const encryptedApiKey = encryptApiKey(plainApiKey);
+    const apiKeyRef = db.collection(COLLECTIONS.API_KEYS).doc();
+    await apiKeyRef.set({
+      key: encryptedApiKey,
+      fingerprintId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
+      enabled: true,
+      metadata: {
+        name: "Test API Key",
+      },
+    });
 
     console.log("Test data created successfully");
-    return { fingerprintId, apiKey, fingerprint: uniqueFingerprint };
+    return { fingerprintId, apiKey: encryptedApiKey, fingerprint: uniqueFingerprint };
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;

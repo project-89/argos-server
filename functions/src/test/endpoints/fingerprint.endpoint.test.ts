@@ -52,7 +52,7 @@ describe("Fingerprint Endpoint", () => {
       expect(response.data.data).toHaveProperty("createdAt");
       expect(response.data.data).toHaveProperty("metadata");
       expect(response.data.data.metadata).toHaveProperty("test", true);
-      expect(response.data.data).toHaveProperty("tags", {});
+      expect(response.data.data).toHaveProperty("tags", []);
 
       // Verify IP tracking data
       expect(response.data.data).toHaveProperty("ipAddresses");
@@ -212,7 +212,10 @@ describe("Fingerprint Endpoint", () => {
       expect(response.data.data).toHaveProperty("createdAt");
       expect(response.data.data).toHaveProperty("metadata");
       expect(response.data.data.metadata).toHaveProperty("testData", true);
-      expect(response.data.data).toHaveProperty("tags", {});
+      expect(response.data.data).toHaveProperty("tags", []);
+      if (response.data.data.tags) {
+        expect(typeof response.data.data.tags).toBe("object");
+      }
     });
 
     it("should handle non-existent fingerprint", async () => {
