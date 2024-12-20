@@ -82,22 +82,20 @@ describe("CORS Test Suite", () => {
   });
 
   it("should block requests from unauthorized origins", async () => {
-    const origin = "https://unauthorized.com";
-    console.log("[CORS Test] Testing unauthorized origin:", origin);
-
-    const response = await makeRequest("get", `${API_URL}/role/available`, null, {
-      headers: {
-        Origin: origin,
-      },
+    const response = await makeRequest("get", `${API_URL}/`, null, {
       validateStatus: () => true,
+      headers: {
+        Origin: "https://malicious-site.com",
+        Accept: "application/json",
+      },
     });
 
-    console.log("[CORS Test] Response headers:", response.headers);
-    console.log("[CORS Test] Response status:", response.status);
-    console.log("[CORS Test] Response data:", response.data);
-
     expect(response.status).toBe(500);
-    expect(response.data).toContain("Not allowed by CORS");
+    expect(response.data).toEqual({
+      success: false,
+      error: "Internal Server Error",
+      message: "Not allowed by CORS",
+    });
   });
 
   it("should handle preflight requests", async () => {

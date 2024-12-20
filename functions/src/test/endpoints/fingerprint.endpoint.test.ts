@@ -254,12 +254,19 @@ describe("Fingerprint Endpoint", () => {
 
     it("should handle missing ID parameter", async () => {
       const response = await makeRequest("get", `${API_URL}/fingerprint/`, null, {
-        headers: { "x-api-key": validApiKey },
         validateStatus: () => true,
+        headers: {
+          "x-api-key": validApiKey,
+          Accept: "application/json",
+        },
       });
 
       expect(response.status).toBe(404);
-      expect(response.data).toMatch(/Cannot GET \/fingerprint\//);
+      expect(response.data).toEqual({
+        success: false,
+        error: "Not Found",
+        message: "The requested endpoint does not exist",
+      });
     });
 
     it("should reject request without API key", async () => {
