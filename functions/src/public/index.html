@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARGOS Reality Monitoring System - Oneirocom Internal</title>
+    <style>
+        :root {
+            --primary-color: #4b1eb5;
+            --glow-color: rgba(75, 30, 181, 0.3);
+            --text-color: #ffffff;
+            --bg-color: #080314;
+            --secondary-bg: rgba(75, 30, 181, 0.1);
+        }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'SF Mono', monospace;
+            line-height: 1.6;
+            color: var(--text-color);
+            background: var(--bg-color);
+            background-image: 
+                radial-gradient(circle at 50% 50%, var(--glow-color), transparent 70%),
+                linear-gradient(0deg, #080314 0%, #0d0524 100%);
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            position: relative;
+        }
+        header::after {
+            content: "";
+            position: absolute;
+            bottom: -1rem;
+            left: 25%;
+            right: 25%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        }
+        h1 {
+            font-size: 2.5rem;
+            color: var(--text-color);
+            margin-bottom: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.2em;
+            font-weight: 300;
+        }
+        .subtitle {
+            font-size: 1rem;
+            color: rgba(255, 255, 255, 0.6);
+            font-family: monospace;
+        }
+        .card {
+            background: var(--secondary-bg);
+            border: 1px solid rgba(75, 30, 181, 0.2);
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 0 20px rgba(75, 30, 181, 0.1);
+            backdrop-filter: blur(10px);
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--primary-color), transparent);
+        }
+        h2 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-weight: 400;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        h2::before {
+            content: ">";
+            color: var(--primary-color);
+            opacity: 0.7;
+        }
+        ul {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        li {
+            margin-bottom: 0.8rem;
+            padding-left: 1.5rem;
+            position: relative;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        li::before {
+            content: "•";
+            color: var(--primary-color);
+            position: absolute;
+            left: 0;
+        }
+        .endpoint {
+            font-family: monospace;
+            background: rgba(75, 30, 181, 0.2);
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            border: 1px solid rgba(75, 30, 181, 0.3);
+            color: #fff;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #4CAF50;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        footer {
+            text-align: center;
+            margin-top: 3rem;
+            padding-top: 2rem;
+            border-top: 1px solid rgba(75, 30, 181, 0.2);
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.9rem;
+        }
+        .restricted {
+            color: rgba(255, 255, 255, 0.4);
+            font-size: 0.8rem;
+            margin-top: 2rem;
+            text-align: center;
+            font-style: italic;
+        }
+        @media (max-width: 640px) {
+            body {
+                padding: 1rem;
+            }
+            h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ArgOS</h1>
+            <p class="subtitle">Reality Instance Monitoring & Stability Protocol</p>
+            <div class="status-indicator"></div>
+            <span style="color: rgba(255, 255, 255, 0.6)">System Status: Operational</span>
+        </header>
+
+        <section class="card">
+            <h2>System Overview</h2>
+            <p>ARGOS maintains reality coherence through:</p>
+            <ul>
+                <li>Consciousness signature mapping</li>
+                <li>Instance traversal tracking</li>
+                <li>Reality anchor stabilization</li>
+                <li>Quantum variance monitoring</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Core Protocols</h2>
+            <ul>
+                <li>Quantum-encrypted authentication matrices</li>
+                <li>Anti-reality-collapse safeguards</li>
+                <li>Cross-dimensional bridging protocols</li>
+                <li>Real-time reality stream processing</li>
+            </ul>
+        </section>
+
+        <section class="card">
+            <h2>Access Points</h2>
+            <ul>
+                <li><span class="endpoint">/consciousness/register</span> - Register new consciousness signature</li>
+                <li><span class="endpoint">/reality-key/generate</span> - Generate reality access key</li>
+                <li><span class="endpoint">/quantum-variance/current</span> - Query current reality stability metrics</li>
+                <li><span class="endpoint">/reality-coherence</span> - Check local reality coherence index</li>
+            </ul>
+        </section>
+
+        <p class="restricted">NOTICE: This system operates under Protocol 89 clearance. Unauthorized reality manipulation is prohibited.</p>
+
+        <footer>
+            <p>© 2037 Oneirocom Simulation Systems. Reality Rights Reserved.</p>
+        </footer>
+    </div>
+</body>
+</html>

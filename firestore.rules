@@ -8,22 +8,36 @@ service cloud.firestore {
         && timeInMillis >= request.time.toMillis() - 60000; // Within 1 minute past
     }
 
+    function isValidRole(role) {
+      return role in ['user', 'agent-initiate', 'agent-field', 'agent-senior', 'agent-master', 'admin'];
+    }
+
+    function isValidTag(tag) {
+      return tag is string && tag.matches('^[a-zA-Z0-9_-]+$');
+    }
+
     // Rules for fingerprints collection
     match /fingerprints/{fingerprintId} {
-      allow read: if true;  // Public read for fingerprint verification
+      // Only allow read for registration validation
+      allow read: if request.path.matches('/fingerprints/[^/]+$');  // Only direct document reads
       allow write: if false;  // Only Cloud Functions can write
+
+      // Validate fingerprint roles
+      match /roles/{roleId} {
+        allow read: if true;  // Roles need to be readable for validation
+        allow write: if false;  // Only Cloud Functions can write
+        allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
+      }
     }
 
-    // Rules for visits collection
+    // Rules for visits collection - private data
     match /visits/{visitId} {
-      allow read: if true;  // Public read for visit history
-      allow write: if false;  // Only Cloud Functions can write
+      allow read, write: if false;  // Only Cloud Functions can access
     }
 
-    // Rules for presence tracking
+    // Rules for presence tracking - private data
     match /presence/{fingerprintId} {
-      allow read: if true;  // Public read for presence status
-      allow write: if false;  // Only Cloud Functions can write
+      allow read, write: if false;  // Only Cloud Functions can access
     }
 
     // Rules for API keys - most sensitive collection
@@ -31,27 +45,33 @@ service cloud.firestore {
       allow read, write: if false;  // Strictly Cloud Functions only
     }
 
-    // Rules for price history
+    // Rules for price history - public data
     match /price-history/{docId} {
       allow read: if true;  // Public read for price data
       allow write: if false;  // Only Cloud Functions can write
     }
 
-    // Rules for stability metrics
+    // Rules for stability metrics - public data
     match /stability-metrics/{docId} {
       allow read: if true;  // Public read for stability data
       allow write: if false;  // Only Cloud Functions can write
     }
 
-    // Rules for rate limits
+    // Rules for rate limits - private data
     match /rate-limits/{docId} {
       allow read, write: if false;  // Strictly Cloud Functions only
     }
 
-    // Rules for tags
+    // Rules for tags - private data
     match /tags/{tagId} {
-      allow read: if true;  // Public read for tags
-      allow write: if false;  // Only Cloud Functions can write
+      allow read, write: if false;  // Only Cloud Functions can access
+      allow update: if false && isValidTag(request.resource.data.tag);  // Additional validation even though write is false
+    }
+
+    // Rules for role assignments - private data
+    match /roles/{roleId} {
+      allow read, write: if false;  // Only Cloud Functions can access
+      allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
     }
   }
 }

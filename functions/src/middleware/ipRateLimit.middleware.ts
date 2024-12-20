@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
-import * as functions from "firebase-functions";
 
 interface RateLimitConfig {
   windowMs: number;
@@ -10,23 +9,21 @@ interface RateLimitConfig {
 
 const DEFAULT_CONFIG: RateLimitConfig = {
   windowMs: 60 * 60 * 1000, // 1 hour window
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 300, // limit each IP to 300 requests per hour (more restrictive to prevent DDoS)
 };
 
 export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
   const { windowMs } = { ...DEFAULT_CONFIG, ...config };
-  const functionConfig = functions.config();
-  // Use config for max if set, otherwise use config or default
-  const max = functionConfig.rate_limit?.ip_max
-    ? parseInt(functionConfig.rate_limit.ip_max, 10)
+  // Use environment variables or fallback to config/default
+  const isDisabled =
+    process.env.RATE_LIMIT_DISABLED === "true" || process.env.IP_RATE_LIMIT_DISABLED === "true";
+  const max = process.env.IP_RATE_LIMIT_MAX
+    ? parseInt(process.env.IP_RATE_LIMIT_MAX, 10)
     : config.max || DEFAULT_CONFIG.max;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Check if rate limiting is explicitly disabled
-    if (
-      functionConfig.rate_limit?.disabled === "true" ||
-      functionConfig.rate_limit?.ip_disabled === "true"
-    ) {
+    if (isDisabled) {
       console.log("[IP Rate Limit] Rate limiting is disabled");
       next();
       return;
@@ -51,47 +48,39 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
           const result = await db.runTransaction(async (transaction) => {
             const rateLimitRef = db.collection(COLLECTIONS.RATE_LIMITS).doc(`ip:${ip}`);
             const doc = await transaction.get(rateLimitRef);
-
-            if (!doc.exists) {
-              console.log(`[IP Rate Limit] First request from IP: ${ip}`);
-              transaction.set(rateLimitRef, {
-                requests: [now],
-                createdAt: FieldValue.serverTimestamp(),
-                type: "ip",
-              });
-              return { limited: false, count: 1 };
-            }
-
             const data = doc.data();
-            if (!data) {
-              throw new Error("Rate limit data is missing");
-            }
 
-            // Get requests within the current window
-            const requests = (data.requests as number[]) || [];
+            // Get recent requests within the window
+            const recentRequests = data?.requests || [];
             const windowStart = now - windowMs;
-            const recentRequests = requests.filter((time) => time > windowStart);
 
-            console.log(
-              `[IP Rate Limit] IP: ${ip}, Recent requests: ${recentRequests.length}, Max: ${max}, Window: ${new Date(windowStart).toISOString()} to ${new Date(now).toISOString()}`,
+            // Filter out old requests
+            const validRequests = recentRequests.filter(
+              (timestamp: number) => timestamp > windowStart,
             );
 
-            // Check if we've hit the limit
-            if (recentRequests.length >= max) {
-              const oldestRequest = Math.min(...recentRequests);
-              const retryAfter = Math.ceil((oldestRequest + windowMs - now) / 1000);
+            if (validRequests.length >= max) {
+              const oldestValidRequest = validRequests[0];
+              const resetTime = oldestValidRequest + windowMs;
+              const retryAfter = Math.ceil((resetTime - now) / 1000);
+
               console.log(
                 `[IP Rate Limit] Rate limit exceeded for IP: ${ip}, retry after: ${retryAfter}s`,
               );
-              return { limited: true, retryAfter, count: recentRequests.length };
+
+              return { limited: true, retryAfter };
             }
 
-            // Add current request and update
-            const updatedRequests = [...recentRequests, now];
-            transaction.update(rateLimitRef, {
-              requests: updatedRequests,
-              lastUpdated: FieldValue.serverTimestamp(),
-            });
+            // Add current request and update, keeping only requests within the window
+            const updatedRequests = [...validRequests, now];
+            transaction.set(
+              rateLimitRef,
+              {
+                requests: updatedRequests,
+                lastUpdated: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
 
             console.log(
               `[IP Rate Limit] Updated request count for IP: ${ip}, new count: ${updatedRequests.length}`,

@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
-import * as functions from "firebase-functions";
 
 interface RateLimitConfig {
   windowMs: number;
@@ -10,23 +9,22 @@ interface RateLimitConfig {
 
 const DEFAULT_CONFIG: RateLimitConfig = {
   windowMs: 60 * 60 * 1000, // 1 hour window
-  max: 100, // limit each fingerprint to 100 requests per windowMs
+  max: 1000, // limit each fingerprint to 1000 requests per hour (more lenient for authenticated users)
 };
 
 export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
   const { windowMs } = { ...DEFAULT_CONFIG, ...config };
-  const functionConfig = functions.config();
-  // Use config for max if set, otherwise use config or default
-  const max = functionConfig.rate_limit?.fingerprint_max
-    ? parseInt(functionConfig.rate_limit.fingerprint_max, 10)
+  // Use environment variables or fallback to config/default
+  const isDisabled =
+    process.env.RATE_LIMIT_DISABLED === "true" ||
+    process.env.FINGERPRINT_RATE_LIMIT_DISABLED === "true";
+  const max = process.env.FINGERPRINT_RATE_LIMIT_MAX
+    ? parseInt(process.env.FINGERPRINT_RATE_LIMIT_MAX, 10)
     : config.max || DEFAULT_CONFIG.max;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Check if rate limiting is explicitly disabled
-    if (
-      functionConfig.rate_limit?.disabled === "true" ||
-      functionConfig.rate_limit?.fingerprint_disabled === "true"
-    ) {
+    if (isDisabled) {
       console.log("[Fingerprint Rate Limit] Rate limiting is disabled");
       next();
       return;
@@ -38,6 +36,7 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
       const db = getFirestore();
       // Only use the validated fingerprintId from auth middleware
       const fingerprint = req.fingerprintId;
+      const now = Date.now();
 
       if (!fingerprint) {
         // Skip rate limiting if no fingerprint is available (for public routes)
@@ -60,51 +59,39 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
         try {
           const result = await db.runTransaction(async (transaction) => {
             const doc = await transaction.get(rateLimitRef);
-            const now = Date.now();
+            const data = doc.data();
+
+            // Get recent requests within the window
+            const recentRequests = data?.requests || [];
             const windowStart = now - windowMs;
 
-            if (!doc.exists) {
-              console.log(
-                `[Fingerprint Rate Limit] First request from fingerprint: ${fingerprint}`,
-              );
-              transaction.set(rateLimitRef, {
-                requests: [now],
-                createdAt: FieldValue.serverTimestamp(),
-                type: "fingerprint",
-                lastUpdated: FieldValue.serverTimestamp(),
-              });
-              return { limited: false, count: 1 };
-            }
-
-            const data = doc.data();
-            if (!data) {
-              throw new Error("Rate limit data is missing");
-            }
-
-            // Get requests within the current window
-            const requests = (data.requests as number[]) || [];
-            const recentRequests = requests.filter((time) => time > windowStart);
-
-            console.log(
-              `[Fingerprint Rate Limit] Fingerprint: ${fingerprint}, Recent requests: ${recentRequests.length}, Max: ${max}`,
+            // Filter out old requests
+            const validRequests = recentRequests.filter(
+              (timestamp: number) => timestamp > windowStart,
             );
 
-            // Check if we've hit the limit
-            if (recentRequests.length >= max) {
-              const oldestRequest = Math.min(...recentRequests);
-              const retryAfter = Math.ceil((oldestRequest + windowMs - now) / 1000);
+            if (validRequests.length >= max) {
+              const oldestValidRequest = validRequests[0];
+              const resetTime = oldestValidRequest + windowMs;
+              const retryAfter = Math.ceil((resetTime - now) / 1000);
+
               console.log(
                 `[Fingerprint Rate Limit] Rate limit exceeded for fingerprint: ${fingerprint}, retry after: ${retryAfter}s`,
               );
-              return { limited: true, retryAfter, count: recentRequests.length };
+
+              return { limited: true, retryAfter };
             }
 
             // Add current request and update, keeping only requests within the window
-            const updatedRequests = [...recentRequests, now];
-            transaction.update(rateLimitRef, {
-              requests: updatedRequests,
-              lastUpdated: FieldValue.serverTimestamp(),
-            });
+            const updatedRequests = [...validRequests, now];
+            transaction.set(
+              rateLimitRef,
+              {
+                requests: updatedRequests,
+                lastUpdated: FieldValue.serverTimestamp(),
+              },
+              { merge: true },
+            );
 
             console.log(
               `[Fingerprint Rate Limit] Updated request count for fingerprint: ${fingerprint}, new count: ${updatedRequests.length}`,

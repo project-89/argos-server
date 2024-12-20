@@ -15,7 +15,8 @@
     "prepublishOnly": "npm test && npm run lint"
   },
   "dependencies": {
-    "cross-fetch": "^4.0.0"
+    "cross-fetch": "^4.0.0",
+    "firebase-functions": "^6.2.0"
   },
   "peerDependencies": {
     "react": "^18.0.0"
