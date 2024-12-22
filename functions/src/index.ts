@@ -24,36 +24,63 @@ const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
 console.log("[CORS] Allowed origins:", allowedOrigins);
 console.log("[CORS] Options:", CORS_CONFIG.options);
 
-// Apply global middleware
+// Add explicit OPTIONS handler for preflight requests FIRST
+app.options(
+  "*",
+  cors({
+    origin: (origin, callback) => {
+      console.log("[CORS] Preflight request from origin:", origin);
+      const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, origin || "*");
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+    methods: [...CORS_CONFIG.options.methods],
+    allowedHeaders: [...CORS_CONFIG.options.allowedHeaders],
+    exposedHeaders: [...CORS_CONFIG.options.exposedHeaders],
+    maxAge: CORS_CONFIG.options.maxAge,
+  }),
+);
+
+// Apply CORS middleware for all other requests
 app.use(
   cors({
     origin: (origin, callback) => {
       console.log("[CORS] Request from origin:", origin);
+
+      // For requests without an origin, allow with "*" if not using credentials
       if (!origin) {
-        // Allow requests with no origin (like mobile apps or curl requests)
-        console.log("[CORS] No origin, allowing request");
-        callback(null, true);
+        console.log("[CORS] Request without origin - allowing for non-credentialed requests");
+        callback(null, "*");
         return;
       }
 
       const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
       console.log("[CORS] Checking origin against allowed list:", { origin, allowedOrigins });
+
       if (allowedOrigins.includes(origin)) {
+        // For credentialed requests, must return the specific origin
         console.log("[CORS] Origin allowed:", origin);
         callback(null, origin);
       } else {
         console.error(`[CORS] Blocked request from unauthorized origin: ${origin}`);
+        // Return error to trigger CORS failure
         callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-    methods: CORS_CONFIG.options.methods,
-    allowedHeaders: CORS_CONFIG.options.allowedHeaders,
+    methods: [...CORS_CONFIG.options.methods],
+    allowedHeaders: [...CORS_CONFIG.options.allowedHeaders],
+    exposedHeaders: [...CORS_CONFIG.options.exposedHeaders],
     maxAge: CORS_CONFIG.options.maxAge,
-    preflightContinue: CORS_CONFIG.options.preflightContinue,
-    optionsSuccessStatus: CORS_CONFIG.options.optionsSuccessStatus,
+    preflightContinue: false,
+    optionsSuccessStatus: 204,
   }),
 );
+
 app.use(express.json());
 
 // Helper to check if request is from a browser
@@ -133,7 +160,20 @@ app.use((req, res) => {
   });
 });
 
-// Error handler
+// CORS error handler
+app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err.message === "Not allowed by CORS") {
+    console.error("[CORS Error]", err.message);
+    return res.status(403).json({
+      success: false,
+      error: "Forbidden",
+      message: "Not allowed by CORS",
+    });
+  }
+  next(err);
+});
+
+// Generic error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error("[Error Handler]", err);
   sendErrorResponse(res, 500, "500.html", {
@@ -146,7 +186,7 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Export the Express app as a Firebase Cloud Function
 export const api = onRequest(
   {
-    cors: true,
+    cors: false, // Disable Firebase's CORS handling
     memory: "256MiB",
     timeoutSeconds: 60,
     minInstances: 0,

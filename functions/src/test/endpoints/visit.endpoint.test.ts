@@ -122,6 +122,7 @@ describe("Visit Endpoint", () => {
         {
           headers: {
             "x-api-key": validApiKey,
+            Origin: "http://localhost:5173",
           },
           validateStatus: () => true,
         },
@@ -142,27 +143,25 @@ describe("Visit Endpoint", () => {
     });
 
     it("should handle non-existent fingerprint", async () => {
-      await expect(
-        makeRequest(
-          "post",
-          `${API_URL}/visit/log`,
-          {
-            fingerprintId: "non-existent-id",
-            url: "https://test.com",
-          },
-          {
-            headers: { "x-api-key": validApiKey },
-          },
-        ),
-      ).rejects.toMatchObject({
-        response: {
-          status: 404,
-          data: {
-            success: false,
-            error: "Fingerprint not found",
-          },
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/log`,
+        {
+          fingerprintId: "non-existent-id",
+          url: "https://test.com",
         },
-      });
+        {
+          headers: {
+            "x-api-key": validApiKey,
+            Origin: "http://localhost:5173",
+          },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Fingerprint not found");
     });
 
     it("should increment visit count for existing site", async () => {

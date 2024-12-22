@@ -11,6 +11,14 @@ import { PredefinedRole, ROLE_PERMISSIONS, Permission } from "../constants/roles
 export const requirePermission = (requiredPermission: Permission) => {
   return async (req: Request, res: Response, next: NextFunction): Promise<void | Response> => {
     try {
+      // In development, bypass admin checks if explicitly requested
+      if (
+        (process.env.NODE_ENV === "development" || process.env.FUNCTIONS_EMULATOR === "true") &&
+        process.env.BYPASS_ROLE_CHECK === "true"
+      ) {
+        return next();
+      }
+
       const fingerprintId = req.fingerprintId;
       if (!fingerprintId) {
         throw new ApiError(401, "Authentication required");

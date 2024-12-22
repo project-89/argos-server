@@ -89,6 +89,7 @@ export const CORS_CONFIG = {
   options: {
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"] as string[],
     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"] as string[],
+    exposedHeaders: ["Content-Length", "Content-Type", "x-api-key"] as string[],
     credentials: true,
     maxAge: 86400, // 24 hours
     preflightContinue: false,

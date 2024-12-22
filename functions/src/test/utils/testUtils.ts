@@ -1,71 +1,118 @@
-import axios, { AxiosRequestConfig, RawAxiosRequestHeaders } from "axios";
+import axios, { AxiosRequestConfig, AxiosError, RawAxiosRequestHeaders } from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { COLLECTIONS } from "../../constants";
 import * as admin from "firebase-admin";
-import { Agent } from "http";
-import { generateApiKey, encryptApiKey } from "../../utils/api-key";
-
-interface TestHeaders extends RawAxiosRequestHeaders {
-  "x-api-key"?: string;
-  "x-test-env"?: string;
-  "x-test-fingerprint-id"?: string;
-}
-
-// Create a shared HTTP agent with keepAlive disabled
-const agent = new Agent({
-  keepAlive: false,
-  maxSockets: 1,
-});
+import { Agent as HttpAgent } from "http";
+import { Agent as HttpsAgent } from "https";
 
 export const makeRequest = async (
   method: string,
   url: string,
-  data: any = null,
-  config: AxiosRequestConfig = {},
+  data?: any,
+  options: AxiosRequestConfig = {},
 ) => {
-  const headers: TestHeaders = {
-    ...config.headers,
+  // Create new agents for this request
+  const httpAgent = new HttpAgent({ keepAlive: false });
+  const httpsAgent = new HttpsAgent({ keepAlive: false });
+
+  // Set default headers
+  const defaultHeaders: RawAxiosRequestHeaders = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
   };
 
-  // Remove undefined headers
-  Object.keys(headers).forEach((key) => {
-    if (headers[key as keyof TestHeaders] === undefined) {
-      delete headers[key as keyof TestHeaders];
-    }
-  });
-
-  const axiosConfig: AxiosRequestConfig = {
-    method,
-    url,
-    headers,
-    validateStatus: config.validateStatus ?? null, // Use provided validateStatus or default to null
-    httpAgent: agent, // Use the shared agent
-    ...config,
-  };
-
-  // Only add data for non-GET requests
-  if (method.toLowerCase() !== "get" && data !== null) {
-    axiosConfig.data = data;
+  // Handle CORS headers based on credentials
+  const withCredentials = options.withCredentials ?? true;
+  if (withCredentials) {
+    // For credentialed requests, must use a valid origin
+    defaultHeaders.Origin = options.headers?.Origin ?? "http://localhost:5173";
+  } else {
+    // For non-credentialed requests, origin is optional
+    defaultHeaders.Origin = options.headers?.Origin ?? undefined;
   }
 
+  // For OPTIONS requests, ensure proper preflight headers
+  if (method.toLowerCase() === "options") {
+    defaultHeaders["Access-Control-Request-Method"] =
+      options.headers?.["Access-Control-Request-Method"] || "GET";
+    defaultHeaders["Access-Control-Request-Headers"] = [
+      "content-type",
+      "authorization",
+      "x-api-key",
+    ].join(",");
+  }
+
+  // Merge headers, ensuring API key is properly set
+  const headers = {
+    ...defaultHeaders,
+    ...(options.headers || {}),
+  };
+
+  // Ensure x-api-key is set if provided
+  if (options.headers?.["x-api-key"]) {
+    // Move x-api-key to the root level of headers to ensure it's sent correctly
+    headers["x-api-key"] = options.headers["x-api-key"];
+    console.log("Request headers:", {
+      ...headers,
+      "x-api-key": "[REDACTED]",
+    });
+  } else {
+    console.log("No API key provided in request");
+    console.log("Request headers:", headers);
+  }
+
+  const config: AxiosRequestConfig = {
+    method,
+    url,
+    validateStatus: options.validateStatus ?? ((status) => true), // Accept all status codes by default
+    withCredentials,
+    httpAgent,
+    httpsAgent,
+    headers,
+  };
+
+  // Only add data if it's defined and not a GET/HEAD/OPTIONS request
+  if (data !== undefined && !["get", "head", "options"].includes(method.toLowerCase())) {
+    config.data = data;
+  }
+
+  console.log("Making request with config:", {
+    method: config.method,
+    url: config.url,
+    withCredentials: config.withCredentials,
+    headers: {
+      ...config.headers,
+      "x-api-key": config.headers?.["x-api-key"] ? "[REDACTED]" : undefined,
+    },
+    data: config.data,
+  });
+
   try {
-    const response = await axios(axiosConfig);
-    // Only throw on non-2xx status if validateStatus is not provided
-    if (response.status >= 400 && !config.validateStatus) {
-      throw { response };
-    }
+    const response = await axios(config);
+    console.log("Response received:", {
+      status: response.status,
+      headers: response.headers,
+      data: response.data,
+    });
+
     return response;
-  } catch (error: any) {
-    // If validateStatus is provided, return the error response
-    if (error.response && config.validateStatus) {
-      return error.response;
+  } catch (error) {
+    if (error instanceof AxiosError && error.response) {
+      console.error("Request failed:", {
+        status: error.response.status,
+        headers: error.response.headers,
+        data: error.response.data,
+      });
+      throw error;
     }
-    // Otherwise, throw the error
     throw error;
+  } finally {
+    // Close the specific agents used for this request
+    httpAgent.destroy();
+    httpsAgent.destroy();
   }
 };
 
-// Initialize Firebase Admin for testing
 export const initializeTestEnvironment = async () => {
   try {
     console.log("Initializing test environment...");
@@ -118,7 +165,7 @@ export const initializeTestEnvironment = async () => {
 };
 
 // Helper to create test data
-export const createTestData = async (options: { roles?: string[] } = {}) => {
+export const createTestData = async (options: { roles?: string[]; isAdmin?: boolean } = {}) => {
   try {
     console.log("Creating test data...");
 
@@ -127,38 +174,55 @@ export const createTestData = async (options: { roles?: string[] } = {}) => {
       await initializeTestEnvironment();
     }
 
-    const db = admin.firestore();
-
     // Generate a unique fingerprint value
     const uniqueFingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).substring(2)}`;
 
-    // Create fingerprint directly in Firestore
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc();
-    const fingerprintId = fingerprintRef.id;
-    await fingerprintRef.set({
-      fingerprint: uniqueFingerprint,
-      metadata: TEST_CONFIG.testFingerprint.metadata,
-      roles: options.roles || ["user"],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    // Register fingerprint first (always with default user role)
+    const fingerprintResponse = await makeRequest(
+      "post",
+      `${TEST_CONFIG.apiUrl}/fingerprint/register`,
+      {
+        fingerprint: uniqueFingerprint,
+        metadata: TEST_CONFIG.testFingerprint.metadata,
+      },
+    );
+
+    if (!fingerprintResponse.data.success || !fingerprintResponse.data.data.id) {
+      throw new Error(
+        "Failed to register fingerprint: " + JSON.stringify(fingerprintResponse.data),
+      );
+    }
+
+    const fingerprintId = fingerprintResponse.data.data.id;
+
+    // Then register API key for the fingerprint
+    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/register`, {
+      fingerprintId,
     });
 
-    // Generate and store API key directly in Firestore
-    const plainApiKey = generateApiKey();
-    const encryptedApiKey = encryptApiKey(plainApiKey);
-    const apiKeyRef = db.collection(COLLECTIONS.API_KEYS).doc();
-    await apiKeyRef.set({
-      key: encryptedApiKey,
-      fingerprintId,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
-      enabled: true,
-      metadata: {
-        name: "Test API Key",
-      },
-    });
+    if (!apiKeyResponse.data.success || !apiKeyResponse.data.data.key) {
+      throw new Error("Failed to register API key: " + JSON.stringify(apiKeyResponse.data));
+    }
+
+    const apiKey = apiKeyResponse.data.data.key;
+
+    // Set roles directly in the database
+    const db = admin.firestore();
+    if (options.isAdmin || options.roles) {
+      await db
+        .collection(COLLECTIONS.FINGERPRINTS)
+        .doc(fingerprintId)
+        .update({
+          roles: options.roles ?? (options.isAdmin ? ["user", "admin"] : ["user"]),
+        });
+    }
 
     console.log("Test data created successfully");
-    return { fingerprintId, apiKey: encryptedApiKey, fingerprint: uniqueFingerprint };
+    return {
+      fingerprintId,
+      apiKey,
+      fingerprint: uniqueFingerprint,
+    };
   } catch (error) {
     console.error("Failed to create test data:", error);
     throw error;

@@ -46,7 +46,7 @@ export const register = [
       const now = Timestamp.now();
       const docData: Omit<FingerprintDocData, "id"> = {
         fingerprint,
-        roles: [ROLES.USER], // Default role
+        roles: [ROLES.USER], // Always use default user role
         createdAt: now,
         tags: [], // Initialize empty tags array
         metadata: metadata || {},

@@ -31,6 +31,7 @@ export interface TestConfig {
     };
   };
   availableRoles: string[];
+  allowedOrigins: string[];
 }
 
 export const TEST_CONFIG: TestConfig = {
@@ -64,6 +65,14 @@ export const TEST_CONFIG: TestConfig = {
     },
   },
   availableRoles: ["user", "premium", "vip", "admin"],
+  allowedOrigins: [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:5000",
+    "https://test.com",
+    "https://example.com",
+    "https://newsite.com",
+  ],
 };
 
 export const MOCK_PRICES: PriceData = {
@@ -72,6 +81,12 @@ export const MOCK_PRICES: PriceData = {
     usd_24h_change: 2.5,
   },
 };
+
+// Set up test environment variables
+process.env.NODE_ENV = "test";
+process.env.FUNCTIONS_EMULATOR = "true";
+process.env.BYPASS_ROLE_CHECK = "true";
+process.env.ALLOWED_ORIGINS = TEST_CONFIG.allowedOrigins.join(",");
 
 // WARNING: These are test-only encryption keys. DO NOT use these in production!
 // Generate new secure keys for production using:

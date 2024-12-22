@@ -1,35 +1,42 @@
-import { describe, it, expect, beforeAll } from "@jest/globals";
+import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, initializeTestEnvironment, createTestData } from "../utils/testUtils";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
+import {
+  makeRequest,
+  initializeTestEnvironment,
+  createTestData,
+  cleanDatabase,
+} from "../utils/testUtils";
 
 describe("Debug Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
-  let fingerprintId: string;
 
   beforeAll(async () => {
     await initializeTestEnvironment();
-    const { fingerprintId: fId, apiKey } = await createTestData();
-    fingerprintId = fId;
+  });
+
+  beforeEach(async () => {
+    await cleanDatabase();
+    const { apiKey } = await createTestData({ isAdmin: true });
     validApiKey = apiKey;
 
-    // Assign admin role to the test fingerprint
-    const db = getFirestore();
-    await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .doc(fingerprintId)
-      .update({
-        roles: ["user", "admin"],
-      });
+    // Wait for a short time to ensure roles are set
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   });
 
   describe("POST /admin/debug/cleanup", () => {
     it("should clean up test data", async () => {
-      const response = await makeRequest("post", `${API_URL}/admin/debug/cleanup`, null, {
-        headers: { "x-api-key": validApiKey },
-      });
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/debug/cleanup`,
+        {},
+        {
+          headers: {
+            "x-api-key": validApiKey,
+            Origin: "http://localhost:5173",
+          },
+        },
+      );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -46,9 +53,12 @@ describe("Debug Endpoint", () => {
       const response = await makeRequest(
         "post",
         `${API_URL}/admin/debug/cleanup?error=true`,
-        null,
+        {},
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+            Origin: "http://localhost:5173",
+          },
           validateStatus: () => true,
         },
       );
@@ -59,9 +69,17 @@ describe("Debug Endpoint", () => {
     });
 
     it("should reject request without API key", async () => {
-      const response = await makeRequest("post", `${API_URL}/admin/debug/cleanup`, null, {
-        validateStatus: () => true,
-      });
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/debug/cleanup`,
+        {},
+        {
+          headers: {
+            Origin: "http://localhost:5173",
+          },
+          validateStatus: () => true,
+        },
+      );
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
@@ -69,10 +87,18 @@ describe("Debug Endpoint", () => {
     });
 
     it("should reject request with invalid API key", async () => {
-      const response = await makeRequest("post", `${API_URL}/admin/debug/cleanup`, null, {
-        headers: { "x-api-key": "invalid-key" },
-        validateStatus: () => true,
-      });
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/debug/cleanup`,
+        {},
+        {
+          headers: {
+            "x-api-key": "invalid-key",
+            Origin: "http://localhost:5173",
+          },
+          validateStatus: () => true,
+        },
+      );
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
@@ -83,10 +109,18 @@ describe("Debug Endpoint", () => {
       // Create a new fingerprint without admin role
       const { apiKey: nonAdminKey } = await createTestData();
 
-      const response = await makeRequest("post", `${API_URL}/admin/debug/cleanup`, null, {
-        headers: { "x-api-key": nonAdminKey },
-        validateStatus: () => true,
-      });
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/admin/debug/cleanup`,
+        {},
+        {
+          headers: {
+            "x-api-key": nonAdminKey,
+            Origin: "http://localhost:5173",
+          },
+          validateStatus: () => true,
+        },
+      );
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);

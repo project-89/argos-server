@@ -20,10 +20,17 @@ process.env.RATE_LIMIT_ENABLED = "true";
 process.env.IP_RATE_LIMIT_ENABLED = "false";
 
 // Set CORS environment variables for testing
-process.env.ALLOWED_ORIGINS = "https://test.com,https://example.com,https://newsite.com";
-process.env.DEV_ORIGIN_VITE = "http://localhost:5173";
-process.env.DEV_ORIGIN_REACT = "http://localhost:3000";
-process.env.DEV_ORIGIN_FIREBASE = "http://localhost:5000";
+process.env.ALLOWED_ORIGINS = [
+  "http://localhost:5173", // Vite dev server
+  "http://localhost:3000", // React dev server
+  "http://localhost:5000", // Firebase emulator
+  "https://test.com",
+  "https://example.com",
+  "https://newsite.com",
+].join(",");
+
+// Set test environment
+process.env.NODE_ENV = "test";
 
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
@@ -44,10 +51,13 @@ beforeAll(async () => {
 axios.defaults.baseURL = TEST_CONFIG.apiUrl;
 axios.defaults.validateStatus = () => true; // Don't throw on any status
 axios.defaults.headers.common["Content-Type"] = "application/json";
-axios.defaults.headers.common["Access-Control-Allow-Origin"] = "*";
-axios.defaults.headers.common["Access-Control-Allow-Methods"] = "GET,POST,PUT,DELETE,OPTIONS";
-axios.defaults.headers.common["Access-Control-Allow-Headers"] =
-  "Content-Type,Authorization,x-api-key";
+
+// Remove default CORS headers from axios config as they're handled by the server
+delete axios.defaults.headers.common["Access-Control-Allow-Origin"];
+delete axios.defaults.headers.common["Access-Control-Allow-Methods"];
+delete axios.defaults.headers.common["Access-Control-Allow-Headers"];
+delete axios.defaults.headers.common["Access-Control-Request-Headers"];
+delete axios.defaults.headers.common["Access-Control-Request-Method"];
 
 // Clean up after all tests
 afterAll(async () => {

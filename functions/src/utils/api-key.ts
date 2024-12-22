@@ -3,6 +3,16 @@ import * as functions from "firebase-functions";
 
 // Use Firebase Functions config for encryption keys
 const getEncryptionKey = () => {
+  // Use test environment variables if in test mode
+  if (process.env.NODE_ENV === "test") {
+    const key = process.env.FIREBASE_CONFIG_ENCRYPTION_API_KEY || "";
+    console.log("Using test encryption key (base64):", key);
+    const buffer = Buffer.from(key, "base64");
+    console.log("Test encryption key (buffer length):", buffer.length);
+    return buffer;
+  }
+
+  // Use Firebase Functions config in production
   const config = functions.config();
   const key = config.encryption?.api_key || "";
   console.log("Encryption key (base64):", key);
@@ -12,6 +22,16 @@ const getEncryptionKey = () => {
 };
 
 const getEncryptionIv = () => {
+  // Use test environment variables if in test mode
+  if (process.env.NODE_ENV === "test") {
+    const iv = process.env.FIREBASE_CONFIG_ENCRYPTION_API_IV || "";
+    console.log("Using test encryption IV (base64):", iv);
+    const buffer = Buffer.from(iv, "base64");
+    console.log("Test encryption IV (buffer length):", buffer.length);
+    return buffer;
+  }
+
+  // Use Firebase Functions config in production
   const config = functions.config();
   const iv = config.encryption?.api_iv || "";
   console.log("Encryption IV (base64):", iv);

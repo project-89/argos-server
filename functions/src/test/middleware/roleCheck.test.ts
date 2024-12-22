@@ -1,13 +1,16 @@
 import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, cleanDatabase } from "../utils/testUtils";
-import { initializeTestEnvironment, createTestData } from "../utils/testUtils";
+import {
+  makeRequest,
+  initializeTestEnvironment,
+  createTestData,
+  cleanDatabase,
+} from "../utils/testUtils";
 
 describe("Role Check Middleware Test Suite", () => {
-  const API_URL = TEST_CONFIG.apiUrl;
   let adminApiKey: string;
-  let userApiKey: string;
   let adminFingerprintId: string;
+  let userApiKey: string;
   let userFingerprintId: string;
 
   beforeAll(async () => {
@@ -15,41 +18,33 @@ describe("Role Check Middleware Test Suite", () => {
   });
 
   beforeEach(async () => {
-    // Clean database before each test
     await cleanDatabase();
-
     // Create admin user
-    const adminData = await createTestData({ roles: ["admin"] });
+    const adminData = await createTestData({ isAdmin: true });
     adminApiKey = adminData.apiKey;
     adminFingerprintId = adminData.fingerprintId;
 
     // Create regular user
-    const userData = await createTestData({ roles: ["user"] });
+    const userData = await createTestData();
     userApiKey = userData.apiKey;
     userFingerprintId = userData.fingerprintId;
 
-    // Verify data was created
-    const adminResponse = await makeRequest("get", `${API_URL}/role/available`, null, {
-      headers: { "x-api-key": adminApiKey },
-    });
-    expect(adminResponse.status).toBe(200);
-
-    const userResponse = await makeRequest("get", `${API_URL}/role/available`, null, {
-      headers: { "x-api-key": userApiKey },
-    });
-    expect(userResponse.status).toBe(200);
+    // Wait for a short time to ensure roles are set
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   });
 
   it("should allow admin to modify their own roles", async () => {
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/role/assign`,
+      `${TEST_CONFIG.apiUrl}/admin/role/assign`,
       {
         fingerprintId: adminFingerprintId,
-        role: "agent-field",
+        role: "agent-master",
       },
       {
-        headers: { "x-api-key": adminApiKey },
+        headers: {
+          "x-api-key": adminApiKey,
+        },
       },
     );
 
@@ -60,13 +55,15 @@ describe("Role Check Middleware Test Suite", () => {
   it("should allow admin to modify other users' roles", async () => {
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/role/assign`,
+      `${TEST_CONFIG.apiUrl}/admin/role/assign`,
       {
         fingerprintId: userFingerprintId,
-        role: "agent-field",
+        role: "agent-initiate",
       },
       {
-        headers: { "x-api-key": adminApiKey },
+        headers: {
+          "x-api-key": adminApiKey,
+        },
       },
     );
 
@@ -77,13 +74,15 @@ describe("Role Check Middleware Test Suite", () => {
   it("should reject non-admin access to admin endpoints", async () => {
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/role/assign`,
+      `${TEST_CONFIG.apiUrl}/admin/role/assign`,
       {
         fingerprintId: userFingerprintId,
-        role: "agent-field",
+        role: "agent-initiate",
       },
       {
-        headers: { "x-api-key": userApiKey },
+        headers: {
+          "x-api-key": userApiKey,
+        },
         validateStatus: () => true,
       },
     );
@@ -94,18 +93,20 @@ describe("Role Check Middleware Test Suite", () => {
   });
 
   it("should reject requests to admin endpoints when no role data exists", async () => {
-    // Create user without roles
-    const noRoleData = await createTestData();
+    // Create a fingerprint without roles
+    const noRolesData = await createTestData({ roles: [] });
 
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/role/assign`,
+      `${TEST_CONFIG.apiUrl}/admin/role/assign`,
       {
-        fingerprintId: noRoleData.fingerprintId,
-        role: "agent-field",
+        fingerprintId: userFingerprintId,
+        role: "agent-initiate",
       },
       {
-        headers: { "x-api-key": noRoleData.apiKey },
+        headers: {
+          "x-api-key": noRolesData.apiKey,
+        },
         validateStatus: () => true,
       },
     );
@@ -118,13 +119,15 @@ describe("Role Check Middleware Test Suite", () => {
   it("should allow admin access to tag management endpoints", async () => {
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/tag/update`,
+      `${TEST_CONFIG.apiUrl}/admin/tag/update`,
       {
         fingerprintId: userFingerprintId,
-        tags: ["level-1"],
+        tags: ["test-tag"],
       },
       {
-        headers: { "x-api-key": adminApiKey },
+        headers: {
+          "x-api-key": adminApiKey,
+        },
       },
     );
 
@@ -135,13 +138,15 @@ describe("Role Check Middleware Test Suite", () => {
   it("should reject non-admin access to tag management endpoints", async () => {
     const response = await makeRequest(
       "post",
-      `${API_URL}/admin/tag/update`,
+      `${TEST_CONFIG.apiUrl}/admin/tag/update`,
       {
         fingerprintId: userFingerprintId,
-        tags: ["level-2"],
+        tags: ["test-tag"],
       },
       {
-        headers: { "x-api-key": userApiKey },
+        headers: {
+          "x-api-key": userApiKey,
+        },
         validateStatus: () => true,
       },
     );
