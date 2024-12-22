@@ -23,13 +23,13 @@ describe("Tag Endpoint", () => {
     // Create admin user first
     const adminData = await createTestData({
       isAdmin: true,
-      roles: ["user", "admin"], // Explicitly set roles
+      roles: [PREDEFINED_ROLES[0], PREDEFINED_ROLES[PREDEFINED_ROLES.length - 1]], // user and admin roles
     });
     adminApiKey = adminData.apiKey;
 
     // Create regular user
     const userData = await createTestData({
-      roles: ["user"], // Explicitly set roles
+      roles: [PREDEFINED_ROLES[0]], // Explicitly set roles
     });
     userApiKey = userData.apiKey;
     fingerprintId = userData.fingerprintId;
@@ -194,7 +194,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Tags must be an array of strings");
+      expect(response.data.error).toBe("Expected string, received number");
     });
 
     it("should reject request from non-admin user", async () => {
@@ -324,7 +324,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toEqual(["user"]);
+      expect(response.data.data.roles).toEqual([PREDEFINED_ROLES[0]]);
     });
 
     it("should handle non-existent fingerprint", async () => {

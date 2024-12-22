@@ -1,64 +1,27 @@
 import { Request, Response } from "express";
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
-import { generateApiKey, encryptApiKey } from "../utils/api-key";
 import { validateRequest } from "../middleware/validation.middleware";
 import { schemas } from "../types/schemas";
-import { validateApiKey, revokeApiKey } from "../services/apiKeyService";
+import { createApiKey, validateApiKey, revokeApiKey } from "../services/apiKeyService";
 import { sendSuccess, sendError } from "../utils/response";
 
+/**
+ * Register a new API key
+ */
 export const register = [
   validateRequest(schemas.apiKeyRegister),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       const { fingerprintId } = req.body;
+      const result = await createApiKey(fingerprintId);
 
-      // Verify fingerprint exists
-      const db = getFirestore();
-      const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-      const fingerprintDoc = await fingerprintRef.get();
-
-      if (!fingerprintDoc.exists) {
-        return sendError(res, "Fingerprint not found", 404);
-      }
-
-      // Check if fingerprint already has an API key
-      const existingKeySnapshot = await db
-        .collection(COLLECTIONS.API_KEYS)
-        .where("fingerprintId", "==", fingerprintId)
-        .where("enabled", "==", true)
-        .get();
-
-      // Generate new API key
-      const plainApiKey = generateApiKey();
-      const encryptedApiKey = encryptApiKey(plainApiKey);
-
-      // Save encrypted API key (server-side)
-      const apiKeyRef = db.collection(COLLECTIONS.API_KEYS).doc();
-      await apiKeyRef.set({
-        key: encryptedApiKey,
-        fingerprintId,
-        createdAt: new Date(),
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days expiration
-        enabled: true,
-        metadata: {
-          name: "Generated API Key",
+      return sendSuccess(
+        res,
+        {
+          key: result.key,
+          fingerprintId: result.fingerprintId,
         },
-      });
-
-      // If there was an existing key, disable it
-      if (!existingKeySnapshot.empty) {
-        const batch = db.batch();
-        existingKeySnapshot.docs.forEach((doc) => {
-          batch.update(doc.ref, { enabled: false });
-        });
-        await batch.commit();
-      }
-
-      return sendSuccess(res, {
-        key: encryptedApiKey,
-        fingerprintId,
-      });
+        "API key registered successfully",
+      );
     } catch (error) {
       console.error("Error in register API key:", error);
       return sendError(res, error instanceof Error ? error : "Failed to register API key");
@@ -66,6 +29,9 @@ export const register = [
   },
 ];
 
+/**
+ * Validate an API key
+ */
 export const validate = [
   validateRequest(schemas.apiKeyValidate),
   async (req: Request, res: Response): Promise<Response> => {
@@ -84,6 +50,9 @@ export const validate = [
   },
 ];
 
+/**
+ * Revoke an API key
+ */
 export const revoke = [
   validateRequest(schemas.apiKeyRevoke),
   async (req: Request, res: Response): Promise<Response> => {
