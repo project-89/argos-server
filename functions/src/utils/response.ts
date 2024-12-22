@@ -1,5 +1,6 @@
 import { Response } from "express";
 import { ApiError } from "./error";
+import { randomUUID } from "crypto";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -7,22 +8,45 @@ export interface ApiResponse<T = any> {
   error?: string;
   message?: string;
   details?: any[];
+  requestId: string;
+  timestamp: string;
 }
 
+/**
+ * Creates a standardized success response
+ * @param res Express Response object
+ * @param data Response data
+ * @param status HTTP status code (default: 200)
+ */
 export const sendSuccess = <T>(res: Response, data: T, status = 200): Response => {
   const response: ApiResponse<T> = {
     success: true,
     data,
+    requestId: randomUUID(),
+    timestamp: new Date().toISOString(),
   };
 
-  // If data has a message property, include it in the response
-  if (data && typeof data === "object" && "message" in data) {
-    response.message = (data as any).message;
+  // Handle message property consistently
+  if (data && typeof data === "object") {
+    if ("message" in data) {
+      response.message = (data as any).message;
+      // If data only contains a message, don't duplicate it in data
+      if (Object.keys(data).length === 1) {
+        delete response.data;
+      }
+    }
   }
 
   return res.status(status).json(response);
 };
 
+/**
+ * Creates a standardized error response
+ * @param res Express Response object
+ * @param error Error object or message
+ * @param status HTTP status code (default: 500)
+ * @param details Additional error details
+ */
 export const sendError = (
   res: Response,
   error: Error | ApiError | string,
@@ -70,6 +94,8 @@ export const sendError = (
   const response: ApiResponse = {
     success: false,
     error: errorMessage,
+    requestId: randomUUID(),
+    timestamp: new Date().toISOString(),
   };
 
   if (details) {
@@ -79,11 +105,20 @@ export const sendError = (
   return res.status(statusCode).json(response);
 };
 
+/**
+ * Creates a success response with a warning message
+ * @param res Express Response object
+ * @param data Response data
+ * @param warning Warning message
+ * @param status HTTP status code (default: 200)
+ */
 export const sendWarning = <T>(res: Response, data: T, warning: string, status = 200): Response => {
   const response: ApiResponse<T> = {
     success: true,
     data,
     message: warning,
+    requestId: randomUUID(),
+    timestamp: new Date().toISOString(),
   };
   return res.status(status).json(response);
 };
