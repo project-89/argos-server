@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
 import { ApiError } from "../utils/error";
 import { PredefinedRole, ROLE_PERMISSIONS, Permission } from "../constants/roles";
+import { sendError } from "../utils/response";
 
 /**
  * Creates middleware to check if the user has the required permission
@@ -53,22 +54,17 @@ export const requirePermission = (requiredPermission: Permission) => {
       }
 
       next();
-    } catch (err: unknown) {
-      const error = err as Error | ApiError;
-
+    } catch (error) {
       if (error instanceof ApiError) {
-        return res.status(error.statusCode).json({
-          success: false,
-          error: error.message,
-        });
+        return sendError(res, error);
       }
 
       console.error("Error in role check middleware:", error);
-
-      return res.status(500).json({
-        success: false,
-        error: "Permission check failed: " + (error.message || "Unknown error occurred"),
-      });
+      return sendError(
+        res,
+        "Permission check failed: " +
+          (error instanceof Error ? error.message : "Unknown error occurred"),
+      );
     }
   };
 };

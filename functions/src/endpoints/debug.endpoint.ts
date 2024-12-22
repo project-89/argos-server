@@ -1,6 +1,6 @@
 import { Router, Request, Response } from "express";
 import { cleanupService } from "../services/cleanup.service";
-import { ApiError } from "../utils/error";
+import { sendSuccess, sendError } from "../utils/response";
 
 const router = Router();
 
@@ -12,16 +12,13 @@ router.post("/cleanup", async (req: Request, res: Response) => {
     }
 
     const result = await cleanupService();
-    res.json({
-      success: true,
-      data: result,
-    });
+    return sendSuccess(res, result);
   } catch (error) {
     console.error("Error in cleanup endpoint:", error);
-    res.status(error instanceof ApiError ? error.statusCode : 500).json({
-      success: false,
-      error: error instanceof Error ? error.message : "Internal server error",
-    });
+    if (error instanceof Error) {
+      return sendError(res, error);
+    }
+    return sendError(res, "Internal server error");
   }
 });
 

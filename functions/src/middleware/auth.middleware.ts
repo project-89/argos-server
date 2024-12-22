@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
-import { validateApiKey } from "../endpoints/apiKey.endpoint";
+import { validateApiKey } from "../services/apiKeyService";
+import { sendError } from "../utils/response";
 
 // Extend Express Request type to include fingerprintId
 declare global {
@@ -32,11 +33,15 @@ export const validateApiKeyMiddleware = async (
 
     const result = await validateApiKey(apiKey);
     if (!result.isValid) {
-      // If we have a fingerprintId but the key is invalid, it means the key exists but is disabled
-      if (result.fingerprintId) {
-        throw new ApiError(404, "API key not found or already revoked");
+      // If we have a fingerprintId but the key is invalid, it means the key exists but needs refresh
+      if (result.needsRefresh) {
+        throw new ApiError(401, "API key needs to be refreshed");
       }
       throw new ApiError(401, "Invalid API key");
+    }
+
+    if (!result.fingerprintId) {
+      throw new ApiError(500, "Invalid API key data");
     }
 
     // Set fingerprintId on request for use in other middleware/routes
@@ -58,15 +63,9 @@ export const validateApiKeyMiddleware = async (
     next();
   } catch (error) {
     if (error instanceof ApiError) {
-      return res.status(error.statusCode).json({
-        success: false,
-        error: error.message,
-      });
+      return sendError(res, error);
     }
     console.error("Error in auth middleware:", error);
-    return res.status(500).json({
-      success: false,
-      error: "Internal server error",
-    });
+    return sendError(res, "Internal server error");
   }
 };

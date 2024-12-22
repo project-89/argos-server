@@ -151,6 +151,26 @@ app.use("/", protectedRouter);
 // Admin routes (require auth + admin role)
 app.use("/admin", adminRouter);
 
+// CORS error handler
+app.use(
+  (
+    err: Error,
+    req: express.Request,
+    res: express.Response,
+    next: express.NextFunction,
+  ): express.Response | void => {
+    if (err.message === "Not allowed by CORS") {
+      console.error("[CORS Error]", err.message);
+      return res.status(403).json({
+        success: false,
+        error: "Forbidden",
+        message: "Not allowed by CORS",
+      });
+    }
+    next(err);
+  },
+);
+
 // 404 handler for any remaining routes
 app.use((req, res) => {
   sendErrorResponse(res, 404, "404.html", {
@@ -160,23 +180,10 @@ app.use((req, res) => {
   });
 });
 
-// CORS error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  if (err.message === "Not allowed by CORS") {
-    console.error("[CORS Error]", err.message);
-    return res.status(403).json({
-      success: false,
-      error: "Forbidden",
-      message: "Not allowed by CORS",
-    });
-  }
-  next(err);
-});
-
 // Generic error handler
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error("[Error Handler]", err);
-  sendErrorResponse(res, 500, "500.html", {
+  return sendErrorResponse(res, 500, "500.html", {
     success: false,
     error: "Internal Server Error",
     message: process.env.NODE_ENV === "production" ? "An unexpected error occurred" : err.message,

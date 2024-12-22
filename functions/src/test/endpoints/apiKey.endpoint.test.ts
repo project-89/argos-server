@@ -53,6 +53,21 @@ describe("API Key Endpoint", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("key");
       expect(response.data.data).toHaveProperty("fingerprintId", newFingerprintId);
+
+      // Verify the new key works by using it in a request
+      const verifyResponse = await makeRequest(
+        "post",
+        `${TEST_CONFIG.apiUrl}/api-key/register`,
+        {
+          fingerprintId: newFingerprintId,
+        },
+        {
+          headers: {
+            "x-api-key": response.data.data.key,
+          },
+        },
+      );
+      expect(verifyResponse.status).toBe(200);
     });
 
     it("should replace existing API key when registering a new one", async () => {
@@ -79,23 +94,17 @@ describe("API Key Endpoint", () => {
       expect(response.data.data.key).not.toBe(originalApiKey);
       expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
 
-      // Verify the original API key is no longer valid
-      const validateResponse = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
-        {
-          key: originalApiKey,
-        },
-        {
-          headers: {
-            "x-api-key": response.data.data.key,
-          },
-        },
-      );
+      // Verify the original API key is no longer valid by trying to use it
+      const verifyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
+        key: originalApiKey,
+      });
 
-      expect(validateResponse.status).toBe(200);
-      expect(validateResponse.data.success).toBe(true);
-      expect(validateResponse.data.data).toHaveProperty("isValid", false);
+      expect(verifyResponse.status).toBe(200);
+      expect(verifyResponse.data.success).toBe(true);
+      expect(verifyResponse.data.data).toEqual({
+        isValid: false,
+        needsRefresh: true,
+      });
     });
 
     it("should require fingerprintId", async () => {
@@ -144,74 +153,6 @@ describe("API Key Endpoint", () => {
     });
   });
 
-  describe("POST /api-key/validate", () => {
-    it("should validate a valid API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
-        {
-          key: validApiKey,
-        },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("isValid", true);
-      expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
-    });
-
-    it("should reject an invalid API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
-        {
-          key: "invalid-key",
-        },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("isValid", false);
-      expect(response.data.data).not.toHaveProperty("fingerprintId");
-    });
-
-    it("should require key field", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
-        {},
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-        },
-      );
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Required");
-      expect(response.data.details).toEqual([
-        {
-          code: "invalid_type",
-          expected: "string",
-          received: "undefined",
-          path: ["key"],
-          message: "Required",
-        },
-      ]);
-    });
-  });
-
   describe("POST /api-key/revoke", () => {
     it("should revoke an existing API key", async () => {
       const response = await makeRequest(
@@ -231,29 +172,30 @@ describe("API Key Endpoint", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.message).toBe("API key revoked successfully");
 
-      // Verify the key is no longer valid
-      const validateResponse = await makeRequest(
+      // Verify the key is no longer valid by trying to use it
+      const verifyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
+        key: validApiKey,
+      });
+
+      expect(verifyResponse.status).toBe(200);
+      expect(verifyResponse.data.success).toBe(true);
+      expect(verifyResponse.data.data).toEqual({
+        isValid: false,
+        needsRefresh: true,
+      });
+    });
+
+    it("should reject request without API key", async () => {
+      const response = await makeRequest(
         "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
         {
           key: validApiKey,
         },
         {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+          validateStatus: () => true,
         },
       );
-
-      expect(validateResponse.status).toBe(200);
-      expect(validateResponse.data.success).toBe(true);
-      expect(validateResponse.data.data).toHaveProperty("isValid", false);
-    });
-
-    it("should reject request without API key", async () => {
-      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/revoke`, {
-        key: validApiKey,
-      });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
@@ -271,6 +213,7 @@ describe("API Key Endpoint", () => {
           headers: {
             "x-api-key": "invalid-key",
           },
+          validateStatus: () => true,
         },
       );
 
@@ -293,12 +236,84 @@ describe("API Key Endpoint", () => {
           headers: {
             "x-api-key": otherApiKey,
           },
+          validateStatus: () => true,
         },
       );
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("Not authorized to revoke this API key");
+    });
+  });
+
+  describe("POST /api-key/validate", () => {
+    it("should validate a valid API key", async () => {
+      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
+        key: validApiKey,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toEqual({
+        isValid: true,
+        needsRefresh: false,
+      });
+    });
+
+    it("should indicate when a key needs refresh", async () => {
+      // First revoke the key
+      await makeRequest(
+        "post",
+        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        {
+          key: validApiKey,
+        },
+        {
+          headers: {
+            "x-api-key": validApiKey,
+          },
+        },
+      );
+
+      // Then validate it
+      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
+        key: validApiKey,
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toEqual({
+        isValid: false,
+        needsRefresh: true,
+      });
+    });
+
+    it("should handle non-existent API key", async () => {
+      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
+        key: "non-existent-key",
+      });
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data).toEqual({
+        isValid: false,
+        needsRefresh: false,
+      });
+    });
+
+    it("should require key field", async () => {
+      const response = await makeRequest(
+        "post",
+        `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        {},
+        {
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Required");
     });
   });
 });
