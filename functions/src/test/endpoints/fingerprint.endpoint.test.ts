@@ -129,7 +129,7 @@ describe("Fingerprint Endpoint", () => {
       });
 
       // Verify the new IP is tracked and marked as suspicious
-      expect(response3.data).toHaveProperty("warning", "Suspicious IP activity detected");
+      expect(response3.data.message).toBe("Suspicious IP activity detected");
       expect(response3.data.data.ipMetadata.suspiciousIps).toContain(newIp);
       expect(response3.data.data.ipMetadata.primaryIp).toBe(testIp); // First IP should still be primary
     });

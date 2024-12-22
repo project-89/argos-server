@@ -459,10 +459,11 @@ describe("Visit Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(Array.isArray(response.data.data)).toBe(true);
-      expect(response.data.data.length).toBeGreaterThan(0);
+      expect(response.data.message).toBe("Visit history retrieved");
+      expect(Array.isArray(response.data.data.visits)).toBe(true);
+      expect(response.data.data.visits.length).toBeGreaterThan(0);
 
-      const visit = response.data.data[0];
+      const visit = response.data.data.visits[0];
       expect(visit).toHaveProperty("id");
       expect(visit).toHaveProperty("fingerprintId", fingerprintId);
       expect(visit).toHaveProperty("url", "https://test.com");
@@ -525,10 +526,11 @@ describe("Visit Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(Array.isArray(response.data.data)).toBe(true);
-      expect(response.data.data).toHaveLength(2);
-      expect(response.data.data[0]).toHaveProperty("url", "https://test2.com");
-      expect(response.data.data[1]).toHaveProperty("url", "https://test1.com");
+      expect(response.data.message).toBe("Visit history retrieved");
+      expect(Array.isArray(response.data.data.visits)).toBe(true);
+      expect(response.data.data.visits).toHaveLength(2);
+      expect(response.data.data.visits[0]).toHaveProperty("url", "https://test2.com");
+      expect(response.data.data.visits[1]).toHaveProperty("url", "https://test1.com");
     });
 
     it("should require valid API key for history", async () => {

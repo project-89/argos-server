@@ -1,6 +1,6 @@
 import { Response } from "express";
 import { ApiError } from "./error";
-import { randomUUID } from "crypto";
+import { v4 as uuidv4 } from "uuid";
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -9,21 +9,23 @@ export interface ApiResponse<T = any> {
   message?: string;
   details?: any[];
   requestId: string;
-  timestamp: string;
+  timestamp: number;
 }
 
 /**
  * Creates a standardized success response
- * @param res Express Response object
- * @param data Response data
- * @param status HTTP status code (default: 200)
  */
-export const sendSuccess = <T>(res: Response, data: T, status = 200): Response => {
+export const sendSuccess = <T>(
+  res: Response,
+  data: T,
+  message?: string,
+  status = 200,
+): Response => {
   const response: ApiResponse<T> = {
     success: true,
     data,
-    requestId: randomUUID(),
-    timestamp: new Date().toISOString(),
+    requestId: uuidv4(),
+    timestamp: Date.now(),
   };
 
   // Handle message property consistently
@@ -37,15 +39,16 @@ export const sendSuccess = <T>(res: Response, data: T, status = 200): Response =
     }
   }
 
+  // Add explicit message if provided
+  if (message) {
+    response.message = message;
+  }
+
   return res.status(status).json(response);
 };
 
 /**
  * Creates a standardized error response
- * @param res Express Response object
- * @param error Error object or message
- * @param status HTTP status code (default: 500)
- * @param details Additional error details
  */
 export const sendError = (
   res: Response,
@@ -94,8 +97,8 @@ export const sendError = (
   const response: ApiResponse = {
     success: false,
     error: errorMessage,
-    requestId: randomUUID(),
-    timestamp: new Date().toISOString(),
+    requestId: uuidv4(),
+    timestamp: Date.now(),
   };
 
   if (details) {
@@ -107,18 +110,17 @@ export const sendError = (
 
 /**
  * Creates a success response with a warning message
- * @param res Express Response object
- * @param data Response data
- * @param warning Warning message
- * @param status HTTP status code (default: 200)
  */
 export const sendWarning = <T>(res: Response, data: T, warning: string, status = 200): Response => {
   const response: ApiResponse<T> = {
     success: true,
     data,
     message: warning,
-    requestId: randomUUID(),
-    timestamp: new Date().toISOString(),
+    requestId: uuidv4(),
+    timestamp: Date.now(),
   };
   return res.status(status).json(response);
 };
+
+// Alias for sendSuccess for consistency with new naming
+export const success = sendSuccess;
