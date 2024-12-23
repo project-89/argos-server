@@ -6,6 +6,7 @@ import {
   getFingerprintAndUpdateIp,
   getClientIp,
   verifyFingerprint,
+  updateFingerprintMetadata,
 } from "../services/fingerprintService";
 import { sendSuccess, sendError, sendWarning } from "../utils/response";
 
@@ -25,7 +26,7 @@ export const register = [
       const ip = getClientIp(req);
 
       const result = await createFingerprint(fingerprint, ip, metadata);
-      return sendSuccess(res, result, "Fingerprint registered successfully", 201);
+      return sendSuccess(res, { id: result.id }, "Fingerprint registered successfully", 201);
     } catch (error) {
       console.error("Error registering fingerprint:", error);
       return sendError(res, error instanceof Error ? error : "Failed to register fingerprint");
@@ -55,3 +56,24 @@ export const get = async (req: AuthenticatedRequest, res: Response): Promise<Res
     return sendError(res, error instanceof Error ? error : "Failed to get fingerprint");
   }
 };
+
+/**
+ * Update fingerprint metadata
+ */
+export const update = [
+  validateRequest(schemas.fingerprintUpdate),
+  async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+    try {
+      const { metadata } = req.body;
+      const fingerprintId = req.fingerprintId!;
+
+      await verifyFingerprint(fingerprintId);
+      const result = await updateFingerprintMetadata(fingerprintId, metadata);
+
+      return sendSuccess(res, result, "Fingerprint metadata updated successfully");
+    } catch (error) {
+      console.error("Error updating fingerprint:", error);
+      return sendError(res, error instanceof Error ? error : "Failed to update fingerprint");
+    }
+  },
+];

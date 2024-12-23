@@ -3,6 +3,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ROLES } from "../constants";
 import { Fingerprint } from "../types/models";
 import { ApiError } from "../utils/error";
+import { deepMerge } from "../utils/object";
 
 const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed from an IP to establish it as trusted
 const SUSPICIOUS_TIME_WINDOW =
@@ -192,5 +193,43 @@ export const verifyFingerprint = async (
 
   if (authenticatedId && fingerprintId !== authenticatedId) {
     throw new ApiError(403, "API key does not match fingerprint");
+  }
+};
+
+/**
+ * Updates fingerprint metadata
+ */
+export const updateFingerprintMetadata = async (
+  fingerprintId: string,
+  metadata: Record<string, any>,
+): Promise<FingerprintDocData> => {
+  const db = getFirestore();
+  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+
+  try {
+    const fingerprintDoc = await fingerprintRef.get();
+
+    if (!fingerprintDoc.exists) {
+      throw new ApiError(404, "Fingerprint not found");
+    }
+
+    const data = fingerprintDoc.data() as FingerprintDocData;
+    const updatedMetadata = deepMerge(data.metadata || {}, metadata);
+
+    await fingerprintRef.update({
+      metadata: updatedMetadata,
+    });
+
+    return {
+      ...data,
+      id: fingerprintDoc.id,
+      metadata: updatedMetadata,
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    console.error("Error in updateFingerprintMetadata:", error);
+    throw new ApiError(500, "Failed to update fingerprint metadata");
   }
 };

@@ -181,7 +181,7 @@ app.use((req, res, next) => {
 });
 
 // Mount route handlers after auth middleware
-app.use(protectedRouter);
+app.use("/", protectedRouter);
 app.use("/admin", adminRouter);
 
 // CORS error handler

@@ -8,6 +8,7 @@ const protectedRouter = Router();
 
 // Fingerprint operations
 protectedRouter.get("/fingerprint/:id", fingerprint.get);
+protectedRouter.post("/fingerprint/update", ...fingerprint.update);
 
 // Visit tracking
 protectedRouter.post("/visit/log", ...visit.log);
