@@ -2,9 +2,13 @@ import axios, { AxiosRequestConfig, AxiosError, RawAxiosRequestHeaders } from "a
 import { TEST_CONFIG } from "../setup/testConfig";
 import { COLLECTIONS } from "../../constants";
 import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";
 import { Agent as HttpsAgent } from "https";
 
+/**
+ * Make a request to the test server
+ */
 export const makeRequest = async (
   method: string,
   url: string,
@@ -50,69 +54,40 @@ export const makeRequest = async (
 
   // Ensure x-api-key is set if provided
   if (options.headers?.["x-api-key"]) {
-    // Move x-api-key to the root level of headers to ensure it's sent correctly
     headers["x-api-key"] = options.headers["x-api-key"];
-    console.log("Request headers:", {
-      ...headers,
-      "x-api-key": "[REDACTED]",
-    });
-  } else {
-    console.log("No API key provided in request");
-    console.log("Request headers:", headers);
   }
 
   const config: AxiosRequestConfig = {
     method,
     url,
-    validateStatus: options.validateStatus ?? ((status) => true), // Accept all status codes by default
+    validateStatus: options.validateStatus ?? ((status) => true),
     withCredentials,
     httpAgent,
     httpsAgent,
     headers,
   };
 
-  // Only add data if it's defined and not a GET/HEAD/OPTIONS request
   if (data !== undefined && !["get", "head", "options"].includes(method.toLowerCase())) {
     config.data = data;
   }
 
-  console.log("Making request with config:", {
-    method: config.method,
-    url: config.url,
-    withCredentials: config.withCredentials,
-    headers: {
-      ...config.headers,
-      "x-api-key": config.headers?.["x-api-key"] ? "[REDACTED]" : undefined,
-    },
-    data: config.data,
-  });
-
   try {
     const response = await axios(config);
-    console.log("Response received:", {
-      status: response.status,
-      headers: response.headers,
-      data: response.data,
-    });
-
     return response;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
-      console.error("Request failed:", {
-        status: error.response.status,
-        headers: error.response.headers,
-        data: error.response.data,
-      });
       throw error;
     }
     throw error;
   } finally {
-    // Close the specific agents used for this request
     httpAgent.destroy();
     httpsAgent.destroy();
   }
 };
 
+/**
+ * Initialize test environment
+ */
 export const initializeTestEnvironment = async () => {
   try {
     console.log("Initializing test environment...");
@@ -126,37 +101,31 @@ export const initializeTestEnvironment = async () => {
     process.env.GCLOUD_PROJECT = TEST_CONFIG.projectId;
     process.env.NODE_ENV = "test";
 
+    // Disable all rate limiting for tests
+    process.env.RATE_LIMIT_ENABLED = "false";
+    process.env.IP_RATE_LIMIT_ENABLED = "false";
+    process.env.FINGERPRINT_RATE_LIMIT_ENABLED = "false";
+
     // Initialize admin if not already initialized
     if (!admin.apps.length) {
       admin.initializeApp({
         projectId: TEST_CONFIG.projectId,
       });
+
+      // Configure Firestore settings only once during initialization
+      const db = getFirestore();
+      db.settings({
+        host: TEST_CONFIG.firestoreEmulator,
+        ssl: false,
+        experimentalForceLongPolling: true,
+      });
     }
 
-    const db = admin.firestore();
+    // Get Firestore instance
+    const db = getFirestore();
 
-    // Clean the database before tests
-    await cleanDatabase();
-
-    // Verify emulator connection
-    let retries = 3;
-    while (retries > 0) {
-      try {
-        console.log("Attempting to connect to Firestore emulator...");
-        const testDoc = await db.collection("_test_").add({
-          timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        });
-        await testDoc.delete();
-        console.log("Successfully connected to Firestore emulator");
-        break;
-      } catch (error) {
-        console.error(`Failed to connect to Firestore emulator (${retries} retries left):`, error);
-        retries--;
-        if (retries === 0) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    }
-
+    // Clean the database
+    await cleanDatabase(db);
     return db;
   } catch (error) {
     console.error("Failed to initialize test environment:", error);
@@ -164,7 +133,30 @@ export const initializeTestEnvironment = async () => {
   }
 };
 
-// Helper to create test data
+/**
+ * Generate a test fingerprint
+ */
+export const generateTestFingerprint = () => {
+  return {
+    id: `test-fingerprint-${Date.now()}`,
+    components: {
+      userAgent: "Test User Agent",
+      language: "en-US",
+      platform: "Test Platform",
+      screenResolution: "1920x1080",
+      timezone: "UTC",
+      webdriver: false,
+    },
+    metadata: {
+      ip: "127.0.0.1",
+      timestamp: new Date().toISOString(),
+    },
+  };
+};
+
+/**
+ * Create test data for endpoints
+ */
 export const createTestData = async (options: { roles?: string[]; isAdmin?: boolean } = {}) => {
   try {
     console.log("Creating test data...");
@@ -207,7 +199,7 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
     const apiKey = apiKeyResponse.data.data.key;
 
     // Set roles directly in the database
-    const db = admin.firestore();
+    const db = getFirestore();
     if (options.isAdmin || options.roles) {
       await db
         .collection(COLLECTIONS.FINGERPRINTS)
@@ -229,16 +221,26 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
   }
 };
 
-// Clean up test data
-export const cleanDatabase = async () => {
+export const cleanDatabase = async (db?: admin.firestore.Firestore) => {
   try {
     console.log("Cleaning database...");
-    const db = admin.firestore();
+
+    // Get database instance if not provided
+    if (!db) {
+      if (!admin.apps.length) {
+        admin.initializeApp({
+          projectId: TEST_CONFIG.projectId,
+        });
+      }
+      db = getFirestore();
+    }
+
     const collections = Object.values(COLLECTIONS);
+    console.log("Cleaning collections:", collections);
 
     const promises = collections.map(async (collection) => {
-      const snapshot = await db.collection(collection).get();
-      const batch = db.batch();
+      const snapshot = await db!.collection(collection).get();
+      const batch = db!.batch();
       snapshot.docs.forEach((doc) => batch.delete(doc.ref));
       return batch.commit();
     });

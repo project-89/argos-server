@@ -2,15 +2,7 @@ import { Request, Response } from "express";
 import { getCurrentPrices, getPriceHistory } from "../services/priceService";
 import { validateQuery, validateParams } from "../middleware/validation.middleware";
 import { z } from "zod";
-
-// Helper to check if we're in test environment
-const isTestEnv = (req: Request) => {
-  return (
-    process.env.NODE_ENV === "test" ||
-    process.env.FUNCTIONS_EMULATOR === "true" ||
-    req.headers["x-test-env"] === "true"
-  );
-};
+import { sendSuccess, sendError } from "../utils/response";
 
 export const getCurrent = [
   validateQuery(
@@ -29,23 +21,11 @@ export const getCurrent = [
             .filter(Boolean)
         : [];
 
-      const prices = await getCurrentPrices(tokenSymbols, isTestEnv(req));
-      return res.status(200).json({
-        success: true,
-        data: prices,
-      });
-    } catch (error: any) {
+      const prices = await getCurrentPrices(tokenSymbols);
+      return sendSuccess(res, prices);
+    } catch (error) {
       console.error("Error in get current prices:", error);
-      if (error.message.includes("No price data found")) {
-        return res.status(404).json({
-          success: false,
-          error: error.message,
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        error: error.message || "Failed to fetch current prices",
-      });
+      return sendError(res, error instanceof Error ? error : "Failed to fetch current prices");
     }
   },
 ];
@@ -59,24 +39,11 @@ export const getHistory = [
   async (req: Request, res: Response): Promise<Response> => {
     try {
       const { tokenId } = req.params;
-      const history = await getPriceHistory(tokenId, isTestEnv(req));
-
-      return res.status(200).json({
-        success: true,
-        data: history,
-      });
-    } catch (error: any) {
+      const history = await getPriceHistory(tokenId);
+      return sendSuccess(res, history);
+    } catch (error) {
       console.error("Error in get token price history:", error);
-      if (error.message.includes("No price data found")) {
-        return res.status(404).json({
-          success: false,
-          error: "Token not found",
-        });
-      }
-      return res.status(500).json({
-        success: false,
-        error: error.message || "Failed to fetch token price history",
-      });
+      return sendError(res, error instanceof Error ? error : "Failed to fetch token price history");
     }
   },
 ];

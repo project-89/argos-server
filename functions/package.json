@@ -28,7 +28,7 @@
     "predeploy": "npm run build",
     "deploy": "firebase deploy --only functions",
     "logs": "firebase functions:log",
-    "test": "jest",
+    "test": "jest --config jest.config.js --runInBand --detectOpenHandles --forceExit",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage",
     "kill-ports": "kill-port 5001 8080 8085 9229 5000 8081 9000 9090 9099 4000 4400 4500"
@@ -49,7 +49,10 @@
     "kill-port": "^2.0.1",
     "rimraf": "^5.0.5",
     "ts-jest": "^29.1.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "@types/node": "^18.15.11",
+    "@types/supertest": "^2.0.12",
+    "supertest": "^6.3.3"
   },
   "private": true
 }

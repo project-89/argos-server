@@ -210,7 +210,9 @@ describe("Visit Endpoint", () => {
           status: "online",
         },
         {
-          headers: { "x-api-key": validApiKey },
+          headers: {
+            "x-api-key": validApiKey,
+          },
         },
       );
 
@@ -218,7 +220,7 @@ describe("Visit Endpoint", () => {
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
       expect(response.data.data).toHaveProperty("status", "online");
-      expect(response.data.data).toHaveProperty("timestamp");
+      expect(response.data.data).toHaveProperty("lastUpdated");
     });
 
     it("should require fingerprintId and status", async () => {
@@ -238,14 +240,14 @@ describe("Visit Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Required");
+      expect(response.data.error).toBe("Status is required");
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
-          expected: "string",
+          expected: "'online' | 'offline'",
           received: "undefined",
           path: ["status"],
-          message: "Required",
+          message: "Status is required",
         },
       ]);
     });

@@ -1,74 +1,39 @@
-export type MatrixIntegrity = "STABLE" | "FLUCTUATING" | "UNSTABLE" | "CRITICAL";
+import { getCurrentPrices } from "./priceService";
+import { ApiError } from "../utils/error";
 
-interface PriceData {
-  usd: number;
-  usd_24h_change?: number;
+export interface StabilityData {
+  stabilityIndex: number;
+  currentPrice: number;
+  priceChange: number;
+  timestamp: number;
 }
 
-const calculateResistanceLevel = (price: number, volatility: number): number => {
-  const baseResistance = 0.5;
-  const volatilityImpact = Math.min(volatility * 0.1, 0.3);
-  return baseResistance + volatilityImpact;
-};
+/**
+ * Calculate reality stability index based on price data
+ */
+export const calculateStabilityIndex = async (): Promise<StabilityData> => {
+  try {
+    // Get current price data
+    const prices = await getCurrentPrices(["solana"]);
+    if (!prices.solana) {
+      throw new ApiError(500, "Failed to get Solana price data");
+    }
 
-const determineMatrixIntegrity = (stabilityIndex: number): MatrixIntegrity => {
-  if (stabilityIndex >= 0.8) return "STABLE";
-  if (stabilityIndex >= 0.6) return "FLUCTUATING";
-  if (stabilityIndex >= 0.4) return "UNSTABLE";
-  return "CRITICAL";
-};
+    // Calculate a simple stability index based on 24h price change
+    const priceChange = Math.abs(prices.solana.usd_24h_change);
+    const stabilityIndex = Math.max(0, 100 - priceChange);
 
-export const calculateStabilityIndex = async (prices: Record<string, PriceData>) => {
-  const solanaPrice = prices["solana"]?.usd;
-  const solanaPriceChange = prices["solana"]?.usd_24h_change || 0;
-
-  if (!solanaPrice) {
-    throw new Error("Failed to fetch Solana price data");
-  }
-
-  // Calculate short-term change (24h)
-  const shortTermChange = solanaPriceChange / 100; // Convert percentage to decimal
-
-  // Calculate medium-term change (7d) - using short term for now
-  const mediumTermChange = shortTermChange * 0.7;
-
-  // Calculate recent volatility
-  const recentVolatility = Math.abs(shortTermChange);
-
-  // Calculate resistance level
-  const resistanceLevel = calculateResistanceLevel(solanaPrice, recentVolatility);
-  const resistanceImpact = Math.min(resistanceLevel * 0.2, 0.4);
-
-  // Simulate quantum response (random factor)
-  const simulationResponse = Math.random();
-
-  // Calculate final stability index
-  const stabilityFactors = [
-    1 - Math.abs(shortTermChange) * 0.3,
-    1 - Math.abs(mediumTermChange) * 0.2,
-    1 - recentVolatility * 0.2,
-    1 - resistanceImpact,
-    simulationResponse * 0.1,
-  ];
-
-  const realityStabilityIndex =
-    stabilityFactors.reduce((a, b) => a + b, 0) / stabilityFactors.length;
-
-  // Determine matrix integrity
-  const matrixIntegrity = determineMatrixIntegrity(realityStabilityIndex);
-
-  return {
-    realityStabilityIndex,
-    resistanceLevel,
-    metadata: {
-      currentPrice: solanaPrice,
-      shortTermChange,
-      mediumTermChange,
-      recentVolatility,
-      resistanceImpact,
-      simulationResponse,
-      matrixIntegrity,
+    return {
+      stabilityIndex,
+      currentPrice: prices.solana.usd,
+      priceChange: prices.solana.usd_24h_change,
       timestamp: Date.now(),
-    },
-  };
+    };
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    console.error("Error calculating reality stability index:", error);
+    throw new ApiError(500, "Failed to calculate reality stability index");
+  }
 };

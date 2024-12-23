@@ -1,6 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants";
 import { ApiError } from "../utils/error";
+import { updatePresence } from "./presenceService";
+import type { PresenceStatus } from "./presenceService";
 
 export interface Visit {
   fingerprintId: string;
@@ -156,24 +158,9 @@ export const logVisit = async (
 export const updatePresenceStatus = async (
   fingerprintId: string,
   status: string,
-): Promise<{ fingerprintId: string; status: string; timestamp: number }> => {
-  const db = getFirestore();
-  const now = Date.now();
-
-  const presenceRef = await db.collection(COLLECTIONS.PRESENCE).doc(fingerprintId);
-  await presenceRef.set(
-    {
-      status,
-      lastUpdated: now,
-    },
-    { merge: true },
-  );
-
-  return {
-    fingerprintId,
-    status,
-    timestamp: now,
-  };
+): Promise<{ fingerprintId: string; status: string; lastUpdated: string }> => {
+  const result = await updatePresence(fingerprintId, status as PresenceStatus);
+  return result;
 };
 
 /**

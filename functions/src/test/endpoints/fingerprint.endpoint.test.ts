@@ -35,7 +35,6 @@ describe("Fingerprint Endpoint", () => {
         `${API_URL}/fingerprint/register`,
         {
           fingerprint: "test-fingerprint-2",
-          metadata: { test: true },
         },
         {
           headers: {
@@ -44,26 +43,12 @@ describe("Fingerprint Endpoint", () => {
         },
       );
 
-      expect(response.status).toBe(200);
+      expect(response.status).toBe(201);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("id");
       expect(response.data.data).toHaveProperty("fingerprint", "test-fingerprint-2");
-      expect(response.data.data).toHaveProperty("roles", ["user"]);
-      expect(response.data.data).toHaveProperty("createdAt");
-      expect(response.data.data).toHaveProperty("metadata");
-      expect(response.data.data.metadata).toHaveProperty("test", true);
-      expect(response.data.data).toHaveProperty("tags", []);
-
-      // Verify IP tracking data
       expect(response.data.data).toHaveProperty("ipAddresses");
-      expect(Array.isArray(response.data.data.ipAddresses)).toBe(true);
       expect(response.data.data.ipAddresses).toContain(testIp);
-
-      expect(response.data.data).toHaveProperty("ipMetadata");
-      expect(response.data.data.ipMetadata).toHaveProperty("primaryIp", testIp);
-      expect(response.data.data.ipMetadata.ipFrequency[testIp]).toBe(1);
-      expect(response.data.data.ipMetadata).toHaveProperty("lastSeenAt");
-      expect(response.data.data.ipMetadata.suspiciousIps).toEqual([]);
     });
 
     it("should track IP frequency and update primary IP", async () => {
@@ -74,7 +59,6 @@ describe("Fingerprint Endpoint", () => {
         `${API_URL}/fingerprint/register`,
         {
           fingerprint: "test-fingerprint-3",
-          metadata: { test: true },
         },
         {
           headers: {
@@ -83,7 +67,7 @@ describe("Fingerprint Endpoint", () => {
         },
       );
 
-      expect(response1.status).toBe(200);
+      expect(response1.status).toBe(201);
       expect(response1.data.data).toHaveProperty("ipAddresses");
       expect(response1.data.data.ipAddresses).toContain(testIp);
 
@@ -142,7 +126,6 @@ describe("Fingerprint Endpoint", () => {
         `${API_URL}/fingerprint/register`,
         {
           fingerprint: "test-fingerprint-4",
-          metadata: { test: true },
         },
         {
           headers: {

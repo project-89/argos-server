@@ -1,34 +1,72 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest } from "../utils/testUtils";
 
 describe("Reality Stability Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
 
+  beforeEach(() => {
+    // Set NODE_ENV to test to ensure we use mock data
+    process.env.NODE_ENV = "test";
+    process.env.FUNCTIONS_EMULATOR = "true";
+  });
+
   describe("GET /reality-stability", () => {
-    it("should get reality stability index", async () => {
+    it("should return stability index", async () => {
       const response = await makeRequest("get", `${API_URL}/reality-stability`);
+      console.log("Response:", response.data);
 
       expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toBeDefined();
-      expect(response.data.data).toHaveProperty("stabilityIndex");
-      expect(response.data.data).toHaveProperty("currentPrice");
-      expect(response.data.data).toHaveProperty("priceChange");
-      expect(response.data.data).toHaveProperty("timestamp");
-      expect(typeof response.data.data.stabilityIndex).toBe("number");
-      expect(response.data.data.stabilityIndex).toBeGreaterThanOrEqual(0);
-      expect(response.data.data.stabilityIndex).toBeLessThanOrEqual(100);
+      expect(response.data).toEqual({
+        success: true,
+        data: {
+          stabilityIndex: 95, // 100 - |-5|
+          currentPrice: 100,
+          priceChange: -5,
+          timestamp: expect.any(Number),
+        },
+        message: "Reality stability index calculated",
+        requestId: expect.any(String),
+        timestamp: expect.any(Number),
+      });
     });
 
-    it("should handle service errors gracefully", async () => {
-      const response = await makeRequest("get", `${API_URL}/reality-stability?invalid=true`, null, {
-        validateStatus: () => true,
-      });
+    it("should handle calculation errors", async () => {
+      const response = await makeRequest(
+        "get",
+        `${API_URL}/reality-stability?invalid=true`,
+        undefined,
+        {
+          validateStatus: () => true,
+        },
+      );
 
       expect(response.status).toBe(500);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Failed to calculate reality stability index");
+      expect(response.data).toEqual({
+        success: false,
+        error: "Failed to calculate reality stability index",
+        requestId: expect.any(String),
+        timestamp: expect.any(Number),
+      });
+    });
+
+    it("should handle invalid query parameter", async () => {
+      const response = await makeRequest(
+        "get",
+        `${API_URL}/reality-stability?invalid=true`,
+        undefined,
+        {
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(500);
+      expect(response.data).toEqual({
+        success: false,
+        error: "Failed to calculate reality stability index",
+        requestId: expect.any(String),
+        timestamp: expect.any(Number),
+      });
     });
   });
 });

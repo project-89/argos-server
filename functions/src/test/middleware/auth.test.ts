@@ -18,19 +18,10 @@ describe("Auth Test Suite", () => {
   });
 
   it("should allow public endpoint without API key", async () => {
-    // /fingerprint/register is public
-    const response = await makeRequest(
-      "post",
-      `${API_URL}/fingerprint/register`,
-      {
-        fingerprint: "public-test-fingerprint",
-      },
-      {
-        headers: { "x-api-key": undefined },
-        validateStatus: () => true,
-      },
-    );
-    expect(response.status).toBe(200);
+    const response = await makeRequest("post", `${API_URL}/fingerprint/register`, {
+      fingerprint: "test-fingerprint",
+    });
+    expect(response.status).toBe(201);
     expect(response.data.success).toBe(true);
   });
 

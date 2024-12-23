@@ -103,6 +103,9 @@ const sendErrorResponse = (
   }
 };
 
+// Apply rate limiting first
+app.use(ipRateLimit());
+
 // Serve landing page only for browser requests to root
 app.get("/", (req, res) => {
   if (isBrowserRequest(req)) {
@@ -119,9 +122,6 @@ app.get("/", (req, res) => {
 
 // Public routes (no auth required)
 app.use("/", publicRouter);
-
-// Apply rate limiting before auth
-app.use(ipRateLimit());
 
 // Custom auth middleware that bypasses certain paths
 app.use((req, res, next) => {

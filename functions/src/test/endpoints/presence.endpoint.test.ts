@@ -51,7 +51,7 @@ describe("Presence Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Required");
+      expect(response.data.error).toBe("Status is required");
     });
 
     it("should reject request without API key", async () => {
@@ -137,6 +137,29 @@ describe("Presence Endpoint", () => {
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("API key does not match fingerprint");
+    });
+
+    it("should validate status values", async () => {
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/visit/presence`,
+        {
+          fingerprintId,
+          status: "invalid-status",
+        },
+        {
+          headers: {
+            "x-api-key": validApiKey,
+          },
+          validateStatus: () => true,
+        },
+      );
+
+      expect(response.status).toBe(400);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(
+        "Invalid enum value. Expected 'online' | 'offline', received 'invalid-status'",
+      );
     });
   });
 });

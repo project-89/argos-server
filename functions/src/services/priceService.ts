@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import axios from "axios";
 import { COLLECTIONS } from "../constants";
 import * as functions from "firebase-functions";
+import { ApiError } from "../utils/error";
 
 export interface PriceData {
   [symbol: string]: {
@@ -15,6 +16,7 @@ const MOCK_PRICE_DATA: PriceData = {
   bitcoin: { usd: 50000, usd_24h_change: 2.5 },
   ethereum: { usd: 3000, usd_24h_change: 1.8 },
   Project89: { usd: 0.15, usd_24h_change: 2.5 },
+  solana: { usd: 100, usd_24h_change: -5 },
 };
 
 // Mock price history for testing
@@ -39,10 +41,21 @@ const getCoingeckoConfig = () => {
   };
 };
 
-export const getCurrentPrices = async (
-  symbols: string[] = [],
-  isTestEnv = false,
-): Promise<PriceData> => {
+/**
+ * Check if we're in a test environment
+ */
+const isTestEnvironment = () => {
+  return (
+    process.env.NODE_ENV === "test" ||
+    process.env.FUNCTIONS_EMULATOR === "true" ||
+    process.env.JEST_WORKER_ID !== undefined
+  );
+};
+
+/**
+ * Get current prices for specified tokens
+ */
+export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceData> => {
   try {
     const { apiUrl, apiKey } = getCoingeckoConfig();
 
@@ -50,13 +63,13 @@ export const getCurrentPrices = async (
     const tokenSymbols = symbols.length > 0 ? symbols : DEFAULT_TOKENS;
 
     // Use mock data in test environment
-    if (isTestEnv) {
+    if (isTestEnvironment()) {
       const prices: PriceData = {};
       for (const symbol of tokenSymbols) {
         if (MOCK_PRICE_DATA[symbol]) {
           prices[symbol] = MOCK_PRICE_DATA[symbol];
         } else {
-          throw new Error(`No price data found for ${symbol}`);
+          throw new ApiError(404, `No price data found for ${symbol}`);
         }
       }
       return prices;
@@ -98,7 +111,7 @@ export const getCurrentPrices = async (
 
         const data = response.data[symbol] as { usd: number; usd_24h_change: number };
         if (!data) {
-          throw new Error(`No price data found for ${symbol}`);
+          throw new ApiError(404, `No price data found for ${symbol}`);
         }
 
         prices[symbol] = {
@@ -112,28 +125,38 @@ export const getCurrentPrices = async (
           usd_24h_change: data.usd_24h_change,
           timestamp: now,
         });
-      } catch (error: any) {
-        errors.push(`No price data found for ${symbol}`);
+      } catch (error) {
+        if (error instanceof ApiError) {
+          errors.push(error.message);
+        } else {
+          errors.push(`No price data found for ${symbol}`);
+        }
       }
     }
 
     if (Object.keys(prices).length === 0) {
-      throw new Error(errors.join(", "));
+      throw new ApiError(404, errors.join(", "));
     }
 
     return prices;
-  } catch (error: any) {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
     console.error("Error fetching prices:", error);
-    throw error;
+    throw new ApiError(500, "Failed to fetch current prices");
   }
 };
 
-export const getPriceHistory = async (tokenId: string, isTestEnv = false): Promise<any[]> => {
+/**
+ * Get price history for a specific token
+ */
+export const getPriceHistory = async (tokenId: string): Promise<any[]> => {
   try {
     // Use mock data in test environment
-    if (isTestEnv) {
+    if (isTestEnvironment()) {
       if (!MOCK_PRICE_DATA[tokenId]) {
-        throw new Error(`No price data found for ${tokenId}`);
+        throw new ApiError(404, "Token not found");
       }
       return MOCK_PRICE_HISTORY;
     }
@@ -153,21 +176,24 @@ export const getPriceHistory = async (tokenId: string, isTestEnv = false): Promi
       );
 
       if (!response.data || !response.data.prices || !Array.isArray(response.data.prices)) {
-        throw new Error(`No price data found for ${tokenId}`);
+        throw new ApiError(404, "Token not found");
       }
 
       return response.data.prices.map(([timestamp, price]: [number, number]) => ({
         timestamp,
         price,
       }));
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        throw new Error(`No price data found for ${tokenId}`);
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 404) {
+        throw new ApiError(404, "Token not found");
       }
       throw error;
     }
-  } catch (error: any) {
+  } catch (error) {
+    if (error instanceof ApiError) {
+      throw error;
+    }
     console.error("Error fetching price history:", error);
-    throw error;
+    throw new ApiError(500, "Failed to fetch token price history");
   }
 };

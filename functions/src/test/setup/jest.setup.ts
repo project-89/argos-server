@@ -1,7 +1,6 @@
 import { jest, beforeAll, afterAll } from "@jest/globals";
 import { initializeTestEnvironment, cleanDatabase } from "../utils/testUtils";
 import { TEST_CONFIG } from "./testConfig";
-import * as admin from "firebase-admin";
 import axios from "axios";
 
 // Set test environment variables
@@ -15,9 +14,10 @@ process.env.FIREBASE_CONFIG = JSON.stringify({
 process.env.FIREBASE_CONFIG_ENCRYPTION_API_KEY = "a0PJ2Y5qjvkL7LVmer6f1OACff+0kMjMPOJ5YkGS+JM=";
 process.env.FIREBASE_CONFIG_ENCRYPTION_API_IV = "G3z5x+kLY3xFOrfaQUuhnA=";
 
-// Set rate limit environment variables for testing
-process.env.RATE_LIMIT_ENABLED = "true";
+// Disable all rate limiting for tests
+process.env.RATE_LIMIT_ENABLED = "false";
 process.env.IP_RATE_LIMIT_ENABLED = "false";
+process.env.FINGERPRINT_RATE_LIMIT_ENABLED = "false";
 
 // Set CORS environment variables for testing
 process.env.ALLOWED_ORIGINS = [
@@ -31,13 +31,6 @@ process.env.ALLOWED_ORIGINS = [
 
 // Set test environment
 process.env.NODE_ENV = "test";
-
-// Initialize Firebase Admin if not already initialized
-if (!admin.apps.length) {
-  admin.initializeApp({
-    projectId: TEST_CONFIG.projectId,
-  });
-}
 
 // Set timeout for all tests
 jest.setTimeout(TEST_CONFIG.defaultTimeout);

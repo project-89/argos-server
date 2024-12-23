@@ -22,6 +22,6 @@ publicRouter.get("/price/current", ...price.getCurrent);
 publicRouter.get("/price/history/:tokenId", ...price.getHistory);
 
 // Reality stability
-publicRouter.get("/reality-stability", realityStability.getRealityStabilityIndex);
+publicRouter.get("/reality-stability", ...realityStability.getRealityStabilityIndex);
 
 export default publicRouter;

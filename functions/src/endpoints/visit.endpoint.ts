@@ -10,6 +10,7 @@ import {
   getVisitHistory,
   verifyFingerprint,
 } from "../services/visitService";
+import { ApiError } from "../utils/error";
 
 // Validation schemas
 const visitSchema = z.object({
@@ -20,7 +21,10 @@ const visitSchema = z.object({
 
 const presenceSchema = z.object({
   fingerprintId: z.string(),
-  status: z.string(),
+  status: z.enum(["online", "offline"] as const, {
+    invalid_type_error: "Status must be either 'online' or 'offline'",
+    required_error: "Status is required",
+  }),
 });
 
 const removeSiteSchema = z.object({
@@ -50,10 +54,13 @@ export const log = [
       await verifyFingerprint(fingerprintId, req.fingerprintId);
 
       const result = await logVisit(fingerprintId, url, title, clientIp);
-      return sendSuccess(res, { ...result, message: "Visit logged successfully" });
+      return sendSuccess(res, result, "Visit logged successfully");
     } catch (error) {
       console.error("Error in log visit:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to log visit");
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, "Failed to log visit"),
+      );
     }
   },
 ];
@@ -70,10 +77,13 @@ export const updatePresence = [
       await verifyFingerprint(fingerprintId, req.fingerprintId);
 
       const result = await updatePresenceStatus(fingerprintId, status);
-      return sendSuccess(res, { ...result, message: "Presence status updated" });
+      return sendSuccess(res, result, "Presence status updated");
     } catch (error) {
       console.error("Error in update presence:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to update presence");
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, "Failed to update presence"),
+      );
     }
   },
 ];
@@ -90,10 +100,13 @@ export const removeSite = [
       await verifyFingerprint(fingerprintId, req.fingerprintId);
 
       const result = await removeSiteAndVisits(fingerprintId, siteId);
-      return sendSuccess(res, { ...result, message: "Site and visits removed" });
+      return sendSuccess(res, result, "Site and visits removed");
     } catch (error) {
       console.error("Error in remove site:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to remove site");
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, "Failed to remove site"),
+      );
     }
   },
 ];
@@ -115,16 +128,19 @@ export const getHistory = [
       const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;
 
       if (!fingerprintId) {
-        return sendError(res, "Fingerprint ID is required", 400);
+        throw new ApiError(400, "Fingerprint ID is required");
       }
 
       await verifyFingerprint(fingerprintId, req.fingerprintId);
 
       const visits = await getVisitHistory(fingerprintId);
-      return sendSuccess(res, { visits, message: "Visit history retrieved" });
+      return sendSuccess(res, { visits }, "Visit history retrieved");
     } catch (error) {
       console.error("Error in get visit history:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to get visit history");
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, "Failed to get visit history"),
+      );
     }
   },
 ];
