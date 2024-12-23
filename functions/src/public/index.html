@@ -164,6 +164,12 @@
             text-align: center;
             font-style: italic;
         }
+        .method {
+            color: var(--primary-color);
+            font-size: 0.8rem;
+            font-weight: bold;
+            min-width: 50px;
+        }
         @media (max-width: 640px) {
             body {
                 padding: 1rem;
@@ -207,43 +213,44 @@
         </section>
 
         <section class="card">
-          <h2>API Endpoints</h2>
-          <div class="endpoint-group">
-              <h3>Identity Management</h3>
-              <ul>
-                  <li><span class="endpoint">/fingerprint/register</span> - Register new browser fingerprint</li>
-                  <li><span class="endpoint">/api-key/register</span> - Generate API access key</li>
-                  <li><span class="endpoint">/api-key/validate</span> - Validate API credentials</li>
-              </ul>
-          </div>
-      
-          <div class="endpoint-group">
-              <h3>Price Data</h3>
-              <ul>
-                  <li><span class="endpoint">/price/current</span> - Get current token prices</li>
-                  <li><span class="endpoint">/price/history/:tokenId</span> - Get historical price data</li>
-              </ul>
-          </div>
-      
-          <div class="endpoint-group">
-              <h3>Visit Tracking</h3>
-              <ul>
-                  <li><span class="endpoint">/visit/log</span> - Record page visit</li>
-                  <li><span class="endpoint">/visit/presence</span> - Update presence status</li>
-                  <li><span class="endpoint">/visit/history/:fingerprintId</span> - Get visit history</li>
-              </ul>
-          </div>
-      
-          <div class="endpoint-group">
-              <h3>System</h3>
-              <ul>
-                  <li><span class="endpoint">/health</span> - System health check</li>
-                  <li><span class="endpoint">/role/available</span> - List available roles</li>
-              </ul>
-          </div>
-      </section>
+            <h2>API Endpoints</h2>
+            <div class="endpoint-group">
+                <h3>Public Endpoints</h3>
+                <ul>
+                    <li><span class="method">POST</span><span class="endpoint">/fingerprint/register</span> - Register new browser fingerprint</li>
+                    <li><span class="method">POST</span><span class="endpoint">/api-key/register</span> - Generate API access key</li>
+                    <li><span class="method">POST</span><span class="endpoint">/api-key/validate</span> - Validate API credentials</li>
+                    <li><span class="method">GET</span><span class="endpoint">/role/available</span> - List available roles</li>
+                    <li><span class="method">GET</span><span class="endpoint">/price/current</span> - Get current token prices</li>
+                    <li><span class="method">GET</span><span class="endpoint">/price/history/:tokenId</span> - Get historical price data</li>
+                    <li><span class="method">GET</span><span class="endpoint">/reality-stability</span> - Get reality stability index</li>
+                </ul>
+            </div>
 
-        <p class="restricted">NOTICE: This API requires authentication. Unauthorized access attempts will be rate-limited.</p>
+            <div class="endpoint-group">
+                <h3>Protected Endpoints</h3>
+                <ul>
+                    <li><span class="method">POST</span><span class="endpoint">/api-key/revoke</span> - Revoke API key</li>
+                    <li><span class="method">GET</span><span class="endpoint">/fingerprint/:id</span> - Get fingerprint details</li>
+                    <li><span class="method">POST</span><span class="endpoint">/visit/log</span> - Record page visit</li>
+                    <li><span class="method">POST</span><span class="endpoint">/visit/presence</span> - Update presence status</li>
+                    <li><span class="method">POST</span><span class="endpoint">/visit/site/remove</span> - Remove a site</li>
+                    <li><span class="method">GET</span><span class="endpoint">/visit/history/:fingerprintId</span> - Get visit history</li>
+                </ul>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Rate Limiting</h2>
+            <ul>
+                <li>IP-based: 300 requests per hour</li>
+                <li>API Key-based: 1000 requests per hour</li>
+                <li>Rate limit headers included in responses</li>
+                <li>Automatic cleanup of rate limit data</li>
+            </ul>
+        </section>
+
+        <p class="restricted">NOTICE: This protocol exists under Project 89 oversight. Unauthorized reality manipulation attempts will result in instance quarantine.</p>
 
         <footer>
             <p>© 2024 Oneirocom Digital Systems. All Rights Reserved.</p>

@@ -13,7 +13,7 @@ import { withMetrics } from "./middleware/metrics";
 import { errorHandler } from "./middleware/error.middleware";
 
 // Import routers
-import publicRouter from "./routes/public.router";
+import { publicRouter } from "./routes/public.router";
 import protectedRouter from "./routes/protected.router";
 import adminRouter from "./routes/admin.router";
 
