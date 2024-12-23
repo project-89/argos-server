@@ -7,6 +7,10 @@ import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
 import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
 import { CORS_CONFIG } from "./constants/config";
 import path from "path";
+import { composeMiddleware, pathMiddleware } from "./middleware/compose";
+import { MiddlewareConfig } from "./middleware/config";
+import { withMetrics } from "./middleware/metrics";
+import { errorHandler } from "./middleware/error.middleware";
 
 // Import routers
 import publicRouter from "./routes/public.router";
@@ -103,8 +107,29 @@ const sendErrorResponse = (
   }
 };
 
-// Apply rate limiting first
-app.use(ipRateLimit());
+// Initialize middleware configuration
+const middlewareConfig = MiddlewareConfig.getInstance();
+
+// Configure rate limits (can be changed at runtime)
+middlewareConfig.set("rateLimit.ip", {
+  windowMs: 60 * 60 * 1000,
+  max: process.env.IP_RATE_LIMIT_MAX ? parseInt(process.env.IP_RATE_LIMIT_MAX) : 300,
+});
+
+middlewareConfig.set("rateLimit.fingerprint", {
+  windowMs: 60 * 60 * 1000,
+  max: process.env.FINGERPRINT_RATE_LIMIT_MAX
+    ? parseInt(process.env.FINGERPRINT_RATE_LIMIT_MAX)
+    : 1000,
+});
+
+// Apply rate limiting first, but skip for certain paths
+app.use(
+  pathMiddleware(
+    ["/health", "/metrics"],
+    withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.ip")), "ipRateLimit"),
+  ),
+);
 
 // Serve landing page only for browser requests to root
 app.get("/", (req, res) => {
@@ -123,32 +148,40 @@ app.get("/", (req, res) => {
 // Public routes (no auth required)
 app.use("/", publicRouter);
 
-// Custom auth middleware that bypasses certain paths
+// Protected routes setup
+const protectedMiddleware = composeMiddleware(
+  withMetrics(validateApiKeyMiddleware, "auth"),
+  withMetrics(
+    fingerprintRateLimit(middlewareConfig.get("rateLimit.fingerprint")),
+    "fingerprintRateLimit",
+  ),
+);
+
+// Protected routes configuration
+const protectedPaths = ["/fingerprint", "/visit", "/api-key", "/role", "/tag"];
+const adminPaths = ["/admin"];
+
+// Apply auth middleware only to protected paths
 app.use((req, res, next) => {
-  // List of paths that should bypass auth
-  const bypassPaths = ["/error", "/nonexistent"];
-  if (bypassPaths.includes(req.path)) {
+  // Skip auth for public endpoints
+  if (req.path === "/" || req.path.startsWith("/fingerprint/register")) {
     return next();
   }
-  return validateApiKeyMiddleware(req, res, next);
+
+  // Check if the request path matches any protected paths
+  const isProtectedPath = protectedPaths.some((path) => req.path.startsWith(path));
+  const isAdminPath = adminPaths.some((path) => req.path.startsWith(path));
+
+  if (isProtectedPath || isAdminPath) {
+    return protectedMiddleware(req, res, next);
+  }
+
+  // Not a protected path, continue
+  next();
 });
 
-// Test error route
-app.get("/error", (req, res) => {
-  sendErrorResponse(res, 500, "500.html", {
-    success: false,
-    error: "Internal Server Error",
-    message: "A quantum fluctuation has been detected in the reality processing matrix",
-  });
-});
-
-// Apply fingerprint rate limit after auth
-app.use(fingerprintRateLimit());
-
-// Protected routes (require auth)
-app.use("/", protectedRouter);
-
-// Admin routes (require auth + admin role)
+// Mount route handlers after auth middleware
+app.use(protectedRouter);
 app.use("/admin", adminRouter);
 
 // CORS error handler
@@ -170,6 +203,9 @@ app.use(
     next(err);
   },
 );
+
+// Register error handler middleware
+app.use(errorHandler);
 
 // 404 handler for any remaining routes
 app.use((req, res) => {

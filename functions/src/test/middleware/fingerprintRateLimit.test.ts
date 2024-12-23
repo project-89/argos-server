@@ -53,9 +53,11 @@ describe("Fingerprint Rate Limit Test Suite", () => {
   let mockRequest: Partial<RequestWithFingerprint>;
   let mockResponse: Partial<Response>;
   let nextFunction: jest.Mock<void, [any?]>;
-  let requestStore: { [key: string]: number[] } = {};
+  let requestStore: { [key: string]: { requests: number[]; lastCleanup: Date } } = {};
+  let currentTime: Date;
 
   beforeEach(() => {
+    currentTime = new Date();
     mockRequest = {
       headers: {},
       fingerprint: { id: "test-fingerprint" },
@@ -71,29 +73,44 @@ describe("Fingerprint Rate Limit Test Suite", () => {
     nextFunction = jest.fn();
     requestStore = {};
 
-    // Mock Firestore transaction
+    // Mock Firestore transaction with more realistic behavior
     mockFirestore.runTransaction.mockImplementation(async (callback) => {
       const fingerprintId = mockRequest.fingerprintId as string;
       const transaction = {
         get: jest.fn().mockResolvedValue({
-          data: () => ({
-            requests: requestStore[fingerprintId] || [],
-          }),
+          exists: !!requestStore[fingerprintId],
+          data: () => {
+            // If the store exists, filter out old requests based on currentTime
+            if (requestStore[fingerprintId]) {
+              const windowMs = 1000; // Default window for tests
+              const cutoff = new Date(currentTime.getTime() - windowMs);
+              requestStore[fingerprintId].requests = requestStore[fingerprintId].requests.filter(
+                (timestamp) => new Date(timestamp).getTime() > cutoff.getTime(),
+              );
+            }
+            return requestStore[fingerprintId] || { requests: [], lastCleanup: currentTime };
+          },
         }),
         set: jest.fn().mockImplementation((_, data) => {
-          requestStore[fingerprintId] = data.requests;
+          requestStore[fingerprintId] = {
+            requests: data.requests,
+            lastCleanup: data.lastCleanup || currentTime,
+          };
         }),
       };
       return callback(transaction);
     });
   });
 
+  afterEach(() => {
+    requestStore = {};
+    jest.clearAllMocks();
+  });
+
   it("should enforce fingerprint-based rate limits", async () => {
-    // Override the rate limit to 100 for faster testing
-    const middleware = fingerprintRateLimit({ max: 100 });
+    const middleware = fingerprintRateLimit({ max: 100, windowMs: 3600000 });
     const successResponses: any[] = [];
     const limitedResponses: any[] = [];
-    const otherResponses: any[] = [];
 
     // Make 102 requests (100 should succeed, 2 should be limited)
     for (let i = 0; i < 102; i++) {
@@ -115,19 +132,16 @@ describe("Fingerprint Rate Limit Test Suite", () => {
         successResponses.push(response);
       } else if (statusFn.mock.calls[0]?.[0] === 429) {
         limitedResponses.push(response);
-      } else {
-        otherResponses.push(response);
       }
     }
 
-    // We expect exactly 100 successful requests and 2 rate-limited ones
     expect(successResponses.length).toBe(100);
     expect(limitedResponses.length).toBe(2);
-    expect(otherResponses.length).toBe(0);
+    expect(mockFirestore.runTransaction).toHaveBeenCalledTimes(102);
   });
 
   it("should track rate limits separately for different fingerprints", async () => {
-    const middleware = fingerprintRateLimit({ max: 100 });
+    const middleware = fingerprintRateLimit({ max: 100, windowMs: 3600000 });
     const fingerprint1 = { id: "test-fingerprint-1" };
     const fingerprint2 = { id: "test-fingerprint-2" };
 
@@ -153,7 +167,90 @@ describe("Fingerprint Rate Limit Test Suite", () => {
       );
     }
 
-    // Both should succeed as they're under their individual limits
     expect(nextFunction).toHaveBeenCalledTimes(150);
+    expect(requestStore[fingerprint1.id].requests.length).toBe(75);
+    expect(requestStore[fingerprint2.id].requests.length).toBe(75);
+  });
+
+  it("should reset rate limits after window expires", async () => {
+    const windowMs = 1000; // 1 second window
+    const middleware = fingerprintRateLimit({ max: 2, windowMs });
+
+    // Make 2 requests (should succeed)
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(2);
+
+    // Make another request (should be limited)
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(2);
+
+    // Move time forward past window and update request timestamps
+    currentTime = new Date(currentTime.getTime() + windowMs + 100);
+
+    // Make another request (should succeed after window reset)
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(3);
+  });
+
+  it("should handle concurrent requests correctly", async () => {
+    const middleware = fingerprintRateLimit({ max: 5, windowMs: 1000 });
+
+    // Simulate 10 concurrent requests
+    const requests = Array(10)
+      .fill(null)
+      .map(() =>
+        middleware(
+          mockRequest as RequestWithFingerprint,
+          mockResponse as Response,
+          nextFunction as NextFunction,
+        ),
+      );
+
+    await Promise.all(requests);
+    expect(nextFunction).toHaveBeenCalledTimes(5); // Only first 5 should succeed
+  });
+
+  it("should handle database errors gracefully", async () => {
+    const middleware = fingerprintRateLimit({ max: 5, windowMs: 1000 });
+    mockFirestore.runTransaction.mockRejectedValueOnce(new Error("Database error"));
+
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalled(); // Should allow request through on error
+    expect(mockResponse.status).not.toHaveBeenCalled();
+  });
+
+  it("should handle missing fingerprint", async () => {
+    const middleware = fingerprintRateLimit({ max: 5, windowMs: 1000 });
+    delete mockRequest.fingerprint;
+    delete mockRequest.fingerprintId;
+
+    await middleware(
+      mockRequest as RequestWithFingerprint,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalled(); // Should allow request through
+    expect(mockResponse.status).not.toHaveBeenCalled();
   });
 });

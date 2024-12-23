@@ -60,7 +60,7 @@ export const makeRequest = async (
   const config: AxiosRequestConfig = {
     method,
     url,
-    validateStatus: options.validateStatus ?? ((status) => true),
+    validateStatus: () => true, // Always resolve, let the test handle the status
     withCredentials,
     httpAgent,
     httpsAgent,
@@ -76,7 +76,7 @@ export const makeRequest = async (
     return response;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
-      throw error;
+      return error.response;
     }
     throw error;
   } finally {

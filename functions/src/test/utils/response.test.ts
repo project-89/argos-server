@@ -75,11 +75,13 @@ describe("Response Utilities", () => {
 
     it("should standardize common error messages", () => {
       const res = mockResponse();
+      sendError(res as any, "API key is required", 401);
 
-      sendError(res, "API key not found", 401);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalled();
 
       const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
-      expect(response.error).toBe("Invalid API key");
+      expect(response.error).toBe("API key is required");
     });
   });
 

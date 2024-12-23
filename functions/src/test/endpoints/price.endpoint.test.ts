@@ -104,13 +104,21 @@ describe("Price Endpoint", () => {
     });
 
     it("should handle missing tokenId", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history`, null, {
-        validateStatus: () => true,
-      });
+      // Test both with and without trailing slash
+      const responses = await Promise.all([
+        makeRequest("get", `${API_URL}/price/history/`, {
+          validateStatus: () => true,
+        }),
+        makeRequest("get", `${API_URL}/price/history`, {
+          validateStatus: () => true,
+        }),
+      ]);
 
-      expect(response.status).toBe(401);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      responses.forEach((response) => {
+        expect(response.status).toBe(404);
+        expect(response.data.success).toBe(false);
+        expect(response.data.error).toBe("Not Found");
+      });
     });
 
     it("should handle invalid token", async () => {

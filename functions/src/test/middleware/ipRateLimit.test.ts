@@ -47,9 +47,11 @@ describe("IP Rate Limit Test Suite", () => {
   let mockRequest: Partial<Request>;
   let mockResponse: Partial<Response>;
   let nextFunction: jest.Mock<void, [any?]>;
-  let requestStore: { [key: string]: number[] } = {};
+  let requestStore: { [key: string]: { requests: number[]; lastCleanup: Date } } = {};
+  let currentTime: Date;
 
   beforeEach(() => {
+    currentTime = new Date();
     mockRequest = {
       headers: {
         "x-forwarded-for": "192.168.1.1",
@@ -65,29 +67,44 @@ describe("IP Rate Limit Test Suite", () => {
     nextFunction = jest.fn();
     requestStore = {};
 
-    // Mock Firestore transaction
+    // Mock Firestore transaction with more realistic behavior
     mockFirestore.runTransaction.mockImplementation(async (callback) => {
       const ip = mockRequest.headers?.["x-forwarded-for"] as string;
       const transaction = {
         get: jest.fn().mockResolvedValue({
-          data: () => ({
-            requests: requestStore[ip] || [],
-          }),
+          exists: !!requestStore[ip],
+          data: () => {
+            // If the store exists, filter out old requests based on currentTime
+            if (requestStore[ip]) {
+              const windowMs = 1000; // Default window for tests
+              const cutoff = new Date(currentTime.getTime() - windowMs);
+              requestStore[ip].requests = requestStore[ip].requests.filter(
+                (timestamp) => new Date(timestamp).getTime() > cutoff.getTime(),
+              );
+            }
+            return requestStore[ip] || { requests: [], lastCleanup: currentTime };
+          },
         }),
         set: jest.fn().mockImplementation((_, data) => {
-          requestStore[ip] = data.requests;
+          requestStore[ip] = {
+            requests: data.requests,
+            lastCleanup: data.lastCleanup || currentTime,
+          };
         }),
       };
       return callback(transaction);
     });
   });
 
+  afterEach(() => {
+    requestStore = {};
+    jest.clearAllMocks();
+  });
+
   it("should enforce IP-based rate limits", async () => {
-    // Override the rate limit to 100 for faster testing
-    const middleware = ipRateLimit({ max: 100 });
+    const middleware = ipRateLimit({ max: 100, windowMs: 3600000 });
     const successResponses: any[] = [];
     const limitedResponses: any[] = [];
-    const otherResponses: any[] = [];
 
     // Make 102 requests (100 should succeed, 2 should be limited)
     for (let i = 0; i < 102; i++) {
@@ -105,19 +122,16 @@ describe("IP Rate Limit Test Suite", () => {
         successResponses.push(response);
       } else if (statusFn.mock.calls[0]?.[0] === 429) {
         limitedResponses.push(response);
-      } else {
-        otherResponses.push(response);
       }
     }
 
-    // We expect exactly 100 successful requests and 2 rate-limited ones
     expect(successResponses.length).toBe(100);
     expect(limitedResponses.length).toBe(2);
-    expect(otherResponses.length).toBe(0);
+    expect(mockFirestore.runTransaction).toHaveBeenCalledTimes(102);
   });
 
   it("should track rate limits separately for different IPs", async () => {
-    const middleware = ipRateLimit({ max: 100 });
+    const middleware = ipRateLimit({ max: 100, windowMs: 3600000 });
     const ip1 = "192.168.1.1";
     const ip2 = "192.168.1.2";
 
@@ -141,7 +155,89 @@ describe("IP Rate Limit Test Suite", () => {
       );
     }
 
-    // Both should succeed as they're under their individual limits
     expect(nextFunction).toHaveBeenCalledTimes(150);
+    expect(requestStore[ip1].requests.length).toBe(75);
+    expect(requestStore[ip2].requests.length).toBe(75);
+  });
+
+  it("should reset rate limits after window expires", async () => {
+    const windowMs = 1000; // 1 second window
+    const middleware = ipRateLimit({ max: 2, windowMs });
+    const ip = "192.168.1.1";
+    mockRequest.headers = { "x-forwarded-for": ip };
+
+    // Make 2 requests (should succeed)
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(2);
+
+    // Make another request (should be limited)
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(2);
+
+    // Move time forward past window and update request timestamps
+    currentTime = new Date(currentTime.getTime() + windowMs + 100);
+
+    // Make another request (should succeed after window reset)
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalledTimes(3);
+  });
+
+  it("should handle concurrent requests correctly", async () => {
+    const middleware = ipRateLimit({ max: 5, windowMs: 1000 });
+    const ip = "192.168.1.1";
+    mockRequest.headers = { "x-forwarded-for": ip };
+
+    // Simulate 10 concurrent requests
+    const requests = Array(10)
+      .fill(null)
+      .map(() =>
+        middleware(mockRequest as Request, mockResponse as Response, nextFunction as NextFunction),
+      );
+
+    await Promise.all(requests);
+    expect(nextFunction).toHaveBeenCalledTimes(5); // Only first 5 should succeed
+  });
+
+  it("should handle database errors gracefully", async () => {
+    const middleware = ipRateLimit({ max: 5, windowMs: 1000 });
+    mockFirestore.runTransaction.mockRejectedValueOnce(new Error("Database error"));
+
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalled(); // Should allow request through on error
+    expect(mockResponse.status).not.toHaveBeenCalled();
+  });
+
+  it("should handle missing IP address", async () => {
+    const middleware = ipRateLimit({ max: 5, windowMs: 1000 });
+    mockRequest.headers = {};
+
+    await middleware(
+      mockRequest as Request,
+      mockResponse as Response,
+      nextFunction as NextFunction,
+    );
+    expect(nextFunction).toHaveBeenCalled(); // Should allow request through
+    expect(mockResponse.status).not.toHaveBeenCalled();
   });
 });

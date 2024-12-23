@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
 import { validateApiKey } from "../services/apiKeyService";
-import { sendError } from "../utils/response";
 
 // Extend Express Request type to include fingerprintId
 declare global {
@@ -19,7 +18,7 @@ export const validateApiKeyMiddleware = async (
   req: Request,
   res: Response,
   next: NextFunction,
-): Promise<void | Response> => {
+): Promise<void> => {
   try {
     const apiKey = req.headers["x-api-key"];
 
@@ -62,10 +61,11 @@ export const validateApiKeyMiddleware = async (
 
     next();
   } catch (error) {
+    // Pass errors to the error handling middleware
     if (error instanceof ApiError) {
-      return sendError(res, error);
+      next(error);
+    } else {
+      next(new ApiError(500, "Internal server error"));
     }
-    console.error("Error in auth middleware:", error);
-    return sendError(res, "Internal server error");
   }
 };

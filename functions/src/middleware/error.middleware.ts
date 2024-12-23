@@ -30,11 +30,18 @@ export const errorHandler = (
 
   // Handle API errors
   if (err instanceof ApiError) {
-    return sendError(res, err);
+    // Preserve the original error message for API key errors
+    if (
+      err.message === "API key is required" ||
+      err.message === "API key does not match fingerprint"
+    ) {
+      return sendError(res, err.message, err.statusCode);
+    }
+    return sendError(res, err.message, err.statusCode);
   }
 
   // Handle all other errors
   const isProduction = process.env.NODE_ENV === "production";
   const message = isProduction ? "An unexpected error occurred" : err.message;
-  return sendError(res, message);
+  return sendError(res, message, 500);
 };

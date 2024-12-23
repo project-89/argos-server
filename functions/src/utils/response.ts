@@ -68,12 +68,17 @@ export const sendError = (
   // Standardize common error messages
   switch (errorMessage) {
     // Authentication errors - 401
-    case "API key not found":
     case "Invalid API key format":
     case "API key is disabled":
     case "API key needs to be refreshed":
       errorMessage = "Invalid API key";
       statusCode = 401;
+      break;
+
+    // Keep specific error messages for these cases
+    case "API key is required":
+    case "API key does not match fingerprint":
+      statusCode = errorMessage === "API key is required" ? 401 : 403;
       break;
 
     // Authorization errors - 403
@@ -83,7 +88,6 @@ export const sendError = (
 
     // Keep specific error messages for these cases
     case "Not authorized to revoke this API key":
-    case "API key does not match fingerprint":
       statusCode = 403;
       break;
 
