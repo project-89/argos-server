@@ -2,34 +2,105 @@
 
 Argos Server is a Firebase Functions-based API server that handles fingerprinting, visit tracking, and pricing operations. The server is designed to be secure, scalable, and maintainable with a strong emphasis on authentication and data integrity.
 
+## Architecture
+
+### Service Layer
+The server implements a robust service layer pattern:
+- Clear separation of business logic from controllers
+- Standardized error handling and logging
+- Transaction management for data consistency
+- Service-level validation and security
+- Reusable service methods
+
+### Response Standardization
+All API responses follow a consistent format:
+- Success responses include typed data
+- Error responses include clear messages and codes
+- Consistent HTTP status codes
+- Appropriate response headers
+- Type-safe response utilities
+
 ## API Structure
 
 ### Public Endpoints
 These endpoints do not require API key authentication:
-- `/fingerprint/register` - Register a new fingerprint
-- `/api-key/register` - Register a new API key for a fingerprint
-- `/api-key/validate` - Validate an API key
-- `/role/available` - Get available roles
-- `/price/current` - Get current token prices
-- `/price/history/:tokenId` - Get historical price data
-- `/reality-stability` - Get reality stability index
+- `POST /fingerprint/register` - Register a new fingerprint
+  - Response: `{ success: true, data: { fingerprintId: string } }`
+- `POST /api-key/register` - Register a new API key for a fingerprint
+  - Response: `{ success: true, data: { apiKey: string } }`
+- `POST /api-key/validate` - Validate an API key
+  - Response: `{ success: true, data: { valid: boolean, needsRefresh: boolean } }`
+- `GET /role/available` - Get available roles
+  - Response: `{ success: true, data: string[] }`
+- `GET /price/current` - Get current token prices
+  - Response: `{ success: true, data: { [tokenId: string]: { usd: number, usd_24h_change: number } } }`
+- `GET /price/history/:tokenId` - Get historical price data
+  - Response: `{ success: true, data: { timestamp: number, price: number }[] }`
+- `GET /reality-stability` - Get reality stability index
+  - Response: `{ success: true, data: { index: number, timestamp: number } }`
 
 ### Protected Endpoints
 These endpoints require a valid API key in the `x-api-key` header:
-- `/api-key/revoke` - Revoke an API key
-- `/fingerprint/:id` - Get fingerprint details
-- `/visit/log` - Log a visit
-- `/visit/presence` - Update presence status
-- `/visit/site/remove` - Remove a site
-- `/visit/history/:fingerprintId` - Get visit history
+- `POST /api-key/revoke` - Revoke an API key
+  - Response: `{ success: true }`
+- `GET /fingerprint/:id` - Get fingerprint details
+  - Response: `{ success: true, data: { id: string, ... } }`
+- `POST /visit/log` - Log a visit
+  - Response: `{ success: true, data: { visitId: string } }`
+- `POST /visit/presence` - Update presence status
+  - Response: `{ success: true }`
+- `POST /visit/site/remove` - Remove a site
+  - Response: `{ success: true }`
+- `GET /visit/history/:fingerprintId` - Get visit history
+  - Response: `{ success: true, data: Visit[] }`
 
 ### Admin Endpoints
 These endpoints require a valid API key with admin role:
-- `/admin/role/assign` - Assign a role
-- `/admin/role/remove` - Remove a role
-- `/admin/tag/update` - Add or update tags
-- `/admin/tag/roles/update` - Update roles based on tags
-- `/admin/debug/cleanup` - Manual cleanup trigger
+- `POST /admin/role/assign` - Assign a role
+  - Response: `{ success: true }`
+- `POST /admin/role/remove` - Remove a role
+  - Response: `{ success: true }`
+- `POST /admin/tag/update` - Add or update tags
+  - Response: `{ success: true }`
+- `POST /admin/tag/roles/update` - Update roles based on tags
+  - Response: `{ success: true }`
+- `POST /admin/debug/cleanup` - Manual cleanup trigger
+  - Response: `{ success: true }`
+
+### Error Responses
+All endpoints return standardized error responses:
+```json
+{
+  "success": false,
+  "error": "Error message",
+  "code": "ERROR_CODE"
+}
+```
+
+Common status codes:
+- 400: Bad Request (validation errors)
+- 401: Unauthorized (missing/invalid API key)
+- 403: Forbidden (insufficient permissions)
+- 429: Too Many Requests (rate limit exceeded)
+- 500: Internal Server Error
+
+### Rate Limiting
+The server implements two levels of rate limiting:
+
+1. **IP-based Rate Limiting**
+   - 300 requests per hour per IP
+   - Applies to all endpoints
+   - Helps prevent abuse from single IPs
+
+2. **Fingerprint-based Rate Limiting**
+   - 1000 requests per hour per fingerprint
+   - Applies to protected endpoints
+   - Ensures fair resource usage
+
+Rate limit responses include headers:
+- `X-RateLimit-Limit`: Maximum requests allowed
+- `X-RateLimit-Remaining`: Remaining requests
+- `X-RateLimit-Reset`: Time until limit resets (Unix timestamp)
 
 ### Automated Services
 - **Price Cache**: Caches price data for 5 minutes to respect CoinGecko API rate limits
@@ -155,9 +226,37 @@ resource "google_cloudfunctions_function" "scheduledCleanup" {
 - Configurable headers and methods
 
 ### Rate Limiting
-- Per-minute request limits
-- Monthly quota tracking
+- IP-based rate limiting (300/hour)
+- Fingerprint-based rate limiting (1000/hour)
+- Firestore-backed persistence
 - Automatic cleanup of old rate limit data
+- Graceful handling of database errors
+- Concurrent request handling
+
+### Error Handling
+- Standardized error responses
+- Proper status codes
+- Detailed error messages in development
+- Sanitized error messages in production
+- Error logging and monitoring
+- Transaction error handling
+
+### Middleware Architecture
+- Composable middleware pattern
+- Conditional middleware application
+- Context passing between middleware
+- Middleware configuration management
+- Performance monitoring
+- Error propagation
+
+## Test Coverage
+- 137 tests across 18 test suites
+- End-to-end API testing
+- Middleware unit testing
+- Service layer testing
+- Error handling testing
+- Rate limiting testing
+- Concurrent request testing
 
 ## Documentation
 - [Development Guide](DEVELOPMENT.md)
