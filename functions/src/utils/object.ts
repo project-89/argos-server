@@ -15,6 +15,17 @@ export const deepMerge = (
         } else {
           output[key] = deepMerge(target[key], source[key]);
         }
+      } else if (Array.isArray(source[key])) {
+        // If both target and source have arrays, concatenate them
+        if (Array.isArray(target[key])) {
+          console.log("Merging arrays:", { target: target[key], source: source[key] });
+          output[key] = [...target[key], ...source[key]];
+          console.log("Merged array result:", output[key]);
+        } else {
+          // If target doesn't have an array, use source array
+          console.log("Target is not an array, using source:", source[key]);
+          output[key] = source[key];
+        }
       } else {
         Object.assign(output, { [key]: source[key] });
       }

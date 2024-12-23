@@ -579,5 +579,61 @@ describe("Fingerprint Endpoint", () => {
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("API key does not match fingerprint");
     });
+
+    it("should append to arrays in metadata", async () => {
+      // First update with initial form session
+      await makeRequest(
+        "post",
+        `${API_URL}/fingerprint/update`,
+        {
+          metadata: {
+            formSessions: [
+              {
+                timestamp: "2024-01-01T00:00:00Z",
+                question: "What is your name?",
+                answer: "John",
+              },
+            ],
+          },
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      // Add another form session
+      const response = await makeRequest(
+        "post",
+        `${API_URL}/fingerprint/update`,
+        {
+          metadata: {
+            formSessions: [
+              {
+                timestamp: "2024-01-01T00:01:00Z",
+                question: "What is your email?",
+                answer: "john@example.com",
+              },
+            ],
+          },
+        },
+        {
+          headers: { "x-api-key": validApiKey },
+        },
+      );
+
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.metadata.formSessions).toHaveLength(2);
+      expect(response.data.data.metadata.formSessions[0]).toEqual({
+        timestamp: "2024-01-01T00:00:00Z",
+        question: "What is your name?",
+        answer: "John",
+      });
+      expect(response.data.data.metadata.formSessions[1]).toEqual({
+        timestamp: "2024-01-01T00:01:00Z",
+        question: "What is your email?",
+        answer: "john@example.com",
+      });
+    });
   });
 });

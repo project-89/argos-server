@@ -214,7 +214,11 @@ export const updateFingerprintMetadata = async (
     }
 
     const data = fingerprintDoc.data() as FingerprintDocData;
+    console.log("Existing fingerprint data:", JSON.stringify(data, null, 2));
+    console.log("Existing metadata:", JSON.stringify(data.metadata, null, 2));
+    console.log("New metadata:", JSON.stringify(metadata, null, 2));
     const updatedMetadata = deepMerge(data.metadata || {}, metadata);
+    console.log("Merged metadata:", JSON.stringify(updatedMetadata, null, 2));
 
     await fingerprintRef.update({
       metadata: updatedMetadata,
