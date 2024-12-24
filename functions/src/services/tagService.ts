@@ -1,20 +1,11 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
-import { PREDEFINED_ROLES, ROLE_HIERARCHY, PredefinedRole } from "../constants/roles";
+import { COLLECTIONS } from "../constants/collections";
+import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
-
-export interface TagRule {
-  tags: string[];
-  role: PredefinedRole;
-}
-
-export interface TagRules {
-  [key: string]: TagRule;
-}
 
 export interface FingerprintData {
   tags?: string[];
-  roles?: PredefinedRole[];
+  roles?: ROLE[];
 }
 
 /**
@@ -22,7 +13,7 @@ export interface FingerprintData {
  */
 export const canManageRole = async (
   callerFingerprintId: string,
-  targetRole: PredefinedRole,
+  targetRole: ROLE,
 ): Promise<boolean> => {
   const db = getFirestore();
   const callerDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(callerFingerprintId).get();
@@ -32,17 +23,15 @@ export const canManageRole = async (
   }
 
   const callerData = callerDoc.data() as FingerprintData;
-  const callerRoles = callerData?.roles || [PREDEFINED_ROLES[0]]; // Default to first role (user)
+  const callerRoles = callerData?.roles || [ROLE.USER];
 
   // Admin can manage any role
-  if (callerRoles.includes("admin")) {
+  if (callerRoles.includes(ROLE.ADMIN)) {
     return true;
   }
 
   // Get the highest role level of the caller
-  const callerLevel = Math.max(
-    ...callerRoles.map((role) => ROLE_HIERARCHY[role as PredefinedRole] || 0),
-  );
+  const callerLevel = Math.max(...callerRoles.map((role) => ROLE_HIERARCHY[role] || 0));
   const targetLevel = ROLE_HIERARCHY[targetRole];
 
   // Caller must have a higher role level to manage the target role
@@ -97,8 +86,8 @@ export const updateTags = async (
 export const updateRolesByTags = async (
   fingerprintId: string,
   callerFingerprintId: string,
-  tagRules: TagRules,
-): Promise<{ fingerprintId: string; roles: PredefinedRole[] }> => {
+  tagRules: Record<string, { tags: string[]; role: ROLE }>,
+): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
   try {
     // Prevent self-role modification
     if (fingerprintId === callerFingerprintId) {
@@ -124,10 +113,10 @@ export const updateRolesByTags = async (
 
     const data = fingerprintDoc.data() as FingerprintData;
     const currentTags = new Set<string>(data?.tags || []);
-    const currentRoles = new Set<PredefinedRole>(data?.roles || [PREDEFINED_ROLES[0]]);
+    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
 
     // Always ensure user role is present
-    currentRoles.add(PREDEFINED_ROLES[0]); // First role is always 'user'
+    currentRoles.add(ROLE.USER);
 
     // Add new roles based on tag rules
     for (const [_, rule] of Object.entries(tagRules)) {

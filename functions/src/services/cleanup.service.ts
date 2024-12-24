@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
 
 interface CleanupResult {
   cleanupTime: number;

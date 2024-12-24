@@ -1,19 +1,10 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  createTestData,
-  cleanDatabase,
-} from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 
 describe("Debug Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
-
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
 
   beforeEach(async () => {
     await cleanDatabase();

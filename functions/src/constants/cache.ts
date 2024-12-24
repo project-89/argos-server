@@ -17,3 +17,9 @@ export const TTL_CONFIG = {
   API_KEY: 60 * 60, // 1 hour
   FINGERPRINT: 24 * 60 * 60, // 24 hours
 } as const;
+
+export const CACHE_DURATION = {
+  PRICE: 5 * 60 * 1000,
+  RATE_LIMIT: 60 * 60 * 1000,
+  STABILITY: 24 * 60 * 60 * 1000,
+} as const;

@@ -158,7 +158,7 @@ const protectedMiddleware = composeMiddleware(
 );
 
 // Protected routes configuration
-const protectedPaths = ["/fingerprint", "/visit", "/api-key", "/role", "/tag"];
+const protectedPaths = ["/fingerprint", "/visit", "/api-key", "/role", "/tag", "/impressions"];
 const adminPaths = ["/admin"];
 
 // Apply auth middleware only to protected paths

@@ -39,3 +39,14 @@ export const ENDPOINTS = {
   PRICE: "/price",
   STABILITY: "/stability",
 } as const;
+
+// Public endpoints that should not require API key authentication
+export const PUBLIC_ENDPOINTS: readonly string[] = [
+  "/fingerprint/register",
+  "/api-key/register",
+  "/api-key/validate",
+  "/role/available",
+  "/price/current",
+  "/price/history/:tokenId",
+  "/reality-stability",
+];

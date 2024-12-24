@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig, AxiosError, RawAxiosRequestHeaders } from "axios";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { COLLECTIONS } from "../../constants";
-import * as admin from "firebase-admin";
+import { COLLECTIONS } from "../../constants/collections";
+
 import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";
 import { Agent as HttpsAgent } from "https";
@@ -65,9 +65,15 @@ export const makeRequest = async (
     httpAgent,
     httpsAgent,
     headers,
+    ...options,
   };
 
-  if (data !== undefined && !["get", "head", "options"].includes(method.toLowerCase())) {
+  // Only set data if it's not null/undefined and not a GET/HEAD/OPTIONS request
+  if (
+    data !== null &&
+    data !== undefined &&
+    !["get", "head", "options"].includes(method.toLowerCase())
+  ) {
     config.data = data;
   }
 
@@ -86,85 +92,11 @@ export const makeRequest = async (
 };
 
 /**
- * Initialize test environment
- */
-export const initializeTestEnvironment = async () => {
-  try {
-    console.log("Initializing test environment...");
-
-    // Set environment variables
-    process.env.FUNCTIONS_EMULATOR = "true";
-    process.env.FIRESTORE_EMULATOR_HOST = TEST_CONFIG.firestoreEmulator;
-    process.env.FIREBASE_CONFIG = JSON.stringify({
-      projectId: TEST_CONFIG.projectId,
-    });
-    process.env.GCLOUD_PROJECT = TEST_CONFIG.projectId;
-    process.env.NODE_ENV = "test";
-
-    // Disable all rate limiting for tests
-    process.env.RATE_LIMIT_ENABLED = "false";
-    process.env.IP_RATE_LIMIT_ENABLED = "false";
-    process.env.FINGERPRINT_RATE_LIMIT_ENABLED = "false";
-
-    // Initialize admin if not already initialized
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        projectId: TEST_CONFIG.projectId,
-      });
-
-      // Configure Firestore settings only once during initialization
-      const db = getFirestore();
-      db.settings({
-        host: TEST_CONFIG.firestoreEmulator,
-        ssl: false,
-        experimentalForceLongPolling: true,
-      });
-    }
-
-    // Get Firestore instance
-    const db = getFirestore();
-
-    // Clean the database
-    await cleanDatabase(db);
-    return db;
-  } catch (error) {
-    console.error("Failed to initialize test environment:", error);
-    throw error;
-  }
-};
-
-/**
- * Generate a test fingerprint
- */
-export const generateTestFingerprint = () => {
-  return {
-    id: `test-fingerprint-${Date.now()}`,
-    components: {
-      userAgent: "Test User Agent",
-      language: "en-US",
-      platform: "Test Platform",
-      screenResolution: "1920x1080",
-      timezone: "UTC",
-      webdriver: false,
-    },
-    metadata: {
-      ip: "127.0.0.1",
-      timestamp: new Date().toISOString(),
-    },
-  };
-};
-
-/**
  * Create test data for endpoints
  */
 export const createTestData = async (options: { roles?: string[]; isAdmin?: boolean } = {}) => {
   try {
     console.log("Creating test data...");
-
-    // Initialize Firebase if not already initialized
-    if (!admin.apps.length) {
-      await initializeTestEnvironment();
-    }
 
     // Generate a unique fingerprint value
     const uniqueFingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).substring(2)}`;
@@ -221,26 +153,19 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
   }
 };
 
-export const cleanDatabase = async (db?: admin.firestore.Firestore) => {
+/**
+ * Clean the database between tests
+ */
+export const cleanDatabase = async () => {
   try {
     console.log("Cleaning database...");
-
-    // Get database instance if not provided
-    if (!db) {
-      if (!admin.apps.length) {
-        admin.initializeApp({
-          projectId: TEST_CONFIG.projectId,
-        });
-      }
-      db = getFirestore();
-    }
-
+    const db = getFirestore();
     const collections = Object.values(COLLECTIONS);
     console.log("Cleaning collections:", collections);
 
     const promises = collections.map(async (collection) => {
-      const snapshot = await db!.collection(collection).get();
-      const batch = db!.batch();
+      const snapshot = await db.collection(collection).get();
+      const batch = db.batch();
       snapshot.docs.forEach((doc) => batch.delete(doc.ref));
       return batch.commit();
     });

@@ -1,5 +1,5 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
 import { generateApiKey, encryptApiKey } from "../utils/api-key";
 import { ApiError } from "../utils/error";
 

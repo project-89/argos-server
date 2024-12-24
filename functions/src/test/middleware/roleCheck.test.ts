@@ -1,21 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  createTestData,
-  cleanDatabase,
-} from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 
 describe("Role Check Middleware Test Suite", () => {
   let adminApiKey: string;
   let adminFingerprintId: string;
   let userApiKey: string;
   let userFingerprintId: string;
-
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
 
   beforeEach(async () => {
     await cleanDatabase();

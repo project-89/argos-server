@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
 
 interface RateLimitConfig {
   windowMs: number;

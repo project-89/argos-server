@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLES } from "../constants";
+import { ROLE } from "../constants/roles";
 
 // Common sub-schemas
 const tagsSchema = z.record(z.number());
@@ -38,15 +38,15 @@ export const schemas = {
     siteId: z.string(),
   }),
 
-  // Role schemas
+  // ROLE schemas
   roleAssign: z.object({
     fingerprintId: z.string(),
-    role: z.enum(Object.values(ROLES) as [string, ...string[]]),
+    role: z.enum(Object.values(ROLE) as [string, ...string[]]),
   }),
 
   roleRemove: z.object({
     fingerprintId: z.string(),
-    role: z.enum(Object.values(ROLES) as [string, ...string[]]),
+    role: z.enum(Object.values(ROLE) as [string, ...string[]]),
   }),
 
   // Tag schemas
@@ -60,7 +60,7 @@ export const schemas = {
     tagRules: z.record(
       z.object({
         min: z.number(),
-        role: z.enum(Object.values(ROLES) as [string, ...string[]]),
+        role: z.enum(Object.values(ROLE) as [string, ...string[]]),
       }),
     ),
   }),
@@ -76,5 +76,40 @@ export const schemas = {
 
   apiKeyRevoke: z.object({
     key: z.string(),
+  }),
+  // Schemas
+  createImpressionSchema: z.object({
+    fingerprintId: z.string({
+      required_error: "Fingerprint ID is required",
+    }),
+    type: z.string({
+      required_error: "Type is required",
+    }),
+    data: z.record(z.any(), {
+      required_error: "Data is required",
+    }),
+    source: z.string().optional(),
+    sessionId: z.string().optional(),
+  }),
+
+  getImpressionsSchema: z.object({
+    fingerprintId: z.string({
+      required_error: "Fingerprint ID is required",
+    }),
+    type: z.string().optional(),
+    startTime: z.string().datetime().optional(),
+    endTime: z.string().datetime().optional(),
+    limit: z.number().int().positive().optional(),
+    sessionId: z.string().optional(),
+  }),
+
+  deleteImpressionsSchema: z.object({
+    fingerprintId: z.string({
+      required_error: "Fingerprint ID is required",
+    }),
+    type: z.string().optional(),
+    startTime: z.string().datetime().optional(),
+    endTime: z.string().datetime().optional(),
+    sessionId: z.string().optional(),
   }),
 };

@@ -26,11 +26,9 @@ export const validateApiKeyMiddleware = async (
       throw new ApiError(401, "API key is required");
     }
 
-    if (typeof apiKey !== "string") {
-      throw new ApiError(401, "Invalid API key format");
-    }
+    // Pass the raw header value to validateApiKey, which will handle type checking
+    const result = await validateApiKey(apiKey as string);
 
-    const result = await validateApiKey(apiKey);
     if (!result.isValid) {
       // If we have a fingerprintId but the key is invalid, it means the key exists but needs refresh
       if (result.needsRefresh) {
@@ -49,14 +47,12 @@ export const validateApiKeyMiddleware = async (
     // Get the relative path from the request
     const relativePath = req.path;
 
-    // For non-admin routes, check if the request body contains a fingerprintId and if it matches
-    if (
-      !relativePath.startsWith("/admin") &&
-      !relativePath.startsWith("/visit/log") &&
-      req.body?.fingerprintId &&
-      req.body.fingerprintId !== result.fingerprintId
-    ) {
-      throw new ApiError(403, "API key does not match fingerprint");
+    // For non-admin routes, check if the request contains a fingerprintId (in body or params) and if it matches
+    if (!relativePath.startsWith("/admin") && !relativePath.startsWith("/visit/log")) {
+      const requestFingerprintId = req.body?.fingerprintId || req.params?.fingerprintId;
+      if (requestFingerprintId && requestFingerprintId !== result.fingerprintId) {
+        throw new ApiError(403, "API key does not match fingerprint");
+      }
     }
 
     next();
@@ -65,6 +61,7 @@ export const validateApiKeyMiddleware = async (
     if (error instanceof ApiError) {
       next(error);
     } else {
+      console.error("Auth middleware error:", error);
       next(new ApiError(500, "Internal server error"));
     }
   }

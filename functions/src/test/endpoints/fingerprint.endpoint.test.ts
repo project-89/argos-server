@@ -1,12 +1,7 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  createTestData,
-  cleanDatabase,
-} from "../utils/testUtils";
-import { COLLECTIONS } from "../../constants";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { COLLECTIONS } from "../../constants/collections";
 import * as admin from "firebase-admin";
 
 describe("Fingerprint Endpoint", () => {
@@ -14,10 +9,6 @@ describe("Fingerprint Endpoint", () => {
   let validApiKey: string;
   let fingerprintId: string;
   let fingerprintValue: string;
-
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
 
   beforeEach(async () => {
     await cleanDatabase();

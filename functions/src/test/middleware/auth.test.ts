@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest } from "../utils/testUtils";
-import { initializeTestEnvironment, createTestData } from "../utils/testUtils";
+import { createTestData } from "../utils/testUtils";
 
 describe("Auth Test Suite", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -9,8 +9,6 @@ describe("Auth Test Suite", () => {
   let fingerprintId: string;
 
   beforeAll(async () => {
-    // Initialize test environment first
-    await initializeTestEnvironment();
     // Then create test data
     const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;

@@ -35,7 +35,7 @@ All protected endpoints require an API key passed in the `x-api-key` header. API
  - Params: `tokenId` (e.g., "project89")
  - Query: `?timeframe=7d&interval=1h`
 
-#### Role Management
+#### ROLE Management
 - `GET /role/available`
  - Get list of available reality access tiers
  - Returns: `{ roles: string[] }`
@@ -72,7 +72,7 @@ All protected endpoints require an API key passed in the `x-api-key` header. API
  - Get traversal history
  - Params: `fingerprintId`
 
-#### Role Management
+#### ROLE Management
 - `POST /role/assign`
  - Assign reality access tier
  - Body: `{ fingerprintId: string, role: string }`

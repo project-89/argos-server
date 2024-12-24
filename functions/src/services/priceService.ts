@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import axios from "axios";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 

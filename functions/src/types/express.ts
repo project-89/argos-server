@@ -7,4 +7,12 @@ declare global {
   }
 }
 
+import { Request } from "express";
+
+export interface AuthenticatedRequest extends Request {
+  fingerprint?: {
+    id: string;
+  };
+}
+
 export {};

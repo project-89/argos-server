@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
+import { COLLECTIONS } from "../../constants/collections";
 import { updatePresence, getPresence } from "../../services/presenceService";
 import { ApiError } from "../../utils/error";
 

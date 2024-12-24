@@ -53,7 +53,7 @@ const testEndpoints = async () => {
         headers: { "x-api-key": apiKey },
       },
     );
-    console.log("✅ Role assigned:", roleResponse.data);
+    console.log("✅ ROLE assigned:", roleResponse.data);
 
     // Test /fingerprint/:id endpoint
     console.log("\n5️⃣  Testing /fingerprint/:id");
@@ -143,7 +143,7 @@ const testEndpoints = async () => {
       },
       headers: { "x-api-key": apiKey },
     });
-    console.log("✅ Role removed:", deleteRoleResponse.data);
+    console.log("✅ ROLE removed:", deleteRoleResponse.data);
 
     // Test /prices endpoint with default tokens
     console.log("\n1️⃣2️⃣ Testing /prices (default tokens)");

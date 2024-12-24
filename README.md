@@ -53,6 +53,15 @@ These endpoints require a valid API key in the `x-api-key` header:
   - Response: `{ success: true }`
 - `GET /visit/history/:fingerprintId` - Get visit history
   - Response: `{ success: true, data: Visit[] }`
+- `POST /impressions` - Create a new impression
+  - Body: `{ fingerprintId: string, type: string, data: Record<string, any>, source?: string, sessionId?: string }`
+  - Response: `{ success: true, data: { id: string, fingerprintId: string, type: string, data: Record<string, any>, createdAt: string } }`
+- `GET /impressions/:fingerprintId` - Get impressions for a fingerprint
+  - Query: `{ type?: string, startTime?: string, endTime?: string, limit?: number, sessionId?: string }`
+  - Response: `{ success: true, data: Array<{ id: string, fingerprintId: string, type: string, data: Record<string, any>, createdAt: string }> }`
+- `DELETE /impressions/:fingerprintId` - Delete impressions for a fingerprint
+  - Query: `{ type?: string, startTime?: string, endTime?: string, sessionId?: string }`
+  - Response: `{ success: true, data: { deletedCount: number } }`
 
 ### Admin Endpoints
 These endpoints require a valid API key with admin role:
@@ -205,12 +214,12 @@ resource "google_cloudfunctions_function" "scheduledCleanup" {
 - Each API key is uniquely encrypted with a secure initialization vector
 - Encryption keys and IVs are managed through environment variables
 
-### Role-Based Access Control
+### ROLE-Based Access Control
 - Admin endpoints require admin role
-- Role management restricted to admin users
+- ROLE management restricted to admin users
 - Tag management restricted to admin users
 - Default user role assigned on registration
-- Role validation middleware for protected routes
+- ROLE validation middleware for protected routes
 
 ### Request Validation
 - Zod-based schema validation for all endpoints

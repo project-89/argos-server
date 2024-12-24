@@ -1,17 +1,20 @@
-import { describe, it, expect, beforeAll } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest } from "../utils/testUtils";
-import { initializeTestEnvironment } from "../utils/testUtils";
-
-const API_URL = TEST_CONFIG.apiUrl;
 
 describe("CORS Middleware", () => {
-  beforeAll(async () => {
-    process.env.NODE_ENV = "test";
-    process.env.FUNCTIONS_EMULATOR = "true";
-    process.env.ALLOWED_ORIGINS =
-      "http://localhost:5173,http://localhost:3000,http://localhost:5000";
-    await initializeTestEnvironment();
+  const API_URL = TEST_CONFIG.apiUrl;
+  const ALLOWED_ORIGINS = TEST_CONFIG.allowedOrigins;
+
+  it("should allow requests from allowed origins", async () => {
+    const response = await makeRequest("options", `${API_URL}/health`, null, {
+      headers: {
+        Origin: ALLOWED_ORIGINS[0],
+      },
+    });
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGINS[0]);
   });
 
   it("should handle requests from allowed origins", async () => {

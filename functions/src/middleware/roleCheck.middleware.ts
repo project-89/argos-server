@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
-import { PredefinedRole, ROLE_PERMISSIONS, Permission } from "../constants/roles";
+import { ROLE, ROLE_PERMISSIONS, Permission } from "../constants/roles";
 import { sendError } from "../utils/response";
 
 /**
@@ -40,7 +40,7 @@ export const requirePermission = (requiredPermission: Permission) => {
       const roles = Array.isArray(fingerprint.roles) ? fingerprint.roles : [];
 
       // Check if any of the user's roles have the required permission
-      const hasPermission = roles.some((role: PredefinedRole) => {
+      const hasPermission = roles.some((role: ROLE) => {
         const permissions = ROLE_PERMISSIONS[role];
         return Array.isArray(permissions) && permissions.includes(requiredPermission);
       });

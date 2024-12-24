@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase-admin/firestore";
+
 // Domain Models
 export interface Fingerprint {
   fingerprint: string;
@@ -49,4 +51,14 @@ export interface PriceData {
 export interface PriceHistory {
   timestamp: number;
   price: number;
+}
+
+export interface Impression {
+  id: string;
+  fingerprintId: string;
+  type: string; // e.g., 'form_submission', 'page_view', 'interaction'
+  data: Record<string, any>; // Flexible JSON data
+  createdAt: Timestamp;
+  source?: string; // Optional: where this impression came from
+  sessionId?: string; // Optional: to group related impressions
 }

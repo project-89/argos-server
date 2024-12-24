@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 import { z } from "zod";
-import { PREDEFINED_ROLES } from "../constants/roles";
+import { ROLE } from "../constants/roles";
 import { updateTags, updateRolesByTags } from "../services/tagService";
 import { sendSuccess, sendError } from "../utils/response";
 
@@ -20,7 +20,7 @@ const tagRuleSchema = z.record(
         invalid_type_error: "Tag rule tags must be an array of strings",
       })
       .min(1, "At least one tag must be provided in rule"),
-    role: z.enum(PREDEFINED_ROLES, {
+    role: z.nativeEnum(ROLE, {
       required_error: "Role is required",
       invalid_type_error: "Invalid role",
     }),
@@ -30,8 +30,6 @@ const tagRuleSchema = z.record(
     invalid_type_error: "Tag rules must be an object",
   },
 );
-
-type TagRuleType = z.infer<typeof tagRuleSchema>;
 
 /**
  * Add or update tags for a fingerprint
@@ -75,10 +73,7 @@ export const updateRolesBasedOnTags = [
   ),
   async (req: Request, res: Response): Promise<Response> => {
     try {
-      const { fingerprintId, tagRules } = req.body as {
-        fingerprintId: string;
-        tagRules: TagRuleType;
-      };
+      const { fingerprintId, tagRules } = req.body;
       const callerFingerprintId = req.fingerprintId as string;
 
       const result = await updateRolesByTags(fingerprintId, callerFingerprintId, tagRules);

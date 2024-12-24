@@ -73,5 +73,17 @@ service cloud.firestore {
       allow read, write: if false;  // Only Cloud Functions can access
       allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
     }
+
+    // Rules for impressions - private data tied to fingerprints
+    match /impressions/{impressionId} {
+      allow read, write: if false;  // Only Cloud Functions can access
+
+      // Additional validation even though write is false
+      allow create: if false && 
+        request.resource.data.fingerprintId is string &&
+        request.resource.data.type is string &&
+        request.resource.data.data is map &&
+        request.resource.data.createdAt is timestamp;
+    }
   }
 }

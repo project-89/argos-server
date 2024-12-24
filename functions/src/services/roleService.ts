@@ -1,10 +1,10 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants";
-import { PREDEFINED_ROLES, ROLE_HIERARCHY, PredefinedRole } from "../constants/roles";
+import { COLLECTIONS } from "../constants/collections";
+import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
 
 export interface RoleData {
-  roles?: PredefinedRole[];
+  roles?: ROLE[];
 }
 
 /**
@@ -12,7 +12,7 @@ export interface RoleData {
  */
 export const canManageRole = async (
   callerFingerprintId: string,
-  targetRole: PredefinedRole,
+  targetRole: ROLE,
 ): Promise<boolean> => {
   const db = getFirestore();
   const callerDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(callerFingerprintId).get();
@@ -22,10 +22,10 @@ export const canManageRole = async (
   }
 
   const callerData = callerDoc.data() as RoleData;
-  const callerRoles = callerData?.roles || [PREDEFINED_ROLES[0]];
+  const callerRoles = callerData?.roles || [ROLE.USER];
 
   // Admin can manage any role
-  if (callerRoles.includes(PREDEFINED_ROLES[PREDEFINED_ROLES.length - 1])) {
+  if (callerRoles.includes(ROLE.ADMIN)) {
     return true;
   }
 
@@ -49,7 +49,7 @@ export const isAdmin = async (fingerprintId: string): Promise<boolean> => {
   }
 
   const data = doc.data() as RoleData;
-  return data?.roles?.includes(PREDEFINED_ROLES[PREDEFINED_ROLES.length - 1]) || false;
+  return data?.roles?.includes(ROLE.ADMIN) || false;
 };
 
 /**
@@ -58,8 +58,8 @@ export const isAdmin = async (fingerprintId: string): Promise<boolean> => {
 export const assignRole = async (
   fingerprintId: string,
   callerFingerprintId: string,
-  role: PredefinedRole,
-): Promise<{ fingerprintId: string; roles: PredefinedRole[] }> => {
+  role: ROLE,
+): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
   try {
     // Only prevent self-role modification for non-admins
     if (fingerprintId === callerFingerprintId && !(await isAdmin(callerFingerprintId))) {
@@ -81,9 +81,9 @@ export const assignRole = async (
     }
 
     const data = fingerprintDoc.data() as RoleData;
-    const currentRoles = new Set<PredefinedRole>(data?.roles || [PREDEFINED_ROLES[0]]);
+    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
     currentRoles.add(role);
-    currentRoles.add(PREDEFINED_ROLES[0]); // Ensure user role is always present
+    currentRoles.add(ROLE.USER); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
     await fingerprintRef.update({
@@ -109,10 +109,10 @@ export const assignRole = async (
 export const removeRole = async (
   fingerprintId: string,
   callerFingerprintId: string,
-  role: PredefinedRole,
-): Promise<{ fingerprintId: string; roles: PredefinedRole[] }> => {
+  role: ROLE,
+): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
   try {
-    if (role === PREDEFINED_ROLES[0]) {
+    if (role === ROLE.USER) {
       throw new ApiError(400, "Cannot remove user role");
     }
 
@@ -136,9 +136,9 @@ export const removeRole = async (
     }
 
     const data = fingerprintDoc.data() as RoleData;
-    const currentRoles = new Set<PredefinedRole>(data?.roles || [PREDEFINED_ROLES[0]]);
+    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
     currentRoles.delete(role);
-    currentRoles.add(PREDEFINED_ROLES[0]); // Ensure user role is always present
+    currentRoles.add(ROLE.USER); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
     await fingerprintRef.update({
@@ -161,6 +161,6 @@ export const removeRole = async (
 /**
  * Get all available roles
  */
-export const getAvailableRoles = (): PredefinedRole[] => {
-  return [...PREDEFINED_ROLES];
+export const getAvailableRoles = (): ROLE[] => {
+  return [...Object.values(ROLE)];
 };

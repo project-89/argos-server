@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 import { z } from "zod";
-import { PREDEFINED_ROLES } from "../constants/roles";
+import { ROLE } from "../constants/roles";
 import {
   assignRole as assignRoleService,
   removeRole as removeRoleService,
@@ -15,7 +15,7 @@ const roleSchema = z.object({
       required_error: "Fingerprint ID is required",
     })
     .min(1, "Fingerprint ID cannot be empty"),
-  role: z.enum(PREDEFINED_ROLES, {
+  role: z.enum(Object.values(ROLE) as [string, ...string[]], {
     required_error: "Role is required",
     invalid_type_error: "Invalid role",
   }),
@@ -28,7 +28,7 @@ export const assignRole = [
       const { fingerprintId, role } = roleSchema.parse(req.body);
       const callerFingerprintId = req.fingerprintId as string;
 
-      const result = await assignRoleService(fingerprintId, callerFingerprintId, role);
+      const result = await assignRoleService(fingerprintId, callerFingerprintId, role as ROLE);
       return sendSuccess(res, result);
     } catch (error) {
       console.error("Error assigning role:", error);
@@ -44,7 +44,7 @@ export const removeRole = [
       const { fingerprintId, role } = roleSchema.parse(req.body);
       const callerFingerprintId = req.fingerprintId as string;
 
-      const result = await removeRoleService(fingerprintId, callerFingerprintId, role);
+      const result = await removeRoleService(fingerprintId, callerFingerprintId, role as ROLE);
       return sendSuccess(res, result);
     } catch (error) {
       console.error("Error removing role:", error);

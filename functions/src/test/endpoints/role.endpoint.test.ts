@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData } from "../utils/testUtils";
-import { PREDEFINED_ROLES } from "../../constants/roles";
+import { ROLE } from "../../constants/roles";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants";
+import { COLLECTIONS } from "../../constants/collections";
 
 describe("Role Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -226,7 +226,7 @@ describe("Role Endpoint", () => {
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(Array.isArray(response.data.data)).toBe(true);
-      expect(response.data.data).toEqual(expect.arrayContaining([...PREDEFINED_ROLES]));
+      expect(response.data.data).toEqual(expect.arrayContaining(Object.values(ROLE)));
     });
   });
 });

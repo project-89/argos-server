@@ -56,7 +56,7 @@ argos-server/           # Repository root
    - Add new middleware as needed
 
 3. **Constants**
-   - `roles.ts` - Role definitions and hierarchy
+   - `roles.ts` - ROLE definitions and hierarchy
    - `collections.ts` - Firestore collection names
    - `config.ts` - Environment configuration
    - `api.ts` - API-related constants
@@ -126,9 +126,10 @@ argos-server/           # Repository root
    - `fingerprints` - User fingerprints
    - `visits` - Visit tracking
    - `presence` - Real-time presence
-   - `roles` - Role assignments
+   - `roles` - ROLE assignments
    - `tags` - User tags
    - `cache` - Cached data
+   - `impressions` - User interaction tracking
 
 2. **Best Practices**
    - Use batch operations
@@ -168,7 +169,7 @@ argos-server/           # Repository root
    - Rate limit logging
 
 3. **Data Access**
-   - Role-based access
+   - ROLE-based access
    - Input validation
    - Output sanitization
    - Error masking
@@ -248,7 +249,7 @@ argos-server/           # Repository root
 - [x] Updated tag endpoints
 - [x] Updated price endpoints
 - [x] Updated reality stability endpoint
-- [x] Updated debug endpoint
+- [x] Added impression endpoints with validation and tests
 
 #### Testing and Documentation
 - [x] Updated test suites for validation

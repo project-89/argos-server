@@ -1,6 +1,8 @@
 import { Request } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS, ROLES } from "../constants";
+import { COLLECTIONS } from "../constants/collections";
+import { ROLE } from "../constants/roles";
+
 import { Fingerprint } from "../types/models";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
@@ -48,7 +50,7 @@ export const createFingerprint = async (
   const now = Timestamp.now();
   const docData: Omit<FingerprintDocData, "id"> = {
     fingerprint,
-    roles: [ROLES.USER], // Always use default user role
+    roles: [ROLE.USER], // Always use default user role
     createdAt: now,
     tags: [], // Initialize empty tags array
     metadata: metadata || {},

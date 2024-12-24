@@ -1,40 +1,28 @@
-export const PREDEFINED_ROLES = [
-  "user",
-  "agent-initiate",
-  "agent-field",
-  "agent-senior",
-  "agent-master",
-  "admin",
-] as const;
+export enum ROLE {
+  USER = "user",
+  AGENT_INITIATE = "agent-initiate",
+  AGENT_FIELD = "agent-field",
+  AGENT_SENIOR = "agent-senior",
+  AGENT_MASTER = "agent-master",
+  ADMIN = "admin",
+}
 
-export type PredefinedRole = (typeof PREDEFINED_ROLES)[number];
+export type Permission = "admin" | "manage_roles" | "manage_tags";
 
-export const ROLE_HIERARCHY: Record<PredefinedRole, number> = {
-  user: 0,
-  "agent-initiate": 1,
-  "agent-field": 2,
-  "agent-senior": 3,
-  "agent-master": 4,
-  admin: 5,
+export const ROLE_HIERARCHY: Record<ROLE, number> = {
+  [ROLE.USER]: 0,
+  [ROLE.AGENT_INITIATE]: 1,
+  [ROLE.AGENT_FIELD]: 2,
+  [ROLE.AGENT_SENIOR]: 3,
+  [ROLE.AGENT_MASTER]: 4,
+  [ROLE.ADMIN]: 5,
 };
 
-export const DEFAULT_ROLE: PredefinedRole = "user";
-
-export const PERMISSIONS = [
-  "read:basic",
-  "write:basic",
-  "read:advanced",
-  "write:advanced",
-  "admin",
-] as const;
-
-export type Permission = (typeof PERMISSIONS)[number];
-
-export const ROLE_PERMISSIONS: Record<PredefinedRole, readonly Permission[]> = {
-  user: ["read:basic"],
-  "agent-initiate": ["read:basic", "write:basic"],
-  "agent-field": ["read:basic", "write:basic", "read:advanced"],
-  "agent-senior": ["read:basic", "write:basic", "read:advanced", "write:advanced"],
-  "agent-master": ["read:basic", "write:basic", "read:advanced", "write:advanced", "admin"],
-  admin: ["read:basic", "write:basic", "read:advanced", "write:advanced", "admin"],
-} as const;
+export const ROLE_PERMISSIONS: Record<ROLE, Permission[]> = {
+  [ROLE.USER]: [],
+  [ROLE.AGENT_INITIATE]: [],
+  [ROLE.AGENT_FIELD]: ["manage_tags"],
+  [ROLE.AGENT_SENIOR]: ["manage_tags", "manage_roles"],
+  [ROLE.AGENT_MASTER]: ["manage_tags", "manage_roles"],
+  [ROLE.ADMIN]: ["admin", "manage_roles", "manage_tags"],
+};

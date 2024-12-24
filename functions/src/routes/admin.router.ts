@@ -9,7 +9,7 @@ const adminRouter = Router();
 // Apply admin check to all routes in this router
 adminRouter.use(requireAdmin);
 
-// Role management routes
+// ROLE management routes
 adminRouter.post("/role/assign", role.assignRole);
 adminRouter.post("/role/remove", role.removeRole);
 

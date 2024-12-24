@@ -1,21 +1,12 @@
-import { describe, it, expect, beforeAll, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import {
-  makeRequest,
-  initializeTestEnvironment,
-  createTestData,
-  cleanDatabase,
-} from "../utils/testUtils";
-import { PREDEFINED_ROLES } from "../../constants/roles";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { ROLE } from "../../constants/roles";
 
 describe("Tag Endpoint", () => {
   let adminApiKey: string;
   let userApiKey: string;
   let fingerprintId: string;
-
-  beforeAll(async () => {
-    await initializeTestEnvironment();
-  });
 
   beforeEach(async () => {
     await cleanDatabase();
@@ -23,13 +14,13 @@ describe("Tag Endpoint", () => {
     // Create admin user first
     const adminData = await createTestData({
       isAdmin: true,
-      roles: [PREDEFINED_ROLES[0], PREDEFINED_ROLES[PREDEFINED_ROLES.length - 1]], // user and admin roles
+      roles: [ROLE.USER, ROLE.ADMIN], // user and admin roles
     });
     adminApiKey = adminData.apiKey;
 
     // Create regular user
     const userData = await createTestData({
-      roles: [PREDEFINED_ROLES[0]], // Explicitly set roles
+      roles: [ROLE.USER], // Explicitly set roles
     });
     userApiKey = userData.apiKey;
     fingerprintId = userData.fingerprintId;
@@ -244,7 +235,7 @@ describe("Tag Endpoint", () => {
           tagRules: {
             "puzzle-master": {
               tags: ["puzzle-master"],
-              role: "agent-initiate",
+              role: ROLE.AGENT_INITIATE,
             },
           },
         },
@@ -257,7 +248,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toContain("agent-initiate");
+      expect(response.data.data.roles).toContain(ROLE.AGENT_INITIATE);
     });
 
     it("should preserve existing roles while adding new ones", async () => {
@@ -285,11 +276,11 @@ describe("Tag Endpoint", () => {
           tagRules: {
             "puzzle-master": {
               tags: ["puzzle-master"],
-              role: "agent-field",
+              role: ROLE.AGENT_FIELD,
             },
             "early-adopter": {
               tags: ["early-adopter"],
-              role: "agent-initiate",
+              role: ROLE.AGENT_INITIATE,
             },
           },
         },
@@ -302,9 +293,9 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toContain("agent-field");
-      expect(response.data.data.roles).toContain("agent-initiate");
-      expect(response.data.data.roles).toContain("user");
+      expect(response.data.data.roles).toContain(ROLE.AGENT_FIELD);
+      expect(response.data.data.roles).toContain(ROLE.AGENT_INITIATE);
+      expect(response.data.data.roles).toContain(ROLE.USER);
     });
 
     it("should handle empty tagRules object", async () => {
@@ -324,7 +315,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toEqual([PREDEFINED_ROLES[0]]);
+      expect(response.data.data.roles).toEqual([ROLE.USER]);
     });
 
     it("should handle non-existent fingerprint", async () => {
@@ -336,7 +327,7 @@ describe("Tag Endpoint", () => {
           tagRules: {
             "test-tag": {
               tags: ["test-tag"],
-              role: "agent-initiate",
+              role: ROLE.AGENT_INITIATE,
             },
           },
         },
@@ -439,7 +430,9 @@ describe("Tag Endpoint", () => {
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe(
-        `Invalid enum value. Expected ${PREDEFINED_ROLES.map((r) => `'${r}'`).join(" | ")}, received 'invalid-role'`,
+        `Invalid enum value. Expected ${Object.values(ROLE)
+          .map((r) => `'${r}'`)
+          .join(" | ")}, received 'invalid-role'`,
       );
     });
 
