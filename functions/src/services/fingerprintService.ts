@@ -8,10 +8,7 @@ import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
 
 const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed from an IP to establish it as trusted
-const SUSPICIOUS_TIME_WINDOW =
-  process.env.FUNCTIONS_EMULATOR === "true"
-    ? 100 // 100ms for testing
-    : 24 * 60 * 60 * 1000; // 24 hours in milliseconds for production
+const SUSPICIOUS_TIME_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export interface FingerprintDocData extends Omit<Fingerprint, "createdAt" | "ipMetadata"> {
   id: string;
@@ -125,28 +122,11 @@ export const getFingerprintAndUpdateIp = async (
         const timeSinceCreation = Date.now() - data.createdAt.toMillis();
         const isWithinInitialWindow = timeSinceCreation <= SUSPICIOUS_TIME_WINDOW;
 
-        console.log(`[Fingerprint ${id}] New IP detected:`, {
-          ip,
-          primaryIp,
-          primaryFrequency,
-          isPrimaryEstablished,
-          isWithinInitialWindow,
-          createdAt: data.createdAt.toMillis(),
-          now: Date.now(),
-          timeDiff: timeSinceCreation,
-          timeWindow: SUSPICIOUS_TIME_WINDOW,
-          environment: {
-            isEmulator: process.env.FUNCTIONS_EMULATOR === "true",
-          },
-        });
-
         if (isPrimaryEstablished && !isWithinInitialWindow) {
           isSuspicious = true;
           if (!ipMetadata.suspiciousIps.includes(ip)) {
             ipMetadata.suspiciousIps.push(ip);
-            console.warn(
-              `[Fingerprint ${id}] Suspicious IP detected: ${ip} (primary: ${primaryIp}, freq: ${primaryFrequency}, timeSince: ${timeSinceCreation}ms)`,
-            );
+            console.warn(`[Fingerprint ${id}] Suspicious IP detected: ${ip}`);
           }
         }
       }
@@ -216,11 +196,7 @@ export const updateFingerprintMetadata = async (
     }
 
     const data = fingerprintDoc.data() as FingerprintDocData;
-    console.log("Existing fingerprint data:", JSON.stringify(data, null, 2));
-    console.log("Existing metadata:", JSON.stringify(data.metadata, null, 2));
-    console.log("New metadata:", JSON.stringify(metadata, null, 2));
     const updatedMetadata = deepMerge(data.metadata || {}, metadata);
-    console.log("Merged metadata:", JSON.stringify(updatedMetadata, null, 2));
 
     await fingerprintRef.update({
       metadata: updatedMetadata,

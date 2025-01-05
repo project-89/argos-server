@@ -33,7 +33,7 @@ export const CORS_CONFIG = {
     "http://localhost:5000", // Firebase emulator (development only)
   ] as string[],
 
-  // Test-only origins (only allowed in test environment)
+  // Test-specific origins (used in integration tests)
   testOrigins: ["https://test.com", "https://example.com", "https://newsite.com"] as string[],
 
   // Production origins - the only origins allowed in production environment
@@ -47,31 +47,21 @@ export const CORS_CONFIG = {
     const isTestOrDev =
       process.env.NODE_ENV === "test" || process.env.FUNCTIONS_EMULATOR === "true";
 
-    console.log("[CORS Config] Environment:", {
-      NODE_ENV: process.env.NODE_ENV,
-      FUNCTIONS_EMULATOR: process.env.FUNCTIONS_EMULATOR,
-      isTestOrDev,
-    });
-
     // Development/Test environment only
     if (isTestOrDev) {
-      console.log(
-        "[CORS Config] Development/Test environment detected - allowing development origins",
-      );
       origins.push(...CORS_CONFIG.defaultOrigins);
-      origins.push(...CORS_CONFIG.testOrigins);
+      // Include test origins only in test environment
+      if (process.env.NODE_ENV === "test") {
+        origins.push(...CORS_CONFIG.testOrigins);
+      }
     } else {
       // Production environment
-      console.log(
-        "[CORS Config] Production environment detected - strict origin validation enabled",
-      );
       origins.push(...CORS_CONFIG.productionOrigins);
     }
 
     // Add additional origins from environment variable (useful for dynamic configuration in production)
     const envOrigins = process.env.ALLOWED_ORIGINS;
     if (envOrigins) {
-      console.log(`[CORS Config] Adding origins from ALLOWED_ORIGINS: ${envOrigins}`);
       origins.push(...envOrigins.split(",").map((origin) => origin.trim()));
     }
 
@@ -80,9 +70,7 @@ export const CORS_CONFIG = {
       console.error("[CORS Config] SECURITY WARNING: No CORS origins configured in production!");
     }
 
-    const uniqueOrigins = [...new Set(origins)];
-    console.log("[CORS Config] Final allowed origins:", uniqueOrigins);
-    return uniqueOrigins;
+    return [...new Set(origins)];
   },
 
   // CORS Options with security-focused settings

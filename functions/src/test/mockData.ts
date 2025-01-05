@@ -1,4 +1,4 @@
-import { PriceData } from "./priceService";
+import { PriceData } from "../services/priceService";
 
 export const MOCK_PRICE_DATA: PriceData = {
   Project89: {

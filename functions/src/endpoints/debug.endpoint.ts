@@ -6,11 +6,6 @@ const router = Router();
 
 router.post("/cleanup", async (req: Request, res: Response) => {
   try {
-    // Simulate error for testing if error query param is present
-    if (req.query.error === "true") {
-      throw new Error("Simulated error for testing");
-    }
-
     const result = await cleanupService();
     return sendSuccess(res, result);
   } catch (error) {

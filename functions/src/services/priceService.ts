@@ -11,24 +11,6 @@ export interface PriceData {
   };
 }
 
-// Mock data for testing
-const MOCK_PRICE_DATA: PriceData = {
-  bitcoin: { usd: 50000, usd_24h_change: 2.5 },
-  ethereum: { usd: 3000, usd_24h_change: 1.8 },
-  Project89: { usd: 0.15, usd_24h_change: 2.5 },
-  solana: { usd: 100, usd_24h_change: -5 },
-};
-
-// Mock price history for testing
-const MOCK_PRICE_HISTORY = [
-  { timestamp: Date.now() - 86400000 * 30, price: 0.15 },
-  { timestamp: Date.now() - 86400000 * 29, price: 0.16 },
-  { timestamp: Date.now() - 86400000 * 28, price: 0.14 },
-  { timestamp: Date.now() - 86400000 * 27, price: 0.15 },
-  { timestamp: Date.now() - 86400000 * 26, price: 0.16 },
-  { timestamp: Date.now(), price: 0.15 },
-];
-
 const DEFAULT_TOKENS = ["bitcoin", "ethereum"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
@@ -42,15 +24,6 @@ const getCoingeckoConfig = () => {
 };
 
 /**
- * Check if we're in a test environment
- */
-const isTestEnvironment = () => {
-  return (
-    process.env.NODE_ENV === "test" ||
-    process.env.FUNCTIONS_EMULATOR === "true" ||
-    process.env.JEST_WORKER_ID !== undefined
-  );
-};
 
 /**
  * Get current prices for specified tokens
@@ -61,19 +34,6 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
 
     // Use default symbols if none provided
     const tokenSymbols = symbols.length > 0 ? symbols : DEFAULT_TOKENS;
-
-    // Use mock data in test environment
-    if (isTestEnvironment()) {
-      const prices: PriceData = {};
-      for (const symbol of tokenSymbols) {
-        if (MOCK_PRICE_DATA[symbol]) {
-          prices[symbol] = MOCK_PRICE_DATA[symbol];
-        } else {
-          throw new ApiError(404, `No price data found for ${symbol}`);
-        }
-      }
-      return prices;
-    }
 
     const db = getFirestore();
     const now = Date.now();
@@ -153,14 +113,6 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
  */
 export const getPriceHistory = async (tokenId: string): Promise<any[]> => {
   try {
-    // Use mock data in test environment
-    if (isTestEnvironment()) {
-      if (!MOCK_PRICE_DATA[tokenId]) {
-        throw new ApiError(404, "Token not found");
-      }
-      return MOCK_PRICE_HISTORY;
-    }
-
     const { apiUrl, apiKey } = getCoingeckoConfig();
 
     try {
