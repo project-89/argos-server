@@ -2,9 +2,14 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import { updatePresence, getPresence } from "../../services/presenceService";
 import { ApiError } from "../../utils/error";
+import { getCurrentUnixMillis } from "../../utils/timestamp";
 
 jest.mock("firebase-admin/firestore", () => ({
   getFirestore: jest.fn(),
+}));
+
+jest.mock("../../utils/timestamp", () => ({
+  getCurrentUnixMillis: jest.fn(),
 }));
 
 describe("Presence Service", () => {
@@ -21,11 +26,14 @@ describe("Presence Service", () => {
     update: jest.fn(),
   };
 
+  const mockTimestamp = 1672531200000; // 2023-01-01T00:00:00.000Z
+
   beforeEach(() => {
     jest.clearAllMocks();
     (getFirestore as jest.Mock).mockReturnValue(mockFirestore);
     mockFirestore.collection.mockReturnValue(mockCollection);
     mockCollection.doc.mockReturnValue(mockDoc);
+    (getCurrentUnixMillis as jest.Mock).mockReturnValue(mockTimestamp);
   });
 
   describe("updatePresence", () => {
@@ -41,15 +49,15 @@ describe("Presence Service", () => {
       expect(mockFirestore.collection).toHaveBeenCalledWith(COLLECTIONS.FINGERPRINTS);
       expect(mockCollection.doc).toHaveBeenCalledWith(fingerprintId);
       expect(mockDoc.update).toHaveBeenCalledWith({
-        presence: expect.objectContaining({
+        presence: {
           status,
-          lastUpdated: expect.any(String),
-        }),
+          lastUpdated: mockTimestamp,
+        },
       });
       expect(result).toEqual({
         fingerprintId,
         status,
-        lastUpdated: expect.any(String),
+        lastUpdated: mockTimestamp,
       });
     });
 
@@ -63,14 +71,26 @@ describe("Presence Service", () => {
         new ApiError(404, "Fingerprint not found"),
       );
     });
+
+    it("should handle database errors gracefully", async () => {
+      const fingerprintId = "test-fingerprint";
+      const status = "online";
+
+      mockDoc.get.mockResolvedValue({ exists: true });
+      mockDoc.update.mockRejectedValue(new Error("Database error"));
+
+      await expect(updatePresence(fingerprintId, status)).rejects.toThrow(
+        new ApiError(500, "Failed to update presence status"),
+      );
+    });
   });
 
   describe("getPresence", () => {
     it("should get presence status for existing fingerprint", async () => {
       const fingerprintId = "test-fingerprint";
       const mockPresence = {
-        status: "online",
-        lastUpdated: "2023-01-01T00:00:00.000Z",
+        status: "online" as const,
+        lastUpdated: mockTimestamp,
       };
 
       mockDoc.get.mockResolvedValue({
@@ -102,7 +122,7 @@ describe("Presence Service", () => {
       expect(result).toEqual({
         fingerprintId,
         status: "offline",
-        lastUpdated: expect.any(String),
+        lastUpdated: mockTimestamp,
       });
     });
 
@@ -114,6 +134,38 @@ describe("Presence Service", () => {
       await expect(getPresence(fingerprintId)).rejects.toThrow(
         new ApiError(404, "Fingerprint not found"),
       );
+    });
+
+    it("should handle database errors gracefully", async () => {
+      const fingerprintId = "test-fingerprint";
+
+      mockDoc.get.mockRejectedValue(new Error("Database error"));
+
+      await expect(getPresence(fingerprintId)).rejects.toThrow(
+        new ApiError(500, "Failed to get presence status"),
+      );
+    });
+
+    it("should handle invalid presence data gracefully", async () => {
+      const fingerprintId = "test-fingerprint";
+
+      mockDoc.get.mockResolvedValue({
+        exists: true,
+        data: () => ({
+          presence: {
+            status: "invalid-status",
+            lastUpdated: "invalid-timestamp",
+          },
+        }),
+      });
+
+      const result = await getPresence(fingerprintId);
+
+      expect(result).toEqual({
+        fingerprintId,
+        status: "invalid-status",
+        lastUpdated: "invalid-timestamp",
+      });
     });
   });
 });

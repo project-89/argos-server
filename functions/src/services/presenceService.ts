@@ -1,18 +1,19 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
+import { getCurrentUnixMillis } from "../utils/timestamp";
 
 export type PresenceStatus = "online" | "offline";
 
 export interface PresenceData {
   status: PresenceStatus;
-  lastUpdated: string;
+  lastUpdated: number; // Unix timestamp (milliseconds)
 }
 
 export interface FingerprintPresence {
   fingerprintId: string;
   status: PresenceStatus;
-  lastUpdated: string;
+  lastUpdated: number; // Unix timestamp (milliseconds)
 }
 
 /**
@@ -31,7 +32,7 @@ export const updatePresence = async (
       throw new ApiError(404, "Fingerprint not found");
     }
 
-    const lastUpdated = new Date().toISOString();
+    const lastUpdated = getCurrentUnixMillis();
     const presenceData: PresenceData = {
       status,
       lastUpdated,
@@ -75,7 +76,7 @@ export const getPresence = async (fingerprintId: string): Promise<FingerprintPre
       return {
         fingerprintId,
         status: "offline",
-        lastUpdated: new Date().toISOString(),
+        lastUpdated: getCurrentUnixMillis(),
       };
     }
 
