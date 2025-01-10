@@ -1,191 +1,151 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
-import { generateApiKey, encryptApiKey } from "../utils/api-key";
+import { ApiKey } from "../types/models";
 import { ApiError } from "../utils/error";
+import { generateApiKey } from "../utils/key";
+import { getCurrentTimestamp, toUnixMillis } from "../utils/timestamp";
 
-export interface ApiKeyData {
-  key: string;
-  fingerprintId: string;
-  createdAt: Timestamp;
-  expiresAt: Timestamp;
-  enabled: boolean;
-  metadata: {
-    name: string;
-  };
-  revokedAt?: Timestamp;
-}
-
-export interface ApiKeyValidationResult {
-  isValid: boolean;
-  needsRefresh: boolean;
-  fingerprintId?: string;
-}
+// Type for API response that converts Timestamp to Unix time
+type ApiKeyResponse = Omit<ApiKey, "createdAt"> & { createdAt: number };
 
 /**
  * Creates a new API key for a fingerprint
  */
-export const createApiKey = async (fingerprintId: string): Promise<ApiKeyData> => {
-  try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
+export const createApiKey = async (fingerprintId: string): Promise<ApiKeyResponse> => {
+  const db = getFirestore();
+  const key = generateApiKey();
+  const createdAt = getCurrentTimestamp();
 
-    if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
-    }
+  const apiKey: Omit<ApiKey, "id"> = {
+    key,
+    fingerprintId,
+    createdAt,
+    active: true,
+  };
 
-    // Check if fingerprint already has an API key
-    const existingKeySnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("fingerprintId", "==", fingerprintId)
-      .where("enabled", "==", true)
-      .get();
+  const apiKeyRef = await db.collection(COLLECTIONS.API_KEYS).add(apiKey);
 
-    // Generate new API key
-    const plainApiKey = generateApiKey();
-    const encryptedApiKey = encryptApiKey(plainApiKey);
-
-    const apiKeyData: ApiKeyData = {
-      key: encryptedApiKey,
-      fingerprintId,
-      createdAt: Timestamp.now(),
-      expiresAt: Timestamp.fromDate(new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)), // 30 days expiration
-      enabled: true,
-      metadata: {
-        name: "Generated API Key",
-      },
-    };
-
-    // Save encrypted API key
-    const apiKeyRef = db.collection(COLLECTIONS.API_KEYS).doc();
-    await apiKeyRef.set(apiKeyData);
-
-    // If there was an existing key, disable it
-    if (!existingKeySnapshot.empty) {
-      const batch = db.batch();
-      existingKeySnapshot.docs.forEach((doc) => {
-        batch.update(doc.ref, { enabled: false });
-      });
-      await batch.commit();
-    }
-
-    return apiKeyData;
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in createApiKey:", error);
-    throw new ApiError(500, "Failed to create API key");
-  }
+  return {
+    key,
+    fingerprintId,
+    active: true,
+    id: apiKeyRef.id,
+    createdAt: toUnixMillis(createdAt),
+  };
 };
 
 /**
- * Validates an API key
+ * Gets an API key by its key string
  */
-export const validateApiKey = async (apiKey: string): Promise<ApiKeyValidationResult> => {
-  try {
-    const db = getFirestore();
-    const keySnapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", apiKey).get();
+export const getApiKeyByKey = async (key: string): Promise<ApiKeyResponse | null> => {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection(COLLECTIONS.API_KEYS)
+    .where("key", "==", key)
+    .where("active", "==", true)
+    .get();
 
-    if (keySnapshot.empty) {
-      return { isValid: false, needsRefresh: false };
-    }
-
-    const doc = keySnapshot.docs[0];
-    const data = doc.data() as ApiKeyData;
-
-    // Check if key is enabled and not expired
-    const isEnabled = data.enabled;
-    const isExpired = data.expiresAt.toDate() < new Date();
-
-    return {
-      isValid: isEnabled && !isExpired,
-      needsRefresh: !isEnabled || isExpired,
-      fingerprintId: data.fingerprintId,
-    };
-  } catch (error) {
-    console.error("Error in validateApiKey:", error);
-    throw new ApiError(500, "Failed to validate API key");
+  if (snapshot.empty) {
+    return null;
   }
-};
 
-/**
- * Revokes an API key
- */
-export const revokeApiKey = async (apiKey: string, fingerprintId: string): Promise<void> => {
-  try {
-    const db = getFirestore();
-    const keySnapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", apiKey).get();
-
-    if (keySnapshot.empty) {
-      throw new ApiError(404, "API key not found");
-    }
-
-    const doc = keySnapshot.docs[0];
-    const data = doc.data() as ApiKeyData;
-
-    if (!data.enabled) {
-      throw new ApiError(404, "API key is disabled");
-    }
-
-    if (data.fingerprintId !== fingerprintId) {
-      throw new ApiError(403, "Not authorized to revoke this API key");
-    }
-
-    await doc.ref.update({
-      enabled: false,
-      revokedAt: Timestamp.now(),
-    });
-
-    // Verify the update
-    const updatedDoc = await doc.ref.get();
-    const updatedData = updatedDoc.data() as ApiKeyData;
-
-    if (updatedData?.enabled) {
-      throw new ApiError(500, "Failed to disable API key");
-    }
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in revokeApiKey:", error);
-    throw new ApiError(500, "Failed to revoke API key");
-  }
-};
-
-/**
- * Gets an API key by its value
- */
-export const getApiKey = async (apiKey: string): Promise<ApiKeyData | null> => {
-  try {
-    const db = getFirestore();
-    const keySnapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", apiKey).get();
-
-    if (keySnapshot.empty) {
-      return null;
-    }
-
-    return keySnapshot.docs[0].data() as ApiKeyData;
-  } catch (error) {
-    console.error("Error in getApiKey:", error);
-    throw new ApiError(500, "Failed to get API key");
-  }
+  const doc = snapshot.docs[0];
+  const data = doc.data() as ApiKey;
+  return {
+    key: data.key,
+    fingerprintId: data.fingerprintId,
+    active: data.active,
+    id: doc.id,
+    createdAt: toUnixMillis(data.createdAt),
+  };
 };
 
 /**
  * Gets all API keys for a fingerprint
  */
-export const getApiKeysByFingerprint = async (fingerprintId: string): Promise<ApiKeyData[]> => {
-  try {
-    const db = getFirestore();
-    const keysSnapshot = await db
-      .collection(COLLECTIONS.API_KEYS)
-      .where("fingerprintId", "==", fingerprintId)
-      .get();
+export const getApiKeys = async (fingerprintId: string): Promise<ApiKeyResponse[]> => {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection(COLLECTIONS.API_KEYS)
+    .where("fingerprintId", "==", fingerprintId)
+    .orderBy("createdAt", "desc")
+    .get();
 
-    return keysSnapshot.docs.map((doc) => doc.data() as ApiKeyData);
-  } catch (error) {
-    console.error("Error in getApiKeysByFingerprint:", error);
-    throw new ApiError(500, "Failed to get API keys");
+  return snapshot.docs.map((doc) => {
+    const data = doc.data() as ApiKey;
+    return {
+      key: data.key,
+      fingerprintId: data.fingerprintId,
+      active: data.active,
+      id: doc.id,
+      createdAt: toUnixMillis(data.createdAt),
+    };
+  });
+};
+
+/**
+ * Validates an API key
+ */
+export const validateApiKey = async (
+  key: string,
+): Promise<{ isValid: boolean; needsRefresh: boolean; fingerprintId?: string }> => {
+  const apiKey = await getApiKeyByKey(key);
+
+  if (!apiKey) {
+    return { isValid: false, needsRefresh: false };
   }
+
+  return {
+    isValid: apiKey.active,
+    needsRefresh: !apiKey.active,
+    fingerprintId: apiKey.fingerprintId,
+  };
+};
+
+/**
+ * Deactivates an API key
+ */
+export const deactivateApiKey = async (fingerprintId: string, keyId: string): Promise<void> => {
+  const db = getFirestore();
+  const keyRef = db.collection(COLLECTIONS.API_KEYS).doc(keyId);
+  const keyDoc = await keyRef.get();
+
+  if (!keyDoc.exists) {
+    throw new ApiError(404, "API key not found");
+  }
+
+  if (keyDoc.data()?.fingerprintId !== fingerprintId) {
+    throw new ApiError(403, "API key does not belong to fingerprint");
+  }
+
+  await keyRef.update({
+    active: false,
+  });
+};
+
+/**
+ * Revokes an API key
+ */
+export const revokeApiKey = async (key: string, fingerprintId: string): Promise<void> => {
+  const db = getFirestore();
+  const snapshot = await db
+    .collection(COLLECTIONS.API_KEYS)
+    .where("key", "==", key)
+    .where("active", "==", true)
+    .get();
+
+  if (snapshot.empty) {
+    throw new ApiError(404, "API key not found");
+  }
+
+  const doc = snapshot.docs[0];
+  const data = doc.data();
+
+  if (data.fingerprintId !== fingerprintId) {
+    throw new ApiError(403, "Not authorized to revoke this API key");
+  }
+
+  await doc.ref.update({
+    active: false,
+  });
 };
