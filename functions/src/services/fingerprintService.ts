@@ -7,9 +7,6 @@ import { Fingerprint } from "../types/models";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
 
-const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed from an IP to establish it as trusted
-const SUSPICIOUS_TIME_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-
 export interface FingerprintDocData extends Omit<Fingerprint, "createdAt" | "ipMetadata"> {
   id: string;
   createdAt: Timestamp;
@@ -17,12 +14,7 @@ export interface FingerprintDocData extends Omit<Fingerprint, "createdAt" | "ipM
     primaryIp?: string;
     ipFrequency: Record<string, number>;
     lastSeenAt: Record<string, Timestamp>;
-    suspiciousIps: string[];
   };
-}
-
-export interface FingerprintWithSuspicious extends FingerprintDocData {
-  isSuspicious?: boolean;
 }
 
 /**
@@ -56,7 +48,6 @@ export const createFingerprint = async (
       primaryIp: ip,
       ipFrequency: { [ip]: 1 },
       lastSeenAt: { [ip]: now },
-      suspiciousIps: [],
     },
   };
 
@@ -75,7 +66,7 @@ export const createFingerprint = async (
 export const getFingerprintAndUpdateIp = async (
   id: string,
   ip: string,
-): Promise<{ data: FingerprintDocData; isSuspicious: boolean }> => {
+): Promise<{ data: FingerprintDocData }> => {
   const db = getFirestore();
   const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(id);
 
@@ -92,7 +83,7 @@ export const getFingerprintAndUpdateIp = async (
       const ipMetadata = data.ipMetadata || {
         ipFrequency: {},
         lastSeenAt: {},
-        suspiciousIps: [],
+        primaryIp: undefined,
       };
 
       // Ensure tags property exists
@@ -106,29 +97,15 @@ export const getFingerprintAndUpdateIp = async (
       ipMetadata.lastSeenAt[ip] = Timestamp.now();
 
       // Determine primary IP (most frequent)
-      const [primaryIp, primaryFrequency] = Object.entries(ipMetadata.ipFrequency).reduce((a, b) =>
-        a[1] > b[1] ? a : b,
+      const [primaryIp] = Object.entries(ipMetadata.ipFrequency).reduce(
+        (a, b) => (a[1] > b[1] ? a : b),
+        [ip, 0], // Default to current IP if no frequencies exist
       );
       ipMetadata.primaryIp = primaryIp;
 
-      // Check for suspicious activity
-      let isSuspicious = false;
+      // Check if this is a new IP
       if (!ipAddresses.includes(ip)) {
-        // New IP address detected
         ipAddresses.push(ip);
-
-        // Check if this IP is suspicious
-        const isPrimaryEstablished = primaryFrequency >= SUSPICIOUS_IP_THRESHOLD;
-        const timeSinceCreation = Date.now() - data.createdAt.toMillis();
-        const isWithinInitialWindow = timeSinceCreation <= SUSPICIOUS_TIME_WINDOW;
-
-        if (isPrimaryEstablished && !isWithinInitialWindow) {
-          isSuspicious = true;
-          if (!ipMetadata.suspiciousIps.includes(ip)) {
-            ipMetadata.suspiciousIps.push(ip);
-            console.warn(`[Fingerprint ${id}] Suspicious IP detected: ${ip}`);
-          }
-        }
       }
 
       // Update the document
@@ -144,17 +121,13 @@ export const getFingerprintAndUpdateIp = async (
           ipAddresses,
           ipMetadata,
         },
-        isSuspicious,
       };
     });
 
     return updatedDoc;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in getFingerprintAndUpdateIp:", error);
-    throw new ApiError(500, "Failed to get fingerprint");
+    console.error(`[Fingerprint ${id}] Error updating IP:`, error);
+    throw error;
   }
 };
 
