@@ -1,39 +1,9 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presenceService";
 import type { PresenceStatus } from "./presenceService";
-
-export interface Visit {
-  fingerprintId: string;
-  timestamp: number;
-  url: string;
-  title: string | undefined;
-  siteId: string;
-  clientIp?: string;
-}
-
-export interface Site {
-  domain: string;
-  fingerprintId: string;
-  lastVisited: number;
-  title?: string;
-  visits: number;
-  settings: {
-    notifications: boolean;
-    privacy: "public" | "private";
-  };
-}
-
-export interface VisitHistoryResponse {
-  id: string;
-  fingerprintId: string;
-  timestamp: number;
-  url: string;
-  title?: string;
-  siteId: string;
-  site?: Site & { id: string };
-}
+import { Visit, Site, VisitHistoryResponse, SiteModel } from "../types/api.types";
 
 /**
  * Extracts domain from URL
@@ -78,7 +48,7 @@ export const logVisit = async (
 ): Promise<VisitHistoryResponse> => {
   const db = getFirestore();
   const domain = extractDomain(url);
-  const now = Date.now();
+  const now = Timestamp.now();
 
   // Find or create site
   const sitesSnapshot = await db
@@ -89,7 +59,7 @@ export const logVisit = async (
     .get();
 
   let siteId: string;
-  let site: Site & { id: string };
+  let site: SiteModel;
 
   if (sitesSnapshot.empty) {
     // Create new site
@@ -103,11 +73,17 @@ export const logVisit = async (
         notifications: true,
         privacy: "private",
       },
+      createdAt: now,
     };
 
     const siteRef = await db.collection(COLLECTIONS.SITES).add(newSite);
     siteId = siteRef.id;
-    site = { id: siteId, ...newSite };
+    site = {
+      id: siteId,
+      ...newSite,
+      lastVisited: now.toMillis(),
+      createdAt: now.toMillis(),
+    };
   } else {
     // Update existing site
     const siteDoc = sitesSnapshot.docs[0];
@@ -116,7 +92,8 @@ export const logVisit = async (
     site = {
       id: siteId,
       ...siteData,
-      lastVisited: now,
+      lastVisited: now.toMillis(),
+      createdAt: siteData.createdAt.toMillis(),
       visits: (siteData.visits || 0) + 1,
       title: title || siteData.title,
     };
@@ -148,6 +125,7 @@ export const logVisit = async (
   return {
     id: visitRef.id,
     ...sanitizedVisitData,
+    timestamp: sanitizedVisitData.timestamp.toMillis(),
     site,
   };
 };
@@ -158,7 +136,7 @@ export const logVisit = async (
 export const updatePresenceStatus = async (
   fingerprintId: string,
   status: string,
-): Promise<{ fingerprintId: string; status: string; lastUpdated: string }> => {
+): Promise<{ fingerprintId: string; status: string; lastUpdated: number }> => {
   const result = await updatePresence(fingerprintId, status as PresenceStatus);
   return result;
 };
@@ -179,7 +157,8 @@ export const removeSiteAndVisits = async (
     throw new ApiError(404, "Site not found");
   }
 
-  if (siteDoc.data()?.fingerprintId !== fingerprintId) {
+  const siteData = siteDoc.data() as Site;
+  if (siteData.fingerprintId !== fingerprintId) {
     throw new ApiError(403, "Not authorized to remove this site");
   }
 
@@ -199,7 +178,7 @@ export const removeSiteAndVisits = async (
   return {
     fingerprintId,
     siteId,
-    timestamp: Date.now(),
+    timestamp: siteData.lastVisited.toMillis(),
   };
 };
 
@@ -224,9 +203,16 @@ export const getVisitHistory = async (fingerprintId: string): Promise<VisitHisto
         const response: VisitHistoryResponse = {
           ...visitData,
           id: doc.id,
+          timestamp: visitData.timestamp.toMillis(),
         };
         if (siteDoc.exists) {
-          response.site = { id: siteDoc.id, ...(siteDoc.data() as Site) };
+          const siteData = siteDoc.data() as Site;
+          response.site = {
+            id: siteDoc.id,
+            ...siteData,
+            lastVisited: siteData.lastVisited.toMillis(),
+            createdAt: siteData.createdAt.toMillis(),
+          };
         }
         return response;
       }),
