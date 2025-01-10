@@ -5,6 +5,11 @@ import { COLLECTIONS } from "../../constants/collections";
 import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";
 import { Agent as HttpsAgent } from "https";
+import { getCurrentUnixMillis } from "../../utils/timestamp";
+
+// Create shared agents for all requests
+const httpAgent = new HttpAgent({ keepAlive: true });
+const httpsAgent = new HttpsAgent({ keepAlive: true });
 
 /**
  * Make a request to the test server
@@ -15,9 +20,7 @@ export const makeRequest = async (
   data?: any,
   options: AxiosRequestConfig = {},
 ) => {
-  // Create new agents for this request
-  const httpAgent = new HttpAgent({ keepAlive: false });
-  const httpsAgent = new HttpsAgent({ keepAlive: false });
+  console.log(`🔵 Making ${method.toUpperCase()} request to ${url}`);
 
   // Set default headers
   const defaultHeaders: RawAxiosRequestHeaders = {
@@ -28,10 +31,8 @@ export const makeRequest = async (
   // Handle CORS headers based on credentials
   const withCredentials = options.withCredentials ?? true;
   if (withCredentials) {
-    // For credentialed requests, must use a valid origin
     defaultHeaders.Origin = options.headers?.Origin ?? "http://localhost:5173";
   } else {
-    // For non-credentialed requests, origin is optional
     defaultHeaders.Origin = options.headers?.Origin ?? undefined;
   }
 
@@ -60,15 +61,15 @@ export const makeRequest = async (
   const config: AxiosRequestConfig = {
     method,
     url,
-    validateStatus: () => true, // Always resolve, let the test handle the status
+    validateStatus: () => true,
     withCredentials,
     httpAgent,
     httpsAgent,
     headers,
+    timeout: TEST_CONFIG.defaultTimeout,
     ...options,
   };
 
-  // Only set data if it's not null/undefined and not a GET/HEAD/OPTIONS request
   if (
     data !== null &&
     data !== undefined &&
@@ -78,16 +79,33 @@ export const makeRequest = async (
   }
 
   try {
+    console.log(`📤 Request config:`, {
+      method: config.method,
+      url: config.url,
+      headers: config.headers,
+      data: config.data,
+    });
+
     const response = await axios(config);
+
+    console.log(`📥 Response:`, {
+      status: response.status,
+      statusText: response.statusText,
+      data: response.data,
+    });
+
     return response;
   } catch (error) {
     if (error instanceof AxiosError && error.response) {
+      console.error(`❌ Request failed:`, {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+      });
       return error.response;
     }
+    console.error(`❌ Request error:`, error);
     throw error;
-  } finally {
-    httpAgent.destroy();
-    httpsAgent.destroy();
   }
 };
 
@@ -99,7 +117,7 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
     console.log("Creating test data...");
 
     // Generate a unique fingerprint value
-    const uniqueFingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).substring(2)}`;
+    const uniqueFingerprint = `test-fingerprint-${getCurrentUnixMillis()}-${Math.random().toString(36).substring(2)}`;
 
     // Register fingerprint first (always with default user role)
     const fingerprintResponse = await makeRequest(
@@ -158,10 +176,10 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
  */
 export const cleanDatabase = async () => {
   try {
-    console.log("Cleaning database...");
+    console.log("🧹 Cleaning database...");
     const db = getFirestore();
     const collections = Object.values(COLLECTIONS);
-    console.log("Cleaning collections:", collections);
+    console.log("📚 Cleaning collections:", collections);
 
     const promises = collections.map(async (collection) => {
       const snapshot = await db.collection(collection).get();
@@ -171,9 +189,9 @@ export const cleanDatabase = async () => {
     });
 
     await Promise.all(promises);
-    console.log("Database cleaned successfully");
+    console.log("✨ Database cleaned successfully");
   } catch (error) {
-    console.error("Failed to clean database:", error);
+    console.error("💥 Failed to clean database:", error);
     throw error;
   }
 };
