@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 
 interface RateLimitConfig {
@@ -36,7 +36,8 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
       const db = getFirestore();
       // Only use the validated fingerprintId from auth middleware
       const fingerprint = req.fingerprintId;
-      const now = Date.now();
+      const now = Timestamp.now();
+      const nowUnix = now.toMillis();
 
       if (!fingerprint) {
         // Skip rate limiting if no fingerprint is available (for public routes)
@@ -63,17 +64,17 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
 
             // Get recent requests within the window
             const recentRequests = data?.requests || [];
-            const windowStart = now - windowMs;
+            const windowStart = nowUnix - windowMs;
 
             // Filter out old requests
             const validRequests = recentRequests.filter(
-              (timestamp: number) => timestamp > windowStart,
+              (timestamp: Timestamp) => timestamp.toMillis() > windowStart,
             );
 
             if (validRequests.length >= max) {
-              const oldestValidRequest = validRequests[0];
+              const oldestValidRequest = validRequests[0].toMillis();
               const resetTime = oldestValidRequest + windowMs;
-              const retryAfter = Math.ceil((resetTime - now) / 1000);
+              const retryAfter = Math.ceil((resetTime - nowUnix) / 1000);
 
               console.log(
                 `[Fingerprint Rate Limit] Rate limit exceeded for fingerprint: ${fingerprint}, retry after: ${retryAfter}s`,
@@ -88,7 +89,7 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
               rateLimitRef,
               {
                 requests: updatedRequests,
-                lastUpdated: FieldValue.serverTimestamp(),
+                lastUpdated: now,
               },
               { merge: true },
             );

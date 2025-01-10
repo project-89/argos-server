@@ -2,45 +2,45 @@ import { Timestamp } from "firebase-admin/firestore";
 
 // Domain Models
 export interface Fingerprint {
+  id: string;
   fingerprint: string;
-  metadata: Record<string, any>;
   roles: string[];
-  tags: Record<string, any>;
-  createdAt: FirebaseFirestore.Timestamp;
+  tags: string[];
+  metadata: Record<string, any>;
   ipAddresses: string[];
+  createdAt: Timestamp; // Internal Firestore timestamp
   ipMetadata: {
-    primaryIp?: string; // Most frequently used IP
-    ipFrequency: Record<string, number>; // Count of requests per IP
-    lastSeenAt: Record<string, FirebaseFirestore.Timestamp>; // Last time each IP was seen
-    suspiciousIps: string[]; // IPs flagged as potentially suspicious
+    primaryIp?: string;
+    ipFrequency: Record<string, number>;
+    lastSeenAt: Record<string, Timestamp>; // Internal Firestore timestamp
+    suspiciousIps: string[];
   };
 }
 
 export interface ApiKey {
+  id: string;
   key: string;
-  name: string;
   fingerprintId: string;
-  metadata: Record<string, any>;
-  createdAt: FirebaseFirestore.Timestamp;
-  lastUsed: FirebaseFirestore.Timestamp | null;
-  enabled: boolean;
-  usageCount: number;
-  endpointStats: Record<string, number>;
+  createdAt: Timestamp; // Internal Firestore timestamp
+  active: boolean;
 }
 
 export interface Visit {
+  id: string;
   fingerprintId: string;
+  createdAt: Timestamp; // Internal Firestore timestamp
   url: string;
   title?: string;
-  timestamp: number;
-  createdAt: FirebaseFirestore.Timestamp;
+  siteId: string;
+  clientIp?: string;
 }
 
 export interface Presence {
   fingerprintId: string;
   status: "online" | "offline";
   currentSites: string[];
-  lastUpdated: FirebaseFirestore.Timestamp;
+  createdAt: Timestamp; // Internal Firestore timestamp
+  lastUpdated: number; // Unix timestamp for API responses
 }
 
 export interface PriceData {
@@ -49,16 +49,43 @@ export interface PriceData {
 }
 
 export interface PriceHistory {
-  timestamp: number;
+  createdAt: Timestamp; // Internal Firestore timestamp
   price: number;
 }
 
 export interface Impression {
   id: string;
   fingerprintId: string;
-  type: string; // e.g., 'form_submission', 'page_view', 'interaction'
-  data: Record<string, any>; // Flexible JSON data
-  createdAt: Timestamp;
-  source?: string; // Optional: where this impression came from
-  sessionId?: string; // Optional: to group related impressions
+  type: string;
+  data: Record<string, any>;
+  createdAt: Timestamp; // Internal Firestore timestamp
+  source?: string;
+  sessionId?: string;
+}
+
+export interface Site {
+  id: string;
+  domain: string;
+  fingerprintId: string;
+  createdAt: Timestamp; // Internal Firestore timestamp
+  lastVisited: number; // Unix timestamp for API responses
+  title?: string;
+  visits: number;
+  settings: {
+    notifications: boolean;
+    privacy: "public" | "private";
+  };
+}
+
+export interface PresenceData {
+  status: "online" | "offline";
+  createdAt: Timestamp; // Internal Firestore timestamp
+  lastUpdated: number; // Unix timestamp for API responses
+}
+
+export interface FingerprintPresence {
+  fingerprintId: string;
+  status: "online" | "offline";
+  createdAt: Timestamp; // Internal Firestore timestamp
+  lastUpdated: number; // Unix timestamp for API responses
 }
