@@ -1,7 +1,8 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { Impression } from "../types/models";
 import { ApiError } from "../utils/error";
+import { getCurrentTimestamp } from "../utils/timestamp";
 
 /**
  * Verifies fingerprint exists and ownership
@@ -36,12 +37,13 @@ export const createImpression = async (
   },
 ): Promise<Impression> => {
   const db = getFirestore();
+  const createdAt = getCurrentTimestamp();
 
   const impression: Omit<Impression, "id"> = {
     fingerprintId,
     type,
     data,
-    createdAt: Timestamp.now(),
+    createdAt,
     ...(options?.source && { source: options.source }),
     ...(options?.sessionId && { sessionId: options.sessionId }),
   };
@@ -61,8 +63,8 @@ export const getImpressions = async (
   fingerprintId: string,
   options?: {
     type?: string;
-    startTime?: Date;
-    endTime?: Date;
+    startTime?: number; // Unix timestamp (milliseconds)
+    endTime?: number; // Unix timestamp (milliseconds)
     limit?: number;
     sessionId?: string;
   },
@@ -83,11 +85,13 @@ export const getImpressions = async (
   }
 
   if (options?.startTime) {
-    query = query.where("createdAt", ">=", Timestamp.fromDate(options.startTime));
+    const startTimestamp = new Date(options.startTime);
+    query = query.where("createdAt", ">=", startTimestamp);
   }
 
   if (options?.endTime) {
-    query = query.where("createdAt", "<=", Timestamp.fromDate(options.endTime));
+    const endTimestamp = new Date(options.endTime);
+    query = query.where("createdAt", "<=", endTimestamp);
   }
 
   if (options?.limit) {
@@ -95,13 +99,13 @@ export const getImpressions = async (
   }
 
   const snapshot = await query.get();
-  return snapshot.docs.map(
-    (doc) =>
-      ({
-        id: doc.id,
-        ...doc.data(),
-      }) as Impression,
-  );
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+    } as Impression;
+  });
 };
 
 /**
@@ -111,8 +115,8 @@ export const deleteImpressions = async (
   fingerprintId: string,
   options?: {
     type?: string;
-    startTime?: Date;
-    endTime?: Date;
+    startTime?: number; // Unix timestamp (milliseconds)
+    endTime?: number; // Unix timestamp (milliseconds)
     sessionId?: string;
   },
 ): Promise<number> => {
@@ -129,11 +133,13 @@ export const deleteImpressions = async (
   }
 
   if (options?.startTime) {
-    query = query.where("createdAt", ">=", Timestamp.fromDate(options.startTime));
+    const startTimestamp = new Date(options.startTime);
+    query = query.where("createdAt", ">=", startTimestamp);
   }
 
   if (options?.endTime) {
-    query = query.where("createdAt", "<=", Timestamp.fromDate(options.endTime));
+    const endTimestamp = new Date(options.endTime);
+    query = query.where("createdAt", "<=", endTimestamp);
   }
 
   const snapshot = await query.get();
