@@ -8,11 +8,12 @@ export interface Fingerprint {
   tags: string[];
   metadata: Record<string, any>;
   ipAddresses: string[];
-  createdAt: Timestamp; // Internal Firestore timestamp
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
+  lastVisited: Timestamp; // Converted to Unix timestamp for API responses
   ipMetadata: {
     primaryIp?: string;
     ipFrequency: Record<string, number>;
-    lastSeenAt: Record<string, Timestamp>; // Internal Firestore timestamp
+    lastSeenAt: Record<string, Timestamp>; // Converted to Unix timestamp for API responses
     suspiciousIps: string[];
   };
 }
@@ -21,14 +22,14 @@ export interface ApiKey {
   id: string;
   key: string;
   fingerprintId: string;
-  createdAt: Timestamp; // Internal Firestore timestamp
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
   active: boolean;
 }
 
 export interface Visit {
   id: string;
   fingerprintId: string;
-  createdAt: Timestamp; // Internal Firestore timestamp
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
   url: string;
   title?: string;
   siteId: string;
@@ -39,8 +40,8 @@ export interface Presence {
   fingerprintId: string;
   status: "online" | "offline";
   currentSites: string[];
-  createdAt: Timestamp; // Internal Firestore timestamp
-  lastUpdated: number; // Unix timestamp for API responses
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
+  lastUpdated: number;
 }
 
 export interface PriceData {
@@ -49,7 +50,7 @@ export interface PriceData {
 }
 
 export interface PriceHistory {
-  createdAt: Timestamp; // Internal Firestore timestamp
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
   price: number;
 }
 
@@ -58,7 +59,7 @@ export interface Impression {
   fingerprintId: string;
   type: string;
   data: Record<string, any>;
-  createdAt: Timestamp; // Internal Firestore timestamp
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
   source?: string;
   sessionId?: string;
 }
@@ -67,8 +68,8 @@ export interface Site {
   id: string;
   domain: string;
   fingerprintId: string;
-  createdAt: Timestamp; // Internal Firestore timestamp
-  lastVisited: number; // Unix timestamp for API responses
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
+  lastVisited: number;
   title?: string;
   visits: number;
   settings: {
@@ -79,13 +80,13 @@ export interface Site {
 
 export interface PresenceData {
   status: "online" | "offline";
-  createdAt: Timestamp; // Internal Firestore timestamp
-  lastUpdated: number; // Unix timestamp for API responses
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
+  lastUpdated: number;
 }
 
 export interface FingerprintPresence {
   fingerprintId: string;
   status: "online" | "offline";
-  createdAt: Timestamp; // Internal Firestore timestamp
-  lastUpdated: number; // Unix timestamp for API responses
+  createdAt: Timestamp; // Converted to Unix timestamp for API responses
+  lastUpdated: number;
 }
