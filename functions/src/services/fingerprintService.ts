@@ -42,6 +42,7 @@ export const createFingerprint = async (
     roles: [ROLE.USER], // Always use default user role
     createdAt: now,
     tags: [], // Initialize empty tags array
+    lastVisited: now,
     metadata: metadata || {},
     ipAddresses: [ip],
     ipMetadata: {

@@ -2,7 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiKey } from "../types/models";
 import { ApiError } from "../utils/error";
-import { generateApiKey } from "../utils/key";
+import { generateApiKey } from "../utils/api-key";
 import { getCurrentTimestamp, toUnixMillis } from "../utils/timestamp";
 
 // Type for API response that converts Timestamp to Unix time

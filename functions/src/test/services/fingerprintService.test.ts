@@ -79,6 +79,7 @@ describe("Fingerprint Service", () => {
         fingerprint,
         roles: [ROLE.USER],
         createdAt: mockTimestamp,
+        lastVisited: mockTimestamp,
         tags: [],
         metadata,
         ipAddresses: [ip],
