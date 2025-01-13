@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
+import { getCurrentUnixMillis } from "../utils/timestamp";
 
 interface CleanupResult {
   cleanupTime: number;
@@ -40,7 +41,7 @@ interface SiteEngagement {
  */
 export const cleanupService = async (): Promise<CleanupResult> => {
   const db = getFirestore();
-  const now = Date.now();
+  const now = getCurrentUnixMillis();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
   const oneHourAgo = now - 60 * 60 * 1000;
 
@@ -110,7 +111,7 @@ export const cleanupService = async (): Promise<CleanupResult> => {
 
 export const cleanupRateLimits = async (identifier: string): Promise<void> => {
   const db = getFirestore();
-  const now = Date.now();
+  const now = getCurrentUnixMillis();
   const oneHourAgo = now - 3600000;
 
   try {
