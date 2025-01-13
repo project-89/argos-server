@@ -1,15 +1,16 @@
-import { describe, it, expect, beforeAll } from "@jest/globals";
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest } from "../utils/testUtils";
-import { createTestData } from "../utils/testUtils";
+import { createTestData, cleanDatabase } from "../utils/testUtils";
 
 describe("Auth Test Suite", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
 
-  beforeAll(async () => {
-    // Then create test data
+  beforeEach(async () => {
+    await cleanDatabase();
+    // Create test data
     const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
     validApiKey = apiKey;
