@@ -98,7 +98,7 @@ export const updateRolesByTags = async (
     for (const [_, rule] of Object.entries(tagRules)) {
       const hasPermission = await canManageRole(callerFingerprintId, rule.role);
       if (!hasPermission) {
-        throw new ApiError(403, `Insufficient privileges to assign role: ${rule.role}`);
+        throw new ApiError(403, "Insufficient privileges to assign role");
       }
     }
 
