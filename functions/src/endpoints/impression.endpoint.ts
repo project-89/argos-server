@@ -101,8 +101,8 @@ export const get = [
 
       const options = {
         type: type as string | undefined,
-        startTime: startTime ? new Date(startTime as string) : undefined,
-        endTime: endTime ? new Date(endTime as string) : undefined,
+        startTime: startTime ? new Date(startTime as string).getTime() : undefined,
+        endTime: endTime ? new Date(endTime as string).getTime() : undefined,
         limit: limit ? parseInt(limit as string) : undefined,
         sessionId: sessionId as string | undefined,
       };
@@ -142,8 +142,8 @@ export const remove = [
 
       const options = {
         type: type as string | undefined,
-        startTime: startTime ? new Date(startTime as string) : undefined,
-        endTime: endTime ? new Date(endTime as string) : undefined,
+        startTime: startTime ? new Date(startTime as string).getTime() : undefined,
+        endTime: endTime ? new Date(endTime as string).getTime() : undefined,
         sessionId: sessionId as string | undefined,
       };
 

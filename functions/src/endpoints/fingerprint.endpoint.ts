@@ -8,7 +8,7 @@ import {
   verifyFingerprint,
   updateFingerprintMetadata,
 } from "../services/fingerprintService";
-import { sendSuccess, sendError, sendWarning } from "../utils/response";
+import { sendSuccess, sendError } from "../utils/response";
 
 // Extend Request type to include fingerprint
 interface AuthenticatedRequest extends Request {
@@ -44,11 +44,7 @@ export const get = async (req: AuthenticatedRequest, res: Response): Promise<Res
 
     await verifyFingerprint(id, req.fingerprintId);
 
-    const { data, isSuspicious } = await getFingerprintAndUpdateIp(id, ip);
-
-    if (isSuspicious) {
-      return sendWarning(res, data, "Suspicious IP activity detected", 200);
-    }
+    const { data } = await getFingerprintAndUpdateIp(id, ip);
 
     return sendSuccess(res, data, "Fingerprint retrieved successfully", 200);
   } catch (error) {

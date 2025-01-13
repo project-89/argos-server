@@ -3,6 +3,7 @@ import { getCurrentPrices, getPriceHistory } from "../services/priceService";
 import { validateQuery, validateParams } from "../middleware/validation.middleware";
 import { z } from "zod";
 import { sendSuccess, sendError } from "../utils/response";
+import { toUnixMillis } from "../utils/timestamp";
 
 export const getCurrent = [
   validateQuery(
@@ -40,7 +41,12 @@ export const getHistory = [
     try {
       const { tokenId } = req.params;
       const history = await getPriceHistory(tokenId);
-      return sendSuccess(res, history);
+      const formattedHistory = history.map((item) => ({
+        ...item,
+        timestamp: toUnixMillis(item.createdAt),
+        createdAt: undefined,
+      }));
+      return sendSuccess(res, formattedHistory);
     } catch (error) {
       console.error("Error in get token price history:", error);
       return sendError(res, error instanceof Error ? error : "Failed to fetch token price history");
