@@ -40,6 +40,8 @@ export const ENDPOINTS = {
   STABILITY: "/stability",
 } as const;
 
+export const PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price";
+
 // Public endpoints that should not require API key authentication
 export const PUBLIC_ENDPOINTS: readonly string[] = [
   "/fingerprint/register",
