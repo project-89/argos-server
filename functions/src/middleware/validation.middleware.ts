@@ -11,7 +11,28 @@ export const validateRequest = (schema: z.ZodType) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
-        return sendError(res, firstError.message, 400, error.errors);
+        const details = error.errors.map((err) => {
+          const detail: {
+            code: string;
+            path: (string | number)[];
+            message: string;
+            expected?: string;
+            received?: string;
+          } = {
+            code: err.code,
+            path: err.path,
+            message: err.message,
+          };
+
+          if (err.code === "invalid_type") {
+            detail.expected = err.expected as string;
+            detail.received = err.received as string;
+          }
+
+          return detail;
+        });
+
+        return sendError(res, firstError.message, 400, { details });
       }
       return sendError(res, "Invalid request data", 400);
     }
@@ -27,7 +48,13 @@ export const validateQuery = (schema: z.ZodType) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
-        return sendError(res, firstError.message, 400, error.errors);
+        return sendError(res, firstError.message, 400, {
+          details: error.errors.map((err) => ({
+            code: err.code,
+            path: err.path,
+            message: err.message,
+          })),
+        });
       }
       return sendError(res, "Invalid query parameters", 400);
     }
@@ -43,7 +70,13 @@ export const validateParams = (schema: z.ZodType) => {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const firstError = error.errors[0];
-        return sendError(res, firstError.message, 400, error.errors);
+        return sendError(res, firstError.message, 400, {
+          details: error.errors.map((err) => ({
+            code: err.code,
+            path: err.path,
+            message: err.message,
+          })),
+        });
       }
       return sendError(res, "Invalid path parameters", 400);
     }

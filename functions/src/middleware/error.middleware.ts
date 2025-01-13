@@ -20,7 +20,7 @@ export const errorHandler = (
   // Handle Zod validation errors
   if (err instanceof ZodError) {
     const firstError = err.errors[0];
-    return sendError(res, firstError.message, 400, err.errors);
+    return sendError(res, firstError.message, 400);
   }
 
   // Handle CORS errors

@@ -1,3 +1,16 @@
+import { config } from "dotenv";
+import path from "path";
+
+// Load environment variables based on NODE_ENV first
+const envFile = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
+config({ path: path.resolve(__dirname, "../", envFile) });
+
+console.log("Environment loaded:", {
+  NODE_ENV: process.env.NODE_ENV,
+  RATE_LIMIT_DISABLED: process.env.RATE_LIMIT_DISABLED,
+  IP_RATE_LIMIT_DISABLED: process.env.IP_RATE_LIMIT_DISABLED,
+});
+
 import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
@@ -6,8 +19,7 @@ import { validateApiKeyMiddleware } from "./middleware/auth.middleware";
 import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
 import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
 import { CORS_CONFIG } from "./constants/config";
-import path from "path";
-import { composeMiddleware, pathMiddleware } from "./middleware/compose";
+import { composeMiddleware } from "./middleware/compose";
 import { MiddlewareConfig } from "./middleware/config";
 import { withMetrics } from "./middleware/metrics";
 import { errorHandler } from "./middleware/error.middleware";
@@ -123,13 +135,39 @@ middlewareConfig.set("rateLimit.fingerprint", {
     : 1000,
 });
 
-// Apply rate limiting first, but skip for certain paths
-app.use(
-  pathMiddleware(
-    ["/health", "/metrics"],
-    withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.ip")), "ipRateLimit"),
+middlewareConfig.set("rateLimit.health", {
+  windowMs: 60 * 1000, // 1 minute window
+  max: 60, // 1 request per second on average
+});
+
+// Health check rate limiting (lenient but protected)
+const healthMiddleware = composeMiddleware(
+  withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.health")), "healthIpRateLimit"),
+);
+
+// Public endpoints rate limiting (more restrictive)
+const publicMiddleware = composeMiddleware(
+  withMetrics(
+    ipRateLimit({
+      ...middlewareConfig.get("rateLimit.ip"),
+      max: 100, // More restrictive for public endpoints
+    }),
+    "publicIpRateLimit",
   ),
 );
+
+// Protected routes rate limiting
+const protectedMiddleware = composeMiddleware(
+  withMetrics(validateApiKeyMiddleware, "auth"),
+  withMetrics(
+    fingerprintRateLimit(middlewareConfig.get("rateLimit.fingerprint")),
+    "fingerprintRateLimit",
+  ),
+);
+
+// Apply health check rate limiting
+app.use("/health", healthMiddleware);
+app.use("/metrics", healthMiddleware);
 
 // Serve landing page only for browser requests to root
 app.get("/", (req, res) => {
@@ -145,17 +183,12 @@ app.get("/", (req, res) => {
   }
 });
 
+// Apply public middleware to registration endpoints
+app.use("/fingerprint/register", publicMiddleware);
+app.use("/api-key/register", publicMiddleware);
+
 // Public routes (no auth required)
 app.use("/", publicRouter);
-
-// Protected routes setup
-const protectedMiddleware = composeMiddleware(
-  withMetrics(validateApiKeyMiddleware, "auth"),
-  withMetrics(
-    fingerprintRateLimit(middlewareConfig.get("rateLimit.fingerprint")),
-    "fingerprintRateLimit",
-  ),
-);
 
 // Protected routes configuration
 const protectedPaths = ["/fingerprint", "/visit", "/api-key", "/role", "/tag", "/impressions"];
