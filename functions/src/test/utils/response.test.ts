@@ -1,6 +1,7 @@
 import { Response } from "express";
-import { sendSuccess, sendError, sendWarning, ApiResponse } from "../../utils/response";
+import { sendSuccess, sendError, sendWarning } from "../../utils/response";
 import { ApiError } from "../../utils/error";
+import { ApiSuccessResponse, ApiErrorResponse } from "../../types/api.types";
 
 // Mock Express Response
 const mockResponse = () => {
@@ -20,7 +21,7 @@ describe("Response Utilities", () => {
       sendSuccess(res, data);
 
       expect(res.status).toHaveBeenCalledWith(200);
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiSuccessResponse<typeof data>;
 
       expect(response).toMatchObject({
         success: true,
@@ -38,8 +39,8 @@ describe("Response Utilities", () => {
 
       sendSuccess(res, data);
 
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
-      expect(response.data).toBeUndefined();
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiSuccessResponse<typeof data>;
+      expect(response.data).toEqual(data);
       expect(response.message).toBe("Success message");
     });
   });
@@ -52,7 +53,7 @@ describe("Response Utilities", () => {
       sendError(res, error);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiErrorResponse;
 
       expect(response).toMatchObject({
         success: false,
@@ -69,7 +70,7 @@ describe("Response Utilities", () => {
       sendError(res, error);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiErrorResponse;
       expect(response.error).toBe("Not authorized");
     });
 
@@ -80,7 +81,7 @@ describe("Response Utilities", () => {
       expect(res.status).toHaveBeenCalledWith(401);
       expect(res.json).toHaveBeenCalled();
 
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiErrorResponse;
       expect(response.error).toBe("API key is required");
     });
   });
@@ -94,7 +95,7 @@ describe("Response Utilities", () => {
       sendWarning(res, data, warning);
 
       expect(res.status).toHaveBeenCalledWith(200);
-      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiResponse;
+      const response = (res.json as jest.Mock).mock.calls[0][0] as ApiSuccessResponse<typeof data>;
 
       expect(response).toMatchObject({
         success: true,
