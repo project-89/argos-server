@@ -7,7 +7,9 @@ describe("Health Endpoint", () => {
 
   describe("GET /health", () => {
     it("should return healthy status", async () => {
-      const response = await makeRequest("get", `${API_URL}/health`, undefined, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/health`,
         validateStatus: () => true,
       });
 
@@ -21,8 +23,8 @@ describe("Health Endpoint", () => {
         }),
       );
 
-      // Verify timestamp is valid ISO string
-      expect(() => new Date(response.data.data.timestamp)).not.toThrow();
+      // Verify timestamp is a valid ISO string
+      expect(new Date(response.data.data.timestamp).getTime()).not.toBeNaN();
     });
   });
 });
