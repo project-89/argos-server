@@ -33,9 +33,6 @@ describe("API Key Endpoint", () => {
         data: {
           fingerprintId: newFingerprintId,
         },
-        headers: {
-          "x-api-key": validApiKey,
-        },
       });
 
       expect(response.status).toBe(200);
@@ -49,9 +46,6 @@ describe("API Key Endpoint", () => {
         url: `${TEST_CONFIG.apiUrl}/api-key/register`,
         data: {
           fingerprintId: newFingerprintId,
-        },
-        headers: {
-          "x-api-key": response.data.data.key,
         },
       });
       expect(verifyResponse.status).toBe(200);
@@ -67,9 +61,6 @@ describe("API Key Endpoint", () => {
         url: `${TEST_CONFIG.apiUrl}/api-key/register`,
         data: {
           fingerprintId,
-        },
-        headers: {
-          "x-api-key": originalApiKey,
         },
       });
 
@@ -101,21 +92,18 @@ describe("API Key Endpoint", () => {
         method: "post",
         url: `${TEST_CONFIG.apiUrl}/api-key/register`,
         data: {},
-        headers: {
-          "x-api-key": validApiKey,
-        },
       });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Required");
+      expect(response.data.error).toBe("Fingerprint is required");
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
           path: ["fingerprintId"],
-          message: "Required",
+          message: "Fingerprint is required",
         },
       ]);
     });
@@ -126,9 +114,6 @@ describe("API Key Endpoint", () => {
         url: `${TEST_CONFIG.apiUrl}/api-key/register`,
         data: {
           fingerprintId: "non-existent-id",
-        },
-        headers: {
-          "x-api-key": validApiKey,
         },
       });
 
@@ -298,14 +283,14 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Required");
+      expect(response.data.error).toBe("API key is required");
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
           path: ["key"],
-          message: "Required",
+          message: "API key is required",
         },
       ]);
     });
