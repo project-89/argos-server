@@ -2,6 +2,7 @@ import { Request } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ROLE } from "../constants/roles";
+import { ERROR_MESSAGES } from "../constants/api";
 
 import { Fingerprint } from "../types/models";
 import { ApiError } from "../utils/error";
@@ -76,7 +77,7 @@ export const getFingerprintAndUpdateIp = async (
       const fingerprintDoc = await transaction.get(fingerprintRef);
 
       if (!fingerprintDoc.exists) {
-        throw new ApiError(404, "Fingerprint not found");
+        throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
       }
 
       const data = fingerprintDoc.data() as FingerprintDocData;
@@ -127,8 +128,12 @@ export const getFingerprintAndUpdateIp = async (
 
     return updatedDoc;
   } catch (error) {
+    // Re-throw ApiErrors
+    if (error instanceof ApiError) {
+      throw error;
+    }
     console.error(`[Fingerprint ${id}] Error updating IP:`, error);
-    throw error;
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -144,11 +149,11 @@ export const verifyFingerprint = async (
   const fingerprintDoc = await fingerprintRef.get();
 
   if (!fingerprintDoc.exists) {
-    throw new ApiError(404, "Fingerprint not found");
+    throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
   }
 
   if (authenticatedId && fingerprintId !== authenticatedId) {
-    throw new ApiError(403, "API key does not match fingerprint");
+    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 };
 

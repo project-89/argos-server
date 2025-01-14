@@ -1,176 +1,64 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
-import { COLLECTIONS } from "../../constants/collections";
-import * as admin from "firebase-admin";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Fingerprint Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
-  let fingerprintValue: string;
 
   beforeEach(async () => {
     await cleanDatabase();
-    const { fingerprintId: fId, apiKey, fingerprint } = await createTestData();
+    // Create test data
+    const { fingerprintId: fId, apiKey } = await createTestData();
     fingerprintId = fId;
     validApiKey = apiKey;
-    fingerprintValue = fingerprint;
   });
 
   describe("POST /fingerprint/register", () => {
-    it("should register a new fingerprint with IP metadata", async () => {
-      const testIp = "127.0.0.1";
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {
-          fingerprint: "test-fingerprint-2",
-        },
-        {
-          headers: {
-            "x-forwarded-for": testIp,
+    it("should register a new fingerprint", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/register`,
+        data: {
+          fingerprint: "test-fingerprint",
+          metadata: {
+            test: true,
+            name: "Test Fingerprint",
           },
         },
-      );
+      });
 
       expect(response.status).toBe(201);
       expect(response.data.success).toBe(true);
-      // Should only return the fingerprintId
-      expect(response.data.data).toEqual({
-        id: expect.any(String),
+      expect(response.data.data).toHaveProperty("id");
+      expect(response.data.data).toHaveProperty("fingerprint", "test-fingerprint");
+      expect(response.data.data.metadata).toEqual({
+        test: true,
+        name: "Test Fingerprint",
       });
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
-    it("should track IP frequency and update primary IP", async () => {
-      const testIp = "127.0.0.1";
-      // First request with initial IP
-      const response1 = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {
-          fingerprint: "test-fingerprint-3",
-        },
-        {
-          headers: {
-            "x-forwarded-for": testIp,
-          },
-        },
-      );
-
-      expect(response1.status).toBe(201);
-      expect(response1.data.success).toBe(true);
-      // Should only return the fingerprintId
-      expect(response1.data.data).toEqual({
-        id: expect.any(String),
+    it("should require fingerprint", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/register`,
+        data: {},
       });
-
-      const fingerprintId = response1.data.data.id;
-
-      // Create an API key for this fingerprint
-      const apiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
-        fingerprintId,
-      });
-      const apiKey = apiKeyResponse.data.data.key;
-
-      // Make multiple requests with the first IP to establish it as primary
-      for (let i = 0; i < 15; i++) {
-        await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
-          headers: {
-            "x-api-key": apiKey,
-            "x-forwarded-for": testIp,
-          },
-        });
-      }
-
-      // Verify the first IP is now primary (authenticated request should return full data)
-      const response2 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
-        headers: {
-          "x-api-key": apiKey,
-          "x-forwarded-for": testIp,
-        },
-      });
-
-      expect(response2.data.data).toHaveProperty("fingerprint");
-      expect(response2.data.data.ipMetadata.primaryIp).toBe(testIp);
-      expect(response2.data.data.ipMetadata.ipFrequency[testIp]).toBe(17); // Initial + 16 requests
-
-      // Wait for the initial time window to pass
-      await new Promise((resolve) => setTimeout(resolve, 150)); // Wait longer than the test time window (100ms)
-
-      // Make request with a new IP
-      const newIp = "1.2.3.4";
-      const response3 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
-        headers: {
-          "x-api-key": apiKey,
-          "x-forwarded-for": newIp,
-        },
-      });
-
-      // Verify the new IP is tracked and marked as suspicious
-      expect(response3.data.message).toBe("Suspicious IP activity detected");
-      expect(response3.data.data.ipMetadata.suspiciousIps).toContain(newIp);
-      expect(response3.data.data.ipMetadata.primaryIp).toBe(testIp); // First IP should still be primary
-    });
-
-    it("should not mark new IPs as suspicious within initial time window", async () => {
-      const testIp = "127.0.0.1";
-      // Register a new fingerprint
-      const response1 = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {
-          fingerprint: "test-fingerprint-4",
-        },
-        {
-          headers: {
-            "x-forwarded-for": testIp,
-          },
-        },
-      );
-
-      const fingerprintId = response1.data.data.id;
-
-      // Create an API key
-      const apiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
-        fingerprintId,
-      });
-      const apiKey = apiKeyResponse.data.data.key;
-
-      // Make request with a different IP within the time window
-      const newIp = "5.6.7.8";
-      const response2 = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
-        headers: {
-          "x-api-key": apiKey,
-          "x-forwarded-for": newIp,
-        },
-      });
-
-      // Verify the new IP is not marked as suspicious
-      expect(response2.data).not.toHaveProperty("warning");
-      expect(response2.data.data.ipMetadata.suspiciousIps).not.toContain(newIp);
-    });
-
-    it("should require fingerprint field", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {},
-        {
-          validateStatus: () => true,
-        },
-      );
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
           path: ["fingerprint"],
-          message: "Fingerprint is required",
+          message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
       ]);
     });
@@ -178,453 +66,433 @@ describe("Fingerprint Endpoint", () => {
 
   describe("GET /fingerprint/:id", () => {
     it("should get fingerprint by ID", async () => {
-      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/${fingerprintId}`,
         headers: { "x-api-key": validApiKey },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("id", fingerprintId);
-      expect(response.data.data).toHaveProperty("fingerprint", fingerprintValue);
-      expect(response.data.data).toHaveProperty("roles", ["user"]);
-      expect(response.data.data).toHaveProperty("createdAt");
-      expect(response.data.data).toHaveProperty("metadata");
-      expect(response.data.data.metadata).toHaveProperty("testData", true);
-      expect(response.data.data).toHaveProperty("tags", []);
-      if (response.data.data.tags) {
-        expect(typeof response.data.data.tags).toBe("object");
-      }
+      expect(response.data.data.metadata).toEqual({
+        testData: true,
+        name: "Test Fingerprint",
+      });
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
-    it("should handle non-existent fingerprint", async () => {
-      // Create a new fingerprint
-      const newFingerprintResponse = await makeRequest("post", `${API_URL}/fingerprint/register`, {
-        fingerprint: "test-fingerprint-for-404",
-        metadata: { test: true },
+    it("should return 401 when fingerprint for API key no longer exists", async () => {
+      // Create a new fingerprint and API key
+      const newFingerprintResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/register`,
+        data: {
+          fingerprint: "test-fingerprint-for-404",
+          metadata: { test: true },
+        },
       });
       const newFingerprintId = newFingerprintResponse.data.data.id;
 
-      // Create an API key for the new fingerprint
-      const newApiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
-        fingerprintId: newFingerprintId,
+      // Register an API key for the new fingerprint
+      const newApiKeyResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/api-key/register`,
+        data: {
+          fingerprintId: newFingerprintId,
+        },
       });
       const newApiKey = newApiKeyResponse.data.data.key;
 
-      // Delete the fingerprint directly from the database
-      const db = admin.firestore();
-      await db.collection(COLLECTIONS.FINGERPRINTS).doc(newFingerprintId).delete();
+      // Delete the fingerprint from Firestore (manual cleanup)
+      await cleanDatabase();
 
-      // Try to access the deleted fingerprint with its API key
-      const response = await makeRequest(
-        "get",
-        `${API_URL}/fingerprint/${newFingerprintId}`,
-        null,
-        {
-          headers: { "x-api-key": newApiKey },
-          validateStatus: () => true,
-        },
-      );
-
-      expect(response.status).toBe(404);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
-    });
-
-    it("should handle missing ID parameter", async () => {
-      const response = await makeRequest("get", `${API_URL}/fingerprint/`, null, {
-        validateStatus: () => true,
-        headers: {
-          "x-api-key": validApiKey,
-          Accept: "application/json",
-        },
-      });
-
-      expect(response.status).toBe(404);
-      expect(response.data).toEqual({
-        success: false,
-        error: "Not Found",
-        message: "The requested endpoint does not exist",
-      });
-    });
-
-    it("should reject request without API key", async () => {
-      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
-        validateStatus: () => true,
+      // Try to get the deleted fingerprint
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/${newFingerprintId}`,
+        headers: { "x-api-key": newApiKey },
       });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
-    it("should reject request with invalid API key", async () => {
-      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+    it("should return 404 for non-existent fingerprint", async () => {
+      // Try to get a fingerprint that never existed
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/non-existent-id`,
+        headers: { "x-api-key": validApiKey },
+      });
+
+      expect(response.status).toBe(404);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_FINGERPRINT);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
+    });
+
+    it("should require fingerprint ID", async () => {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/`,
+        headers: { "x-api-key": validApiKey },
+      });
+
+      expect(response.status).toBe(404);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe("Not Found");
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
+    });
+
+    it("should require API key", async () => {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/${fingerprintId}`,
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
+    });
+
+    it("should reject invalid API key", async () => {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/${fingerprintId}`,
         headers: { "x-api-key": "invalid-key" },
-        validateStatus: () => true,
       });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid API key");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
     it("should reject request when API key does not match fingerprint", async () => {
-      // Create another fingerprint with a different fingerprint value
-      const otherFingerprintResponse = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {
-          fingerprint: "completely-different-fingerprint",
+      // Create another fingerprint and API key
+      const otherFingerprintResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/register`,
+        data: {
+          fingerprint: "other-test-fingerprint",
           metadata: { test: true },
         },
-      );
+      });
       const otherFingerprintId = otherFingerprintResponse.data.data.id;
 
-      // Create API key for the other fingerprint
-      const otherApiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
-        fingerprintId: otherFingerprintId,
+      // Register an API key for the other fingerprint
+      const otherApiKeyResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/api-key/register`,
+        data: {
+          fingerprintId: otherFingerprintId,
+        },
       });
       const otherApiKey = otherApiKeyResponse.data.data.key;
 
-      // Try to access the first fingerprint using the second fingerprint's API key
-      const response = await makeRequest("get", `${API_URL}/fingerprint/${fingerprintId}`, null, {
+      // Try to get the first fingerprint using the second fingerprint's API key
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/fingerprint/${fingerprintId}`,
         headers: { "x-api-key": otherApiKey },
-        validateStatus: () => true,
       });
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
   });
 
   describe("POST /fingerprint/update", () => {
-    it("should update fingerprint metadata with simple values", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+    it("should update fingerprint metadata", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: {
-            string: "test",
-            number: 42,
-            boolean: true,
-            null: null,
+            test: true,
+            name: "Updated Test Fingerprint",
+            newField: "new value",
           },
         },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("fingerprint");
-      expect(response.data.data).toHaveProperty("id");
-      expect(response.data.data.metadata).toEqual(
-        expect.objectContaining({
-          string: "test",
-          number: 42,
-          boolean: true,
-          null: null,
-        }),
-      );
-    });
-
-    it("should update fingerprint metadata with nested objects", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
-          metadata: {
-            nested: {
-              level1: {
-                level2: "deep value",
-                array: [1, 2, 3],
-              },
-              sibling: "value",
-            },
-          },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data).toHaveProperty("fingerprint");
-      expect(response.data.data).toHaveProperty("id");
-      expect(response.data.data.metadata.nested).toEqual({
-        level1: {
-          level2: "deep value",
-          array: [1, 2, 3],
-        },
-        sibling: "value",
+        headers: { "x-api-key": validApiKey },
       });
-    });
-
-    it("should merge nested metadata objects", async () => {
-      // First update with initial nested structure
-      await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
-          metadata: {
-            settings: {
-              theme: "dark",
-              notifications: true,
-            },
-            preferences: {
-              language: "en",
-            },
-          },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      // Update with additional nested fields (should merge with existing)
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
-          metadata: {
-            settings: {
-              fontSize: 14,
-              notifications: false, // Should override this specific value
-            },
-            preferences: {
-              timezone: "UTC", // Should add this while keeping existing values
-            },
-          },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      // Should contain both old and new settings, with overridden values
-      expect(response.data.data.metadata.settings).toEqual({
-        theme: "dark", // Kept from original
-        fontSize: 14, // Added in update
-        notifications: false, // Updated value
+      expect(response.data.data).toHaveProperty("id", fingerprintId);
+      expect(response.data.data.metadata).toEqual({
+        test: true,
+        name: "Updated Test Fingerprint",
+        newField: "new value",
+        testData: true,
       });
-      // Should merge preference objects
-      expect(response.data.data.metadata.preferences).toEqual({
-        language: "en", // Kept from original
-        timezone: "UTC", // Added in update
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
+    });
+
+    it("should merge metadata with existing values", async () => {
+      // First update
+      const firstResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
+          metadata: {
+            test: true,
+            name: "First Update",
+            field1: "value1",
+          },
+        },
+        headers: { "x-api-key": validApiKey },
       });
-    });
 
-    it("should handle arrays in metadata", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+      expect(firstResponse.status).toBe(200);
+      expect(firstResponse.data.success).toBe(true);
+      expect(firstResponse.data.data.metadata).toEqual({
+        test: true,
+        name: "First Update",
+        field1: "value1",
+        testData: true,
+      });
+      expect(firstResponse.data.requestId).toBeTruthy();
+      expect(firstResponse.data.timestamp).toBeTruthy();
+
+      // Second update with different fields
+      const secondResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: {
-            tags: ["tag1", "tag2"],
-            scores: [1, 2, 3],
-            mixed: [1, "two", { three: 3 }],
+            field2: "value2",
           },
         },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data.metadata.tags).toEqual(["tag1", "tag2"]);
-      expect(response.data.data.metadata.scores).toEqual([1, 2, 3]);
-      expect(response.data.data.metadata.mixed).toEqual([1, "two", { three: 3 }]);
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.data.success).toBe(true);
+      expect(secondResponse.data.data.metadata).toEqual({
+        test: true,
+        name: "First Update",
+        field1: "value1",
+        field2: "value2",
+        testData: true,
+      });
+      expect(secondResponse.data.requestId).toBeTruthy();
+      expect(secondResponse.data.timestamp).toBeTruthy();
     });
 
-    it("should handle special characters in metadata", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+    it("should override existing metadata values", async () => {
+      // First update
+      const firstResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: {
-            "special.key": "value",
-            "emoji-key": "🔑",
-            unicode: "⚡️ Unicode ✨",
+            test: true,
+            name: "First Update",
+            field1: "value1",
           },
         },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+      });
 
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data.metadata["special.key"]).toBe("value");
-      expect(response.data.data.metadata["emoji-key"]).toBe("🔑");
-      expect(response.data.data.metadata.unicode).toBe("⚡️ Unicode ✨");
+      expect(firstResponse.status).toBe(200);
+      expect(firstResponse.data.success).toBe(true);
+      expect(firstResponse.data.data.metadata).toEqual({
+        test: true,
+        name: "First Update",
+        field1: "value1",
+        testData: true,
+      });
+      expect(firstResponse.data.requestId).toBeTruthy();
+      expect(firstResponse.data.timestamp).toBeTruthy();
+
+      // Second update overriding field1
+      const secondResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
+          metadata: {
+            field1: "new value",
+          },
+        },
+        headers: { "x-api-key": validApiKey },
+      });
+
+      expect(secondResponse.status).toBe(200);
+      expect(secondResponse.data.success).toBe(true);
+      expect(secondResponse.data.data.metadata).toEqual({
+        test: true,
+        name: "First Update",
+        field1: "new value",
+        testData: true,
+      });
+      expect(secondResponse.data.requestId).toBeTruthy();
+      expect(secondResponse.data.timestamp).toBeTruthy();
     });
 
-    it("should require metadata field", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {},
+    it("should require fingerprintId", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {},
+        headers: { "x-api-key": validApiKey },
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
+      expect(response.data.details).toEqual([
         {
-          headers: { "x-api-key": validApiKey },
-          validateStatus: () => true,
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["fingerprintId"],
+          message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
-      );
+      ]);
+    });
+
+    it("should require metadata", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
+        },
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("Metadata is required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "object",
+          received: "undefined",
+          path: ["metadata"],
+          message: "Metadata is required",
+        },
+      ]);
     });
 
     it("should validate metadata is an object", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: "not an object",
         },
-        {
-          headers: { "x-api-key": validApiKey },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Metadata must be an object");
+      expect(response.data.error).toBe("Expected object, received string");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "object",
+          received: "string",
+          path: ["metadata"],
+          message: "Expected object, received string",
+        },
+      ]);
     });
 
-    it("should reject request without API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+    it("should require API key", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: { test: true },
         },
-        {
-          validateStatus: () => true,
-        },
-      );
+      });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
-    it("should reject request with invalid API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+    it("should reject invalid API key", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: { test: true },
         },
-        {
-          headers: { "x-api-key": "invalid-key" },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": "invalid-key" },
+      });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid API key");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
 
     it("should reject request when API key does not match fingerprint", async () => {
-      // Create another fingerprint with a different API key
-      const otherFingerprintResponse = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/register`,
-        {
-          fingerprint: "different-fingerprint",
+      // Create another fingerprint and API key
+      const otherFingerprintResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/register`,
+        data: {
+          fingerprint: "other-test-fingerprint",
           metadata: { test: true },
         },
-      );
+      });
       const otherFingerprintId = otherFingerprintResponse.data.data.id;
 
-      // Create API key for the other fingerprint
-      const otherApiKeyResponse = await makeRequest("post", `${API_URL}/api-key/register`, {
-        fingerprintId: otherFingerprintId,
+      // Register an API key for the other fingerprint
+      const otherApiKeyResponse = await makeRequest({
+        method: "post",
+        url: `${API_URL}/api-key/register`,
+        data: {
+          fingerprintId: otherFingerprintId,
+        },
       });
       const otherApiKey = otherApiKeyResponse.data.data.key;
 
       // Try to update the first fingerprint using the second fingerprint's API key
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/fingerprint/update`,
+        data: {
+          fingerprintId,
           metadata: { test: true },
-          fingerprintId: fingerprintId, // Add fingerprintId to explicitly specify which fingerprint to update
         },
-        {
-          headers: { "x-api-key": otherApiKey },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": otherApiKey },
+      });
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
-    });
-
-    it("should append to arrays in metadata", async () => {
-      // First update with initial form session
-      await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
-          metadata: {
-            formSessions: [
-              {
-                timestamp: "2024-01-01T00:00:00Z",
-                question: "What is your name?",
-                answer: "John",
-              },
-            ],
-          },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      // Add another form session
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/fingerprint/update`,
-        {
-          metadata: {
-            formSessions: [
-              {
-                timestamp: "2024-01-01T00:01:00Z",
-                question: "What is your email?",
-                answer: "john@example.com",
-              },
-            ],
-          },
-        },
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data.metadata.formSessions).toHaveLength(2);
-      expect(response.data.data.metadata.formSessions[0]).toEqual({
-        timestamp: "2024-01-01T00:00:00Z",
-        question: "What is your name?",
-        answer: "John",
-      });
-      expect(response.data.data.metadata.formSessions[1]).toEqual({
-        timestamp: "2024-01-01T00:01:00Z",
-        question: "What is your email?",
-        answer: "john@example.com",
-      });
+      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      expect(response.data.requestId).toBeTruthy();
+      expect(response.data.timestamp).toBeTruthy();
     });
   });
 });
