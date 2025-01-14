@@ -1,13 +1,20 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest } from "../utils/testUtils";
+import { makeRequest, destroyAgent } from "../utils/testUtils";
 
 describe("CORS Middleware", () => {
   const API_URL = TEST_CONFIG.apiUrl;
   const ALLOWED_ORIGINS = TEST_CONFIG.allowedOrigins;
 
-  it("should allow requests from allowed origins", async () => {
-    const response = await makeRequest("options", `${API_URL}/health`, null, {
+  afterAll(async () => {
+    // Clean up HTTP agent to prevent open handles
+    destroyAgent();
+  });
+
+  it("should allow preflight OPTIONS requests from allowed origins", async () => {
+    const response = await makeRequest({
+      method: "options",
+      url: `${API_URL}/health`,
       headers: {
         Origin: ALLOWED_ORIGINS[0],
       },
@@ -17,21 +24,38 @@ describe("CORS Middleware", () => {
     expect(response.headers["access-control-allow-origin"]).toBe(ALLOWED_ORIGINS[0]);
   });
 
-  it("should handle requests from allowed origins", async () => {
-    const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
+  it("should allow GET requests from allowed origins with credentials", async () => {
+    const response = await makeRequest({
+      method: "get",
+      url: `${API_URL}/role/available`,
       headers: {
         Origin: "http://localhost:5173",
       },
     });
+    expect(response.status).toBe(200);
+    expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
+    expect(response.headers["access-control-allow-credentials"]).toBe("true");
+  });
 
+  it("should handle requests from allowed origins", async () => {
+    const response = await makeRequest({
+      method: "get",
+      url: `${API_URL}/role/available`,
+      headers: {
+        Origin: "http://localhost:5173",
+      },
+    });
     expect(response.status).toBe(200);
     expect(response.headers["access-control-allow-origin"]).toBe("http://localhost:5173");
     expect(response.headers["access-control-allow-credentials"]).toBe("true");
   });
 
   it("should handle non-credentialed requests without origin", async () => {
-    const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
-      withCredentials: false,
+    const response = await makeRequest({
+      method: "get",
+      url: `${API_URL}/role/available`,
+      // Explicitly omit Origin header to test this case
+      headers: {},
     });
 
     expect(response.status).toBe(200);
@@ -39,7 +63,9 @@ describe("CORS Middleware", () => {
   });
 
   it("should handle preflight requests", async () => {
-    const response = await makeRequest("options", `${API_URL}/role/available`, undefined, {
+    const response = await makeRequest({
+      method: "options",
+      url: `${API_URL}/role/available`,
       headers: {
         Origin: "http://localhost:5173",
         "Access-Control-Request-Method": "GET",
@@ -56,7 +82,9 @@ describe("CORS Middleware", () => {
   });
 
   it("should reject requests from unauthorized origins", async () => {
-    const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
+    const response = await makeRequest({
+      method: "get",
+      url: `${API_URL}/role/available`,
       headers: {
         Origin: "https://unauthorized.com",
       },
@@ -72,12 +100,13 @@ describe("CORS Middleware", () => {
 
   describe("Credentialed Requests", () => {
     it("should handle credentialed requests from allowed origins", async () => {
-      const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/role/available`,
         headers: {
           Origin: "http://localhost:5173",
           Cookie: "test=123",
         },
-        withCredentials: true,
       });
 
       expect(response.status).toBe(200);
@@ -87,11 +116,12 @@ describe("CORS Middleware", () => {
     });
 
     it("should expose configured headers in credentialed responses", async () => {
-      const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/role/available`,
         headers: {
           Origin: "http://localhost:5173",
         },
-        withCredentials: true,
       });
 
       expect(response.status).toBe(200);
@@ -108,13 +138,13 @@ describe("CORS Middleware", () => {
     });
 
     it("should include Vary header for credentialed requests", async () => {
-      const response = await makeRequest("get", `${API_URL}/role/available`, undefined, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/role/available`,
         headers: {
           Origin: "http://localhost:5173",
         },
-        withCredentials: true,
       });
-
       expect(response.status).toBe(200);
       expect(response.headers["vary"]).toBe("Origin");
     });
