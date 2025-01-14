@@ -72,8 +72,6 @@ export interface ApiKeyValidationRequest {
 export interface ApiKeyValidationResponse {
   isValid: boolean;
   needsRefresh: boolean;
-  fingerprintId?: string;
-  timestamp: number; // Unix timestamp
 }
 
 /**
