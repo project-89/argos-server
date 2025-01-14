@@ -1,110 +1,72 @@
-import axios, { AxiosRequestConfig, AxiosError, RawAxiosRequestHeaders } from "axios";
+import fetch, { RequestInit } from "node-fetch";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { COLLECTIONS } from "../../constants/collections";
-
 import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";
-import { Agent as HttpsAgent } from "https";
-import { getCurrentUnixMillis } from "../../utils/timestamp";
 
-// Create shared agents for all requests
-const httpAgent = new HttpAgent({ keepAlive: true });
-const httpsAgent = new HttpsAgent({ keepAlive: true });
+// Create a custom agent with a small keepAlive timeout
+const agent = new HttpAgent({
+  keepAlive: true,
+  keepAliveMsecs: 100,
+  maxSockets: 1,
+});
 
 /**
- * Make a request to the test server
+ * Destroy the HTTP agent to clean up any remaining connections
  */
-export const makeRequest = async (
-  method: string,
-  url: string,
-  data?: any,
-  options: AxiosRequestConfig = {},
-) => {
-  console.log(`🔵 Making ${method.toUpperCase()} request to ${url}`);
+export const destroyAgent = () => {
+  agent.destroy();
+};
 
-  // Set default headers
-  const defaultHeaders: RawAxiosRequestHeaders = {
-    Accept: "application/json",
-    "Content-Type": "application/json",
-  };
+interface TestDataOptions {
+  roles?: string[];
+  isAdmin?: boolean;
+}
 
-  // Handle CORS headers based on credentials
-  const withCredentials = options.withCredentials ?? true;
-  if (withCredentials) {
-    defaultHeaders.Origin = options.headers?.Origin ?? "http://localhost:5173";
-  } else {
-    defaultHeaders.Origin = options.headers?.Origin ?? undefined;
-  }
-
-  // For OPTIONS requests, ensure proper preflight headers
-  if (method.toLowerCase() === "options") {
-    defaultHeaders["Access-Control-Request-Method"] =
-      options.headers?.["Access-Control-Request-Method"] || "GET";
-    defaultHeaders["Access-Control-Request-Headers"] = [
-      "content-type",
-      "authorization",
-      "x-api-key",
-    ].join(",");
-  }
-
-  // Merge headers, ensuring API key is properly set
-  const headers = {
-    ...defaultHeaders,
-    ...(options.headers || {}),
-  };
-
-  // Ensure x-api-key is set if provided
-  if (options.headers?.["x-api-key"]) {
-    headers["x-api-key"] = options.headers["x-api-key"];
-  }
-
-  const config: AxiosRequestConfig = {
-    method,
-    url,
-    validateStatus: () => true,
-    withCredentials,
-    httpAgent,
-    httpsAgent,
-    headers,
-    timeout: TEST_CONFIG.defaultTimeout,
-    ...options,
-  };
-
-  if (
-    data !== null &&
-    data !== undefined &&
-    !["get", "head", "options"].includes(method.toLowerCase())
-  ) {
-    config.data = data;
-  }
+export const makeRequest = async (config: {
+  method: string;
+  url: string;
+  headers?: Record<string, string>;
+  data?: any;
+}) => {
+  console.log(`🔵 Making ${config.method.toUpperCase()} request to ${config.url}`);
 
   try {
+    const requestConfig: RequestInit = {
+      method: config.method,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+        ...config.headers,
+      },
+      body: config.data ? JSON.stringify(config.data) : undefined,
+      agent, // Use our custom agent
+    };
+
     console.log(`📤 Request config:`, {
       method: config.method,
       url: config.url,
-      headers: config.headers,
+      headers: requestConfig.headers,
       data: config.data,
     });
 
-    const response = await axios(config);
+    const response = await fetch(config.url, requestConfig);
+    const data = await response.json();
 
     console.log(`📥 Response:`, {
       status: response.status,
       statusText: response.statusText,
-      data: response.data,
+      data,
     });
 
-    return response;
+    return {
+      status: response.status,
+      statusText: response.statusText,
+      data,
+    };
   } catch (error) {
-    if (error instanceof AxiosError && error.response) {
-      console.error(`❌ Request failed:`, {
-        status: error.response.status,
-        statusText: error.response.statusText,
-        data: error.response.data,
-      });
-      return error.response;
-    }
-    console.error(`❌ Request error:`, error);
+    console.error(`❌ Request failed:`, error);
     throw error;
   }
 };
@@ -112,63 +74,53 @@ export const makeRequest = async (
 /**
  * Create test data for endpoints
  */
-export const createTestData = async (options: { roles?: string[]; isAdmin?: boolean } = {}) => {
-  try {
-    console.log("Creating test data...");
+export const createTestData = async (options: TestDataOptions = {}) => {
+  console.log("Creating test data...");
 
-    // Generate a unique fingerprint value
-    const uniqueFingerprint = `test-fingerprint-${getCurrentUnixMillis()}-${Math.random().toString(36).substring(2)}`;
-
-    // Register fingerprint first (always with default user role)
-    const fingerprintResponse = await makeRequest(
-      "post",
-      `${TEST_CONFIG.apiUrl}/fingerprint/register`,
-      {
-        fingerprint: uniqueFingerprint,
-        metadata: TEST_CONFIG.testFingerprint.metadata,
+  // Register fingerprint
+  const fingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fingerprintResponse = await makeRequest({
+    method: "post",
+    url: `${TEST_CONFIG.apiUrl}/fingerprint/register`,
+    data: {
+      fingerprint,
+      metadata: {
+        testData: true,
+        name: "Test Fingerprint",
       },
-    );
+    },
+  });
 
-    if (!fingerprintResponse.data.success || !fingerprintResponse.data.data.id) {
-      throw new Error(
-        "Failed to register fingerprint: " + JSON.stringify(fingerprintResponse.data),
-      );
-    }
-
-    const fingerprintId = fingerprintResponse.data.data.id;
-
-    // Then register API key for the fingerprint
-    const apiKeyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/register`, {
-      fingerprintId,
-    });
-
-    if (!apiKeyResponse.data.success || !apiKeyResponse.data.data.key) {
-      throw new Error("Failed to register API key: " + JSON.stringify(apiKeyResponse.data));
-    }
-
-    const apiKey = apiKeyResponse.data.data.key;
-
-    // Set roles directly in the database
-    const db = getFirestore();
-    if (options.isAdmin || options.roles) {
-      await db
-        .collection(COLLECTIONS.FINGERPRINTS)
-        .doc(fingerprintId)
-        .update({
-          roles: options.roles ?? (options.isAdmin ? ["user", "admin"] : ["user"]),
-        });
-    }
-
-    console.log("Test data created successfully");
-    return {
-      fingerprintId,
-      apiKey,
-      fingerprint: uniqueFingerprint,
-    };
-  } catch (error) {
-    console.error("Failed to create test data:", error);
-    throw error;
+  if (!fingerprintResponse.data.success) {
+    console.error("Failed to register fingerprint:", fingerprintResponse.data);
+    throw new Error("Failed to register fingerprint");
   }
+
+  const fingerprintId = fingerprintResponse.data.data.id;
+  console.log("Created fingerprint:", { fingerprintId });
+
+  // Register API key - no authentication needed for first key
+  const apiKeyResponse = await makeRequest({
+    method: "post",
+    url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+    data: {
+      fingerprintId,
+    },
+  });
+
+  if (!apiKeyResponse.data.success) {
+    console.error("Failed to register API key:", apiKeyResponse.data);
+    throw new Error("Failed to register API key");
+  }
+
+  const apiKey = apiKeyResponse.data.data.key;
+  console.log("Created API key");
+
+  console.log("Test data created successfully");
+  return {
+    fingerprintId,
+    apiKey,
+  };
 };
 
 /**
@@ -176,10 +128,21 @@ export const createTestData = async (options: { roles?: string[]; isAdmin?: bool
  */
 export const cleanDatabase = async () => {
   try {
-    console.log("🧹 Cleaning database...");
+    // Safety checks to prevent accidental production data deletion
+    if (process.env.NODE_ENV !== "test") {
+      throw new Error("cleanDatabase can only be run in test environment");
+    }
+    if (!process.env.FUNCTIONS_EMULATOR) {
+      throw new Error("cleanDatabase can only be run with Firestore emulator");
+    }
+    if (!process.env.FIRESTORE_EMULATOR_HOST) {
+      throw new Error("Firestore emulator host not set");
+    }
+
+    console.log("🧹 Cleaning test database...");
     const db = getFirestore();
     const collections = Object.values(COLLECTIONS);
-    console.log("📚 Cleaning collections:", collections);
+    console.log("📚 Cleaning test collections:", collections);
 
     const promises = collections.map(async (collection) => {
       const snapshot = await db.collection(collection).get();
@@ -189,9 +152,9 @@ export const cleanDatabase = async () => {
     });
 
     await Promise.all(promises);
-    console.log("✨ Database cleaned successfully");
+    console.log("✨ Test database cleaned successfully");
   } catch (error) {
-    console.error("💥 Failed to clean database:", error);
+    console.error("💥 Failed to clean test database:", error);
     throw error;
   }
 };
