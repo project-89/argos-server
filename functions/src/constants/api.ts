@@ -21,12 +21,14 @@ export const HTTP_STATUS = {
 
 export const ERROR_MESSAGES = {
   INVALID_API_KEY: "Invalid API key",
-  MISSING_API_KEY: "Missing API key",
-  INVALID_FINGERPRINT: "Invalid fingerprint",
-  MISSING_FINGERPRINT: "Missing fingerprint",
+  MISSING_API_KEY: "API key is required",
+  INVALID_FINGERPRINT: "Fingerprint not found",
+  MISSING_FINGERPRINT: "Fingerprint is required",
   RATE_LIMIT_EXCEEDED: "Rate limit exceeded",
   INTERNAL_ERROR: "Internal server error",
-  INSUFFICIENT_PERMISSIONS: "Insufficient permissions",
+  INSUFFICIENT_PERMISSIONS: "API key does not match fingerprint",
+  MISSING_METADATA: "Metadata is required",
+  INVALID_METADATA: "Expected object, received string",
 } as const;
 
 export const ENDPOINTS = {
