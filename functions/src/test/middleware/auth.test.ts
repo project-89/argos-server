@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest } from "../utils/testUtils";
-import { createTestData, cleanDatabase } from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 
 describe("Auth Test Suite", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -17,26 +16,27 @@ describe("Auth Test Suite", () => {
   });
 
   it("should allow public endpoint without API key", async () => {
-    const response = await makeRequest("post", `${API_URL}/fingerprint/register`, {
-      fingerprint: "test-fingerprint",
+    const response = await makeRequest({
+      method: "post",
+      url: `${API_URL}/fingerprint/register`,
+      data: {
+        fingerprint: "test-fingerprint",
+      },
     });
     expect(response.status).toBe(201);
     expect(response.data.success).toBe(true);
   });
 
   it("should reject protected endpoint without API key", async () => {
-    const response = await makeRequest(
-      "post",
-      `${API_URL}/tag/update`,
-      {
+    const response = await makeRequest({
+      method: "post",
+      url: `${API_URL}/tag/update`,
+      data: {
         fingerprintId,
         tags: { visits: 10 },
       },
-      {
-        headers: { "x-api-key": undefined },
-        validateStatus: () => true,
-      },
-    );
+      // Omit headers entirely to test missing API key
+    });
 
     expect(response.status).toBe(401);
     expect(response.data.success).toBe(false);
@@ -44,18 +44,15 @@ describe("Auth Test Suite", () => {
   });
 
   it("should reject protected endpoint with invalid API key", async () => {
-    const response = await makeRequest(
-      "post",
-      `${API_URL}/tag/update`,
-      {
+    const response = await makeRequest({
+      method: "post",
+      url: `${API_URL}/tag/update`,
+      data: {
         fingerprintId,
         tags: { visits: 10 },
       },
-      {
-        headers: { "x-api-key": "invalid-key" },
-        validateStatus: () => true,
-      },
-    );
+      headers: { "x-api-key": "invalid-key" },
+    });
 
     expect(response.status).toBe(401);
     expect(response.data.success).toBe(false);
@@ -63,17 +60,15 @@ describe("Auth Test Suite", () => {
   });
 
   it("should allow protected endpoint with valid API key", async () => {
-    const response = await makeRequest(
-      "post",
-      `${API_URL}/visit/presence`,
-      {
+    const response = await makeRequest({
+      method: "post",
+      url: `${API_URL}/visit/presence`,
+      data: {
         fingerprintId,
         status: "online",
       },
-      {
-        headers: { "x-api-key": validApiKey },
-      },
-    );
+      headers: { "x-api-key": validApiKey },
+    });
 
     expect(response.status).toBe(200);
     expect(response.data.success).toBe(true);
@@ -85,18 +80,15 @@ describe("Auth Test Suite", () => {
     const { apiKey: otherApiKey } = await createTestData();
 
     // Try to update tags for the first fingerprint using the second fingerprint's API key
-    const response = await makeRequest(
-      "post",
-      `${API_URL}/tag/update`,
-      {
+    const response = await makeRequest({
+      method: "post",
+      url: `${API_URL}/tag/update`,
+      data: {
         fingerprintId, // Using first fingerprint ID
         tags: { visits: 15 },
       },
-      {
-        headers: { "x-api-key": otherApiKey }, // Using second fingerprint's API key
-        validateStatus: () => true,
-      },
-    );
+      headers: { "x-api-key": otherApiKey }, // Using second fingerprint's API key
+    });
 
     expect(response.status).toBe(403);
     expect(response.data.success).toBe(false);

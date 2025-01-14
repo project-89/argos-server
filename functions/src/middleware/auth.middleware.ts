@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
-import { validateApiKey } from "../services/apiKeyService";
+import { validateApiKey, getApiKeyByKey } from "../services/apiKeyService";
 
 // Extend Express Request type to include fingerprintId
 declare global {
@@ -26,23 +26,24 @@ export const validateApiKeyMiddleware = async (
       throw new ApiError(401, "API key is required");
     }
 
-    // Pass the raw header value to validateApiKey, which will handle type checking
-    const result = await validateApiKey(apiKey as string);
-
-    if (!result.isValid) {
-      // If we have a fingerprintId but the key is invalid, it means the key exists but needs refresh
-      if (result.needsRefresh) {
-        throw new ApiError(401, "API key needs to be refreshed");
-      }
+    // First check if the API key exists
+    const apiKeyDetails = await getApiKeyByKey(apiKey as string);
+    if (!apiKeyDetails) {
       throw new ApiError(401, "Invalid API key");
     }
 
-    if (!result.fingerprintId) {
+    // Then validate the API key
+    const validationResult = await validateApiKey(apiKey as string);
+    if (!validationResult.isValid && validationResult.needsRefresh) {
+      throw new ApiError(401, "API key needs to be refreshed");
+    }
+
+    if (!apiKeyDetails.fingerprintId) {
       throw new ApiError(500, "Invalid API key data");
     }
 
     // Set fingerprintId on request for use in other middleware/routes
-    req.fingerprintId = result.fingerprintId;
+    req.fingerprintId = apiKeyDetails.fingerprintId;
 
     // Get the relative path from the request
     const relativePath = req.path;
@@ -50,7 +51,7 @@ export const validateApiKeyMiddleware = async (
     // For non-admin routes, check if the request contains a fingerprintId (in body or params) and if it matches
     if (!relativePath.startsWith("/admin") && !relativePath.startsWith("/visit/log")) {
       const requestFingerprintId = req.body?.fingerprintId || req.params?.fingerprintId;
-      if (requestFingerprintId && requestFingerprintId !== result.fingerprintId) {
+      if (requestFingerprintId && requestFingerprintId !== apiKeyDetails.fingerprintId) {
         throw new ApiError(403, "API key does not match fingerprint");
       }
     }
