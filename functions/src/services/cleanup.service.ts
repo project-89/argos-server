@@ -1,39 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-
-interface CleanupResult {
-  cleanupTime: number;
-  itemsCleaned: {
-    visits: number;
-    presence: number;
-    priceCache: number;
-    rateLimitStats: number;
-    rateLimitRequests: number;
-  };
-}
-
-interface VisitData {
-  id: string;
-  fingerprintId: string;
-  siteId: string;
-  timestamp: number;
-}
-
-interface VisitPattern {
-  currentSite: string;
-  nextSite: string;
-  transitionCount: number;
-  averageTimeSpent: number;
-}
-
-interface SiteEngagement {
-  siteId: string;
-  totalVisits: number;
-  averageTimeSpent: number;
-  returnRate: number;
-  commonNextSites: string[];
-}
+import { CleanupResult, VisitData, VisitPattern, SiteEngagement } from "../types/api.types";
 
 /**
  * Cleanup service to remove old data from the database
