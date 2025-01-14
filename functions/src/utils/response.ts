@@ -48,7 +48,8 @@ export const sendError = (
   // Add error code if available
   if (error instanceof ApiError) {
     response.code = error.name;
-    status = error.statusCode;
+    // Only use error's status code if none was explicitly passed
+    status = status || error.statusCode;
   }
 
   return res.status(status || 500).json(response);
