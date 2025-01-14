@@ -7,13 +7,18 @@ import { ERROR_MESSAGES } from "../constants/api";
 declare global {
   namespace Express {
     interface Request {
-      fingerprintId?: string;
+      fingerprintId?: string; // This represents the caller's fingerprint ID
     }
   }
 }
 
+// List of public endpoints that don't require an API key
+const PUBLIC_ENDPOINTS = ["/fingerprint/register", "/api-key/register", "/api-key/validate"];
+
 /**
- * Middleware to validate API key and set fingerprintId on request
+ * Middleware to validate API key and set caller's fingerprintId on request
+ * - Public routes: No API key required
+ * - All other routes: Require valid API key, sets caller's fingerprintId
  */
 export const validateApiKeyMiddleware = async (
   req: Request,
@@ -21,12 +26,18 @@ export const validateApiKeyMiddleware = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
+    // Check if this is a public endpoint
+    if (PUBLIC_ENDPOINTS.some((endpoint) => req.path.startsWith(endpoint))) {
+      return next();
+    }
+
+    // For all other routes, API key is required
     const apiKey = req.headers["x-api-key"];
     if (!apiKey) {
       throw new ApiError(401, ERROR_MESSAGES.MISSING_API_KEY);
     }
 
-    // First check if the API key exists
+    // First check if the API key exists and get its details
     const apiKeyDetails = await getApiKeyByKey(apiKey as string);
     if (!apiKeyDetails) {
       throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
@@ -42,20 +53,8 @@ export const validateApiKeyMiddleware = async (
       throw new ApiError(500, "Invalid API key data");
     }
 
-    // Set fingerprintId on request for use in other middleware/routes
+    // Set the caller's fingerprint ID - this identifies who is making the request
     req.fingerprintId = apiKeyDetails.fingerprintId;
-
-    // Get the relative path from the request
-    const relativePath = req.path;
-
-    // For non-admin routes, check if the request contains a fingerprintId (in body or params) and if it matches
-    if (!relativePath.startsWith("/admin") && !relativePath.startsWith("/visit/log")) {
-      const requestFingerprintId =
-        req.body?.fingerprintId || req.params?.fingerprintId || req.params?.id;
-      if (requestFingerprintId && requestFingerprintId !== apiKeyDetails.fingerprintId) {
-        throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
-      }
-    }
 
     next();
   } catch (error) {

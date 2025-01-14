@@ -74,24 +74,4 @@ describe("Auth Test Suite", () => {
     expect(response.data.success).toBe(true);
     expect(response.data.data.status).toBe("online");
   });
-
-  it("should reject request when API key does not match fingerprint", async () => {
-    // Create another fingerprint and API key
-    const { apiKey: otherApiKey } = await createTestData();
-
-    // Try to update tags for the first fingerprint using the second fingerprint's API key
-    const response = await makeRequest({
-      method: "post",
-      url: `${API_URL}/tag/update`,
-      data: {
-        fingerprintId, // Using first fingerprint ID
-        tags: { visits: 15 },
-      },
-      headers: { "x-api-key": otherApiKey }, // Using second fingerprint's API key
-    });
-
-    expect(response.status).toBe(403);
-    expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
-  });
 });
