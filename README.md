@@ -73,8 +73,6 @@ These endpoints require a valid API key with admin role:
   - Response: `{ success: true }`
 - `POST /admin/tag/roles/update` - Update roles based on tags
   - Response: `{ success: true }`
-- `POST /admin/debug/cleanup` - Manual cleanup trigger
-  - Response: `{ success: true }`
 
 ### Error Responses
 All endpoints return standardized error responses:

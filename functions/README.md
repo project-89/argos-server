@@ -1,4 +1,3 @@
-
 # Project 89: Argos Server Functions
 
 ## Overview
@@ -87,11 +86,6 @@ All protected endpoints require an API key passed in the `x-api-key` header. API
 - `POST /tag/roles/update`
  - Update reality tiers based on tags
  - Body: `{ fingerprintId: string }`
-
-#### Debug Operations
-- `POST /debug/cleanup`
- - Manual trigger for reality matrix recalibration
- - Protected administrator protocol
 
 ## Automated Services
 
