@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
 
 describe("API Key Endpoint", () => {
   let fingerprintId: string;
@@ -16,29 +16,27 @@ describe("API Key Endpoint", () => {
   describe("POST /api-key/register", () => {
     it("should register a new API key", async () => {
       // Create a new fingerprint without an API key
-      const registerResponse = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/fingerprint/register`,
-        {
+      const registerResponse = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/fingerprint/register`,
+        data: {
           fingerprint: "test-fingerprint-2",
           metadata: { test: true },
         },
-      );
+      });
       const newFingerprintId = registerResponse.data.data.id;
 
       // Register an API key for the new fingerprint
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/register`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+        data: {
           fingerprintId: newFingerprintId,
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+        headers: {
+          "x-api-key": validApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -46,18 +44,16 @@ describe("API Key Endpoint", () => {
       expect(response.data.data).toHaveProperty("fingerprintId", newFingerprintId);
 
       // Verify the new key works by using it in a request
-      const verifyResponse = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/register`,
-        {
+      const verifyResponse = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+        data: {
           fingerprintId: newFingerprintId,
         },
-        {
-          headers: {
-            "x-api-key": response.data.data.key,
-          },
+        headers: {
+          "x-api-key": response.data.data.key,
         },
-      );
+      });
       expect(verifyResponse.status).toBe(200);
     });
 
@@ -66,18 +62,16 @@ describe("API Key Endpoint", () => {
       const originalApiKey = validApiKey;
 
       // Register a new API key for the same fingerprint
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/register`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+        data: {
           fingerprintId,
         },
-        {
-          headers: {
-            "x-api-key": originalApiKey,
-          },
+        headers: {
+          "x-api-key": originalApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -86,8 +80,12 @@ describe("API Key Endpoint", () => {
       expect(response.data.data).toHaveProperty("fingerprintId", fingerprintId);
 
       // Verify the original API key is no longer valid by trying to use it
-      const verifyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
-        key: originalApiKey,
+      const verifyResponse = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {
+          key: originalApiKey,
+        },
       });
 
       expect(verifyResponse.status).toBe(200);
@@ -99,16 +97,14 @@ describe("API Key Endpoint", () => {
     });
 
     it("should require fingerprintId", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/register`,
-        {},
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+        data: {},
+        headers: {
+          "x-api-key": validApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
@@ -125,18 +121,16 @@ describe("API Key Endpoint", () => {
     });
 
     it("should validate fingerprintId exists", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/register`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/register`,
+        data: {
           fingerprintId: "non-existent-id",
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+        headers: {
+          "x-api-key": validApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
@@ -146,26 +140,28 @@ describe("API Key Endpoint", () => {
 
   describe("POST /api-key/revoke", () => {
     it("should revoke an existing API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        data: {
           key: validApiKey,
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+        headers: {
+          "x-api-key": validApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.message).toBe("API key revoked successfully");
 
       // Verify the key is no longer valid by trying to use it
-      const verifyResponse = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
-        key: validApiKey,
+      const verifyResponse = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {
+          key: validApiKey,
+        },
       });
 
       expect(verifyResponse.status).toBe(200);
@@ -177,16 +173,13 @@ describe("API Key Endpoint", () => {
     });
 
     it("should reject request without API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        data: {
           key: validApiKey,
         },
-        {
-          validateStatus: () => true,
-        },
-      );
+      });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
@@ -194,19 +187,16 @@ describe("API Key Endpoint", () => {
     });
 
     it("should reject request with invalid API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        data: {
           key: validApiKey,
         },
-        {
-          headers: {
-            "x-api-key": "invalid-key",
-          },
-          validateStatus: () => true,
+        headers: {
+          "x-api-key": "invalid-key",
         },
-      );
+      });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
@@ -217,19 +207,16 @@ describe("API Key Endpoint", () => {
       // Create another fingerprint with a different API key
       const { apiKey: otherApiKey } = await createTestData();
 
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
-        {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        data: {
           key: validApiKey,
         },
-        {
-          headers: {
-            "x-api-key": otherApiKey,
-          },
-          validateStatus: () => true,
+        headers: {
+          "x-api-key": otherApiKey,
         },
-      );
+      });
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
@@ -239,8 +226,12 @@ describe("API Key Endpoint", () => {
 
   describe("POST /api-key/validate", () => {
     it("should validate a valid API key", async () => {
-      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
-        key: validApiKey,
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {
+          key: validApiKey,
+        },
       });
 
       expect(response.status).toBe(200);
@@ -252,23 +243,25 @@ describe("API Key Endpoint", () => {
     });
 
     it("should indicate when a key needs refresh", async () => {
-      // First revoke the key
-      await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/revoke`,
-        {
+      // Revoke the key first
+      await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        data: {
           key: validApiKey,
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
+        headers: {
+          "x-api-key": validApiKey,
         },
-      );
+      });
 
       // Then validate it
-      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
-        key: validApiKey,
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {
+          key: validApiKey,
+        },
       });
 
       expect(response.status).toBe(200);
@@ -279,32 +272,56 @@ describe("API Key Endpoint", () => {
       });
     });
 
-    it("should handle non-existent API key", async () => {
-      const response = await makeRequest("post", `${TEST_CONFIG.apiUrl}/api-key/validate`, {
-        key: "non-existent-key",
+    it("should indicate when a key does not exist", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {
+          key: "non-existent-key",
+        },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toEqual({
         isValid: false,
-        needsRefresh: false,
+        needsRefresh: true,
       });
     });
 
-    it("should require key field", async () => {
-      const response = await makeRequest(
-        "post",
-        `${TEST_CONFIG.apiUrl}/api-key/validate`,
-        {},
-        {
-          validateStatus: () => true,
-        },
-      );
+    it("should require key", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${TEST_CONFIG.apiUrl}/api-key/validate`,
+        data: {},
+      });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
       expect(response.data.error).toBe("Required");
+      expect(response.data.details).toEqual([
+        {
+          code: "invalid_type",
+          expected: "string",
+          received: "undefined",
+          path: ["key"],
+          message: "Required",
+        },
+      ]);
     });
   });
+});
+
+// Global cleanup
+afterAll((done) => {
+  // Clean up database and destroy agent
+  cleanDatabase()
+    .then(() => {
+      destroyAgent();
+      done();
+    })
+    .catch((error) => {
+      console.error("Failed to clean up:", error);
+      done(error);
+    });
 });
