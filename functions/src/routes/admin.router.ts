@@ -5,15 +5,12 @@ import * as tag from "../endpoints/tag.endpoint";
 
 const adminRouter = Router();
 
-// Apply admin check to all routes in this router
-adminRouter.use(requireAdmin);
+// ROLE management routes - apply admin check per route
+adminRouter.post("/role/assign", requireAdmin, role.assignRole);
+adminRouter.post("/role/remove", requireAdmin, role.removeRole);
 
-// ROLE management routes
-adminRouter.post("/role/assign", role.assignRole);
-adminRouter.post("/role/remove", role.removeRole);
-
-// Tag management routes
-adminRouter.post("/tag/update", tag.addOrUpdateTags);
-adminRouter.post("/tag/rules", tag.updateRolesBasedOnTags);
+// Tag management routes - apply admin check per route
+adminRouter.post("/tag/update", requireAdmin, tag.addOrUpdateTags);
+adminRouter.post("/tag/rules", requireAdmin, tag.updateRolesBasedOnTags);
 
 export default adminRouter;
