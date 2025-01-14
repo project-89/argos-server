@@ -19,8 +19,8 @@ export const destroyAgent = () => {
 };
 
 interface TestDataOptions {
+  metadata?: Record<string, any>;
   roles?: string[];
-  isAdmin?: boolean;
 }
 
 export const makeRequest = async (config: {
@@ -28,16 +28,22 @@ export const makeRequest = async (config: {
   url: string;
   headers?: Record<string, string>;
   data?: any;
+  params?: Record<string, string>;
+  validateStatus?: () => boolean;
 }) => {
   console.log(`🔵 Making ${config.method.toUpperCase()} request to ${config.url}`);
 
   try {
+    // Add query parameters to URL if provided
+    const urlWithParams = config.params
+      ? `${config.url}${config.url.includes("?") ? "&" : "?"}${new URLSearchParams(config.params)}`
+      : config.url;
+
     const requestConfig: RequestInit = {
       method: config.method,
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
-        Origin: "http://localhost:5173",
         ...config.headers,
       },
       body: config.data ? JSON.stringify(config.data) : undefined,
@@ -46,25 +52,40 @@ export const makeRequest = async (config: {
 
     console.log(`📤 Request config:`, {
       method: config.method,
-      url: config.url,
+      url: urlWithParams,
       headers: requestConfig.headers,
       data: config.data,
+      params: config.params,
     });
 
-    const response = await fetch(config.url, requestConfig);
-    const data = await response.json();
+    const response = await fetch(urlWithParams, requestConfig);
+    let data;
 
-    console.log(`📥 Response:`, {
+    // Only try to parse JSON for non-OPTIONS requests
+    if (config.method.toLowerCase() !== "options") {
+      try {
+        data = await response.json();
+      } catch (e) {
+        data = null;
+      }
+    }
+
+    // Convert headers to a plain object
+    const headers: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      headers[key.toLowerCase()] = value;
+    });
+
+    const result = {
       status: response.status,
       statusText: response.statusText,
       data,
-    });
-
-    return {
-      status: response.status,
-      statusText: response.statusText,
-      data,
+      headers,
     };
+
+    console.log(`📥 Response:`, result);
+
+    return result;
   } catch (error) {
     console.error(`❌ Request failed:`, error);
     throw error;
@@ -75,7 +96,7 @@ export const makeRequest = async (config: {
  * Create test data for endpoints
  */
 export const createTestData = async (options: TestDataOptions = {}) => {
-  console.log("Creating test data...");
+  console.log("Creating test data with options:", options);
 
   // Register fingerprint
   const fingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -84,7 +105,7 @@ export const createTestData = async (options: TestDataOptions = {}) => {
     url: `${TEST_CONFIG.apiUrl}/fingerprint/register`,
     data: {
       fingerprint,
-      metadata: {
+      metadata: options.metadata || {
         testData: true,
         name: "Test Fingerprint",
       },
@@ -98,6 +119,20 @@ export const createTestData = async (options: TestDataOptions = {}) => {
 
   const fingerprintId = fingerprintResponse.data.data.id;
   console.log("Created fingerprint:", { fingerprintId });
+
+  // If roles are provided, set them directly in Firestore
+  if (options.roles) {
+    const db = getFirestore();
+    await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).update({
+      roles: options.roles,
+    });
+    console.log("Updated fingerprint roles:", { fingerprintId, roles: options.roles });
+
+    // Verify roles were set
+    const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+    const data = doc.data();
+    console.log("Verified fingerprint data:", { fingerprintId, data });
+  }
 
   // Register API key - no authentication needed for first key
   const apiKeyResponse = await makeRequest({
@@ -114,9 +149,8 @@ export const createTestData = async (options: TestDataOptions = {}) => {
   }
 
   const apiKey = apiKeyResponse.data.data.key;
-  console.log("Created API key");
+  console.log("Created API key for fingerprint:", { fingerprintId });
 
-  console.log("Test data created successfully");
   return {
     fingerprintId,
     apiKey,
