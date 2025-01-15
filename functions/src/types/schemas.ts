@@ -8,17 +8,12 @@ const tagsSchema = z.record(z.number());
 export const schemas = {
   // Fingerprint schemas
   fingerprintRegister: z.object({
-    fingerprint: z.string({
-      required_error: "Fingerprint is required",
-    }),
+    fingerprint: z.string(),
     metadata: z.record(z.any()).optional(),
   }),
 
   fingerprintUpdate: z.object({
-    metadata: z.record(z.any(), {
-      required_error: "Metadata is required",
-      invalid_type_error: "Metadata must be an object",
-    }),
+    metadata: z.record(z.any()),
   }),
 
   // Visit schemas
@@ -77,25 +72,18 @@ export const schemas = {
   apiKeyRevoke: z.object({
     key: z.string(),
   }),
-  // Schemas
+
+  // Impression schemas
   createImpressionSchema: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint ID is required",
-    }),
-    type: z.string({
-      required_error: "Type is required",
-    }),
-    data: z.record(z.any(), {
-      required_error: "Data is required",
-    }),
+    fingerprintId: z.string(),
+    type: z.string(),
+    data: z.record(z.any()),
     source: z.string().optional(),
     sessionId: z.string().optional(),
   }),
 
   getImpressionsSchema: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint ID is required",
-    }),
+    fingerprintId: z.string(),
     type: z.string().optional(),
     startTime: z.string().datetime().optional(),
     endTime: z.string().datetime().optional(),
@@ -104,9 +92,7 @@ export const schemas = {
   }),
 
   deleteImpressionsSchema: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint ID is required",
-    }),
+    fingerprintId: z.string(),
     type: z.string().optional(),
     startTime: z.string().datetime().optional(),
     endTime: z.string().datetime().optional(),

@@ -209,6 +209,47 @@ export interface RealityStabilityResponse {
 }
 
 /**
+ * Cleanup Service Types
+ */
+export interface CleanupResult {
+  cleanupTime: number;
+  itemsCleaned: {
+    visits: number;
+    presence: number;
+    priceCache: number;
+    rateLimitStats: number;
+    rateLimitRequests: number;
+  };
+}
+
+export interface VisitData {
+  id: string;
+  fingerprintId: string;
+  siteId: string;
+  timestamp: number;
+}
+
+export interface VisitPattern {
+  currentSite: string;
+  nextSite: string;
+  transitionCount: number;
+  averageTimeSpent: number;
+}
+
+export interface SiteEngagement {
+  siteId: string;
+  totalVisits: number;
+  averageTimeSpent: number;
+  returnRate: number;
+  commonNextSites: string[];
+}
+
+export interface VisitAnalysis {
+  patterns: VisitPattern[];
+  engagement: SiteEngagement[];
+}
+
+/**
  * API Endpoints Configuration
  */
 export const API_ENDPOINTS = {
