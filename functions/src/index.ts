@@ -23,6 +23,9 @@ import { composeMiddleware } from "./middleware/compose";
 import { MiddlewareConfig } from "./middleware/config";
 import { withMetrics } from "./middleware/metrics";
 import { errorHandler } from "./middleware/error.middleware";
+import { ApiError } from "./utils/error";
+import { ERROR_MESSAGES } from "./constants/api";
+import { sendError } from "./utils/response";
 
 // Import routers
 import { publicRouter } from "./routes/public.router";
@@ -103,20 +106,6 @@ app.use(express.json());
 const isBrowserRequest = (req: express.Request): boolean => {
   const accept = req.headers.accept || "";
   return accept.includes("text/html") || accept.includes("*/*");
-};
-
-// Helper to send error response
-const sendErrorResponse = (
-  res: express.Response,
-  statusCode: number,
-  browserFile: string,
-  apiError: { success: false; error: string; message: string },
-) => {
-  if (isBrowserRequest(res.req)) {
-    res.status(statusCode).sendFile(path.join(__dirname, "public", browserFile));
-  } else {
-    res.status(statusCode).json(apiError);
-  }
 };
 
 // Initialize middleware configuration
@@ -217,11 +206,11 @@ app.use(errorHandler);
 
 // 404 handler for any remaining routes
 app.use((req, res) => {
-  sendErrorResponse(res, 404, "404.html", {
-    success: false,
-    error: "Not Found",
-    message: "The requested endpoint does not exist",
-  });
+  if (isBrowserRequest(req)) {
+    res.status(404).sendFile(path.join(__dirname, "public", "404.html"));
+  } else {
+    sendError(res, new ApiError(404, ERROR_MESSAGES.NOT_FOUND));
+  }
 });
 
 // Export the Express app as a Firebase Cloud Function

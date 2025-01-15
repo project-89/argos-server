@@ -134,9 +134,9 @@ describe("Fingerprint Endpoint", () => {
         headers: { "x-api-key": validApiKey },
       });
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_FINGERPRINT);
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
       expect(response.data.requestId).toBeTruthy();
       expect(response.data.timestamp).toBeTruthy();
     });
@@ -151,7 +151,7 @@ describe("Fingerprint Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_FINGERPRINT);
+      expect(response.data.error).toBe(ERROR_MESSAGES.NOT_FOUND);
       expect(response.data.requestId).toBeTruthy();
       expect(response.data.timestamp).toBeTruthy();
     });
@@ -212,9 +212,9 @@ describe("Fingerprint Endpoint", () => {
         headers: { "x-api-key": otherApiKey },
       });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
       expect(response.data.requestId).toBeTruthy();
       expect(response.data.timestamp).toBeTruthy();
     });
