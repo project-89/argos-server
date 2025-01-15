@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 import { z } from "zod";
 import { createImpression, getImpressions, deleteImpressions } from "../services/impressionService";
