@@ -15,17 +15,18 @@ describe("Ownership Check Middleware Test Suite", () => {
     await cleanDatabase();
 
     // Create two regular users
-    const { fingerprintId: fId1, apiKey: key1 } = await createTestData();
+    const { fingerprintId: fId1, apiKey: key1 } = await createTestData({ skipCleanup: true });
     fingerprintId = fId1;
     validApiKey = key1;
 
-    const { fingerprintId: fId2, apiKey: key2 } = await createTestData();
+    const { fingerprintId: fId2, apiKey: key2 } = await createTestData({ skipCleanup: true });
     otherFingerprintId = fId2;
     otherApiKey = key2;
 
     // Create an admin user
     const { fingerprintId: adminId, apiKey: adminKey } = await createTestData({
       roles: [ROLE.ADMIN, ROLE.USER],
+      skipCleanup: true,
     });
     adminFingerprintId = adminId;
     adminApiKey = adminKey;
