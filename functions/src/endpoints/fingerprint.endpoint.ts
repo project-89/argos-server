@@ -1,91 +1,80 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 import { schemas } from "../types/schemas";
+import { sendError, sendSuccess } from "../utils/response";
+import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 import {
   createFingerprint,
   getFingerprintAndUpdateIp,
-  getClientIp,
-  verifyFingerprint,
   updateFingerprintMetadata,
+  getClientIp,
 } from "../services/fingerprintService";
-import { sendSuccess } from "../utils/response";
-import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
 
-// Extend Request type to include fingerprint
-interface AuthenticatedRequest extends Request {
-  fingerprintId?: string;
-}
+const LOG_PREFIX = "[Fingerprint Endpoint]";
 
-/**
- * Register a new fingerprint
- */
 export const register = [
   validateRequest(schemas.fingerprintRegister),
   async (req: Request, res: Response): Promise<Response> => {
     try {
+      console.log(`${LOG_PREFIX} Starting fingerprint registration`);
       const { fingerprint, metadata } = req.body;
       const ip = getClientIp(req);
-
       const result = await createFingerprint(fingerprint, ip, metadata);
+      console.log(`${LOG_PREFIX} Successfully created fingerprint`);
       return sendSuccess(res, result, "Fingerprint registered successfully", 201);
     } catch (error) {
-      console.error("Error registering fingerprint:", error);
+      console.error(`${LOG_PREFIX} Error registering fingerprint:`, error);
       if (error instanceof ApiError) {
-        throw error;
+        return sendError(res, error, error.statusCode);
       }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
     }
   },
 ];
 
-/**
- * Get fingerprint by ID
- */
-export const get = async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
-  const { id } = req.params;
-
-  if (!id) {
-    throw new ApiError(404, "Not Found");
-  }
-
+export const get = async (req: Request, res: Response): Promise<Response> => {
   try {
-    // Verify fingerprint ownership first
-    await verifyFingerprint(id, req.fingerprintId);
+    console.log(`${LOG_PREFIX} Starting fingerprint retrieval`);
+    const fingerprintId = req.params.id;
 
-    const result = await getFingerprintAndUpdateIp(id, req.ip || "unknown");
+    // This should be caught by the ownership middleware now
+    if (!fingerprintId) {
+      throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
+    }
+
+    const result = await getFingerprintAndUpdateIp(fingerprintId, getClientIp(req));
+    console.log(`${LOG_PREFIX} Successfully retrieved fingerprint`);
     return sendSuccess(res, result.data);
   } catch (error) {
-    // Let the error middleware handle all errors
+    console.error(`${LOG_PREFIX} Error retrieving fingerprint:`, error);
     if (error instanceof ApiError) {
-      throw error;
+      return sendError(res, error, error.statusCode);
     }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
   }
 };
 
-/**
- * Update fingerprint metadata
- */
 export const update = [
   validateRequest(schemas.fingerprintUpdate),
-  async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
+  async (req: Request, res: Response): Promise<Response> => {
     try {
+      console.log(`${LOG_PREFIX} Starting fingerprint update`);
       const { fingerprintId, metadata } = req.body;
-      if (!fingerprintId) {
-        throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
-      }
-
-      await verifyFingerprint(fingerprintId);
       const result = await updateFingerprintMetadata(fingerprintId, metadata);
-
-      return sendSuccess(res, result, "Fingerprint metadata updated successfully");
+      console.log(`${LOG_PREFIX} Successfully updated fingerprint`);
+      return sendSuccess(res, result, "Fingerprint updated successfully");
     } catch (error) {
-      console.error("Error updating fingerprint:", error);
+      console.error(`${LOG_PREFIX} Error updating fingerprint:`, error);
       if (error instanceof ApiError) {
-        throw error;
+        return sendError(res, error, error.statusCode);
       }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
     }
   },
 ];
+
+export const getBase = async (req: Request, res: Response): Promise<Response> => {
+  console.log(`${LOG_PREFIX} Missing fingerprint ID in request`);
+  return sendError(res, new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT), 404);
+};

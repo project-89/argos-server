@@ -1,19 +1,23 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
 import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Fingerprint Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
-  let validApiKey: string;
   let fingerprintId: string;
+  let validApiKey: string;
 
   beforeEach(async () => {
     await cleanDatabase();
-    // Create test data
-    const { fingerprintId: fId, apiKey } = await createTestData();
-    fingerprintId = fId;
-    validApiKey = apiKey;
+    const testData = await createTestData();
+    fingerprintId = testData.fingerprintId;
+    validApiKey = testData.apiKey;
+  });
+
+  afterAll(async () => {
+    await cleanDatabase();
+    destroyAgent();
   });
 
   describe("POST /fingerprint/register", () => {
@@ -142,11 +146,12 @@ describe("Fingerprint Endpoint", () => {
         method: "get",
         url: `${API_URL}/fingerprint/`,
         headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
       });
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Not Found");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_FINGERPRINT);
       expect(response.data.requestId).toBeTruthy();
       expect(response.data.timestamp).toBeTruthy();
     });
@@ -355,6 +360,7 @@ describe("Fingerprint Endpoint", () => {
         url: `${API_URL}/fingerprint/update`,
         data: {},
         headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
       });
 
       expect(response.status).toBe(400);
@@ -379,11 +385,12 @@ describe("Fingerprint Endpoint", () => {
           fingerprintId,
         },
         headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
       });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Metadata is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_METADATA);
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
