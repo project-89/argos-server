@@ -131,15 +131,77 @@ export const createTestData = async (options: TestDataOptions = {}) => {
   // If roles are provided, set them directly in Firestore
   if (options.roles) {
     const db = getFirestore();
-    await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).update({
-      roles: options.roles,
-    });
-    console.log("Updated fingerprint roles:", { fingerprintId, roles: options.roles });
+    console.log("Setting roles for fingerprint:", { fingerprintId, roles: options.roles });
+
+    // First check the current state
+    const beforeDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+    console.log("Document state before setting roles:", beforeDoc.data());
+
+    // Set initial roles
+    await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .doc(fingerprintId)
+      .set(
+        {
+          roles: options.roles,
+          fingerprint,
+          metadata: options.metadata || {
+            testData: true,
+            name: "Test Fingerprint",
+          },
+        },
+        { merge: true },
+      );
+
+    // Check immediately after setting
+    const afterDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+    console.log("Document state immediately after setting roles:", afterDoc.data());
 
     // Verify roles were set
-    const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-    const data = doc.data();
-    console.log("Verified fingerprint data:", { fingerprintId, data });
+    let retries = 0;
+    const maxRetries = 3;
+    let rolesVerified = false;
+
+    while (retries < maxRetries && !rolesVerified) {
+      const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+      const data = doc.data();
+      console.log(`Verification attempt ${retries + 1}:`, { fingerprintId, data });
+
+      if (data?.roles && Array.isArray(data.roles) && data.roles.length === options.roles.length) {
+        const hasAllRoles = options.roles.every((role) => data.roles.includes(role));
+        if (hasAllRoles) {
+          rolesVerified = true;
+          console.log("Roles verified successfully:", data.roles);
+          break;
+        }
+      }
+
+      retries++;
+      if (!rolesVerified && retries < maxRetries) {
+        console.log(`Retry ${retries}: Roles not verified yet, waiting...`);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+      }
+    }
+
+    if (!rolesVerified) {
+      console.error(
+        "Role verification failed. Final document state:",
+        await db
+          .collection(COLLECTIONS.FINGERPRINTS)
+          .doc(fingerprintId)
+          .get()
+          .then((d) => d.data()),
+      );
+      throw new Error(`Failed to verify roles after ${maxRetries} attempts`);
+    }
+
+    // Double check the roles one final time
+    const finalCheck = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+    const finalData = finalCheck.data();
+    console.log("Final role verification:", { fingerprintId, roles: finalData?.roles });
+    if (!finalData?.roles || !options.roles.every((role) => finalData.roles.includes(role))) {
+      throw new Error("Final role verification failed");
+    }
   }
 
   // Register API key - no authentication needed for first key

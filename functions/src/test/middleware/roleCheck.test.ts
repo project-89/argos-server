@@ -14,27 +14,34 @@ describe("Role Check Middleware Test Suite", () => {
 
   beforeEach(async () => {
     await cleanDatabase();
+    console.log("Database cleaned, creating admin user...");
 
     // Create admin user
-    const adminData = await createTestData({ roles: [ROLE.ADMIN, ROLE.USER] });
+    const adminData = await createTestData({ roles: [ROLE.ADMIN, ROLE.USER], skipCleanup: true });
     adminApiKey = adminData.apiKey;
     adminFingerprintId = adminData.fingerprintId;
+    console.log("Admin user created:", { adminFingerprintId, adminApiKey });
 
     // Create regular user
-    const userData = await createTestData();
+    const userData = await createTestData({ skipCleanup: true });
     userApiKey = userData.apiKey;
     userFingerprintId = userData.fingerprintId;
+    console.log("Regular user created:", { userFingerprintId, userApiKey });
 
     // Verify roles were set correctly
     const db = getFirestore();
+    console.log("Verifying admin roles...");
     const adminDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(adminFingerprintId).get();
     const adminRoles = adminDoc.data()?.roles || [];
-    console.log("Admin roles:", adminRoles);
+    console.log("Admin document data:", adminDoc.data());
+    console.log("Admin roles array:", adminRoles);
     expect(adminRoles).toContain(ROLE.ADMIN);
 
+    console.log("Verifying user roles...");
     const userDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(userFingerprintId).get();
     const userRoles = userDoc.data()?.roles || [];
-    console.log("User roles:", userRoles);
+    console.log("User document data:", userDoc.data());
+    console.log("User roles array:", userRoles);
     expect(userRoles).toContain(ROLE.USER);
 
     // Verify API keys are valid
