@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export interface RoleData {
   roles?: ROLE[];
@@ -63,13 +64,13 @@ export const assignRole = async (
   try {
     // Only prevent self-role modification for non-admins
     if (fingerprintId === callerFingerprintId && !(await isAdmin(callerFingerprintId))) {
-      throw new ApiError(403, "Cannot modify your own roles");
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Check if caller has sufficient privileges
     const hasPermission = await canManageRole(callerFingerprintId, role);
     if (!hasPermission) {
-      throw new ApiError(403, "Insufficient privileges to assign this role");
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     const db = getFirestore();
@@ -77,7 +78,7 @@ export const assignRole = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as RoleData;
@@ -99,7 +100,7 @@ export const assignRole = async (
       throw error;
     }
     console.error("Error in assignRole:", error);
-    throw new ApiError(500, "Failed to assign role");
+    throw new ApiError(500, ERROR_MESSAGES.FAILED_ASSIGN_ROLE);
   }
 };
 
@@ -113,18 +114,18 @@ export const removeRole = async (
 ): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
   try {
     if (role === ROLE.USER) {
-      throw new ApiError(400, "Cannot remove user role");
+      throw new ApiError(400, ERROR_MESSAGES.CANNOT_REMOVE_USER_ROLE);
     }
 
     // Only prevent self-role modification for non-admins
     if (fingerprintId === callerFingerprintId && !(await isAdmin(callerFingerprintId))) {
-      throw new ApiError(403, "Cannot modify your own roles");
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Check if caller has sufficient privileges
     const hasPermission = await canManageRole(callerFingerprintId, role);
     if (!hasPermission) {
-      throw new ApiError(403, "Insufficient privileges to remove this role");
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     const db = getFirestore();
@@ -132,7 +133,7 @@ export const removeRole = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as RoleData;
@@ -154,7 +155,7 @@ export const removeRole = async (
       throw error;
     }
     console.error("Error in removeRole:", error);
-    throw new ApiError(500, "Failed to remove role");
+    throw new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_ROLE);
   }
 };
 
