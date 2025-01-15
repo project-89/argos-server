@@ -204,9 +204,9 @@ describe("API Key Endpoint", () => {
         },
       });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
     });
   });
 
