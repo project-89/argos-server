@@ -12,6 +12,14 @@ export const verifyFingerprint = async (
   fingerprintId: string,
   authenticatedId?: string,
 ): Promise<void> => {
+  // First check if fingerprint exists
+  const db = getFirestore();
+  const fingerprintDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+
+  if (!fingerprintDoc.exists) {
+    throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+  }
+
   if (authenticatedId && fingerprintId !== authenticatedId) {
     throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
