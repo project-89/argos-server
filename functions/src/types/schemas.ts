@@ -136,4 +136,28 @@ export const schemas = {
     endTime: z.string().datetime().optional(),
     sessionId: z.string().optional(),
   }),
-};
+
+  impressionCreate: z.object({
+    fingerprintId: z.string({
+      required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+    }),
+    type: z.string({
+      required_error: ERROR_MESSAGES.REQUIRED_FIELD,
+    }),
+    data: z.record(z.any(), {
+      required_error: ERROR_MESSAGES.MISSING_METADATA,
+    }),
+    source: z.string().optional(),
+    sessionId: z.string().optional(),
+  }),
+
+  impressionDelete: z.object({
+    fingerprintId: z.string({
+      required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+    }),
+    type: z.string().optional(),
+    startTime: z.string().datetime().optional(),
+    endTime: z.string().datetime().optional(),
+    sessionId: z.string().optional(),
+  }),
+} as const;

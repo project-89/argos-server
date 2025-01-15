@@ -76,7 +76,7 @@ describe("Impression Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_METADATA);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
     });
   });
 
@@ -148,11 +148,10 @@ describe("Impression Endpoint", () => {
 
       const response = await makeRequest({
         method: "get",
-        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}?type=form_submission`,
         headers: {
           "x-api-key": validApiKey,
         },
-        params: { type: "form_submission" },
       });
 
       expect(response.status).toBe(200);
@@ -191,7 +190,7 @@ describe("Impression Endpoint", () => {
       expect(invalidResponse.data.success).toBe(false);
       expect(invalidResponse.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
 
-      // Test with mismatched but valid API key - should return 403
+      // Test with mismatched but valid API key - should return 401 for GET requests
       const mismatchResponse = await makeRequest({
         method: "get",
         url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
@@ -201,9 +200,9 @@ describe("Impression Endpoint", () => {
         validateStatus: () => true,
       });
 
-      expect(mismatchResponse.status).toBe(403);
+      expect(mismatchResponse.status).toBe(401);
       expect(mismatchResponse.data.success).toBe(false);
-      expect(mismatchResponse.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      expect(mismatchResponse.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
 
       // Test with correct API key - should return 200
       const validResponse = await makeRequest({
