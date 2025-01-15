@@ -1,6 +1,8 @@
+import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import { ROLE } from "../../constants/roles";
+import { ERROR_MESSAGES } from "../../constants/api";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase } from "../utils/testUtils";
 import {
@@ -123,19 +125,19 @@ describe("Role Service", () => {
     it("should not allow field agent to assign senior role", async () => {
       await expect(
         assignRole(testFingerprints.target, testFingerprints.field, ROLE.AGENT_SENIOR),
-      ).rejects.toThrow(new ApiError(403, "Insufficient privileges to assign this role"));
+      ).rejects.toThrow(new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED));
     });
 
     it("should not allow non-admin to modify their own roles", async () => {
       await expect(
         assignRole(testFingerprints.senior, testFingerprints.senior, ROLE.AGENT_MASTER),
-      ).rejects.toThrow(new ApiError(403, "Cannot modify your own roles"));
+      ).rejects.toThrow(new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED));
     });
 
     it("should throw 404 for non-existent target fingerprint", async () => {
       await expect(
         assignRole("non-existent", testFingerprints.admin, ROLE.AGENT_FIELD),
-      ).rejects.toThrow(new ApiError(404, "Fingerprint not found"));
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     });
   });
 
@@ -156,19 +158,19 @@ describe("Role Service", () => {
     it("should not allow removing USER role", async () => {
       await expect(
         removeRole(testFingerprints.target, testFingerprints.admin, ROLE.USER),
-      ).rejects.toThrow(new ApiError(400, "Cannot remove user role"));
+      ).rejects.toThrow(new ApiError(400, ERROR_MESSAGES.CANNOT_REMOVE_USER_ROLE));
     });
 
     it("should not allow non-admin to modify their own roles", async () => {
       await expect(
         removeRole(testFingerprints.senior, testFingerprints.senior, ROLE.AGENT_SENIOR),
-      ).rejects.toThrow(new ApiError(403, "Cannot modify your own roles"));
+      ).rejects.toThrow(new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED));
     });
 
     it("should throw 404 for non-existent target fingerprint", async () => {
       await expect(
         removeRole("non-existent", testFingerprints.admin, ROLE.AGENT_FIELD),
-      ).rejects.toThrow(new ApiError(404, "Fingerprint not found"));
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     });
   });
 

@@ -1,6 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import { ROLE } from "../../constants/roles";
+import { ERROR_MESSAGES } from "../../constants/api";
 import {
   createFingerprint,
   getFingerprintAndUpdateIp,
@@ -158,7 +159,7 @@ describe("Fingerprint Service", () => {
       });
 
       await expect(getFingerprintAndUpdateIp(fingerprintId, ip)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT),
       );
     });
   });
@@ -178,7 +179,7 @@ describe("Fingerprint Service", () => {
       mockDoc.get.mockResolvedValue({ exists: false });
 
       await expect(verifyFingerprint(fingerprintId)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT),
       );
     });
 
@@ -189,7 +190,7 @@ describe("Fingerprint Service", () => {
       mockDoc.get.mockResolvedValue({ exists: true });
 
       await expect(verifyFingerprint(fingerprintId, authenticatedId)).rejects.toThrow(
-        new ApiError(403, "API key does not match fingerprint"),
+        new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS),
       );
     });
   });
@@ -235,7 +236,7 @@ describe("Fingerprint Service", () => {
       mockDoc.get.mockResolvedValue({ exists: false });
 
       await expect(updateFingerprintMetadata(fingerprintId, metadata)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
 
@@ -246,7 +247,7 @@ describe("Fingerprint Service", () => {
       mockDoc.get.mockRejectedValue(new Error("Database error"));
 
       await expect(updateFingerprintMetadata(fingerprintId, metadata)).rejects.toThrow(
-        new ApiError(500, "Failed to update fingerprint metadata"),
+        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
       );
     });
   });

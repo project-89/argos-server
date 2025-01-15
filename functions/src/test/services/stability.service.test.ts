@@ -1,6 +1,7 @@
 import { calculateStabilityIndex } from "../../services/stabilityService";
 import { getCurrentPrices } from "../../services/priceService";
 import { ApiError } from "../../utils/error";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 jest.mock("../../services/priceService");
 
@@ -43,7 +44,7 @@ describe("Stability Service", () => {
       (getCurrentPrices as jest.Mock).mockRejectedValue(new Error("Price service error"));
 
       await expect(calculateStabilityIndex()).rejects.toThrow(
-        new ApiError(500, "Failed to calculate reality stability index"),
+        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
       );
     });
 

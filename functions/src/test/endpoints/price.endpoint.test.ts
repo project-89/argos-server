@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Price Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -14,8 +15,9 @@ describe("Price Endpoint", () => {
 
   describe("GET /price/current", () => {
     it("should allow public access", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/current`, null, {
-        headers: { "x-api-key": undefined },
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/current`,
         validateStatus: () => true,
       });
 
@@ -25,7 +27,9 @@ describe("Price Endpoint", () => {
     });
 
     it("should return current prices for default tokens", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/current`, null, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/current`,
         headers: { "x-api-key": validApiKey },
       });
 
@@ -36,14 +40,11 @@ describe("Price Endpoint", () => {
     });
 
     it("should return prices for specified tokens", async () => {
-      const response = await makeRequest(
-        "get",
-        `${API_URL}/price/current?symbols=Project89`,
-        null,
-        {
-          headers: { "x-api-key": validApiKey },
-        },
-      );
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/current?symbols=Project89`,
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
@@ -53,26 +54,24 @@ describe("Price Endpoint", () => {
     });
 
     it("should handle invalid tokens", async () => {
-      const response = await makeRequest(
-        "get",
-        `${API_URL}/price/current?symbols=invalid-token`,
-        null,
-        {
-          headers: { "x-api-key": validApiKey },
-          validateStatus: () => true,
-        },
-      );
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/current?symbols=invalid-token`,
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("No price data found for invalid-token");
+      expect(response.data.error).toBe(ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
     });
   });
 
   describe("GET /price/history/:tokenId", () => {
     it("should allow public access", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history/Project89`, null, {
-        headers: { "x-api-key": undefined },
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/history/Project89`,
         validateStatus: () => true,
       });
 
@@ -82,7 +81,9 @@ describe("Price Endpoint", () => {
     });
 
     it("should return price history for a token", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history/Project89`, null, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/history/Project89`,
         headers: { "x-api-key": validApiKey },
       });
 
@@ -97,10 +98,14 @@ describe("Price Endpoint", () => {
     it("should handle missing tokenId", async () => {
       // Test both with and without trailing slash
       const responses = await Promise.all([
-        makeRequest("get", `${API_URL}/price/history/`, {
+        makeRequest({
+          method: "get",
+          url: `${API_URL}/price/history/`,
           validateStatus: () => true,
         }),
-        makeRequest("get", `${API_URL}/price/history`, {
+        makeRequest({
+          method: "get",
+          url: `${API_URL}/price/history`,
           validateStatus: () => true,
         }),
       ]);
@@ -108,19 +113,21 @@ describe("Price Endpoint", () => {
       responses.forEach((response) => {
         expect(response.status).toBe(404);
         expect(response.data.success).toBe(false);
-        expect(response.data.error).toBe("Not Found");
+        expect(response.data.error).toBe(ERROR_MESSAGES.NOT_FOUND);
       });
     });
 
     it("should handle invalid token", async () => {
-      const response = await makeRequest("get", `${API_URL}/price/history/invalid-token`, null, {
+      const response = await makeRequest({
+        method: "get",
+        url: `${API_URL}/price/history/invalid-token`,
         headers: { "x-api-key": validApiKey },
         validateStatus: () => true,
       });
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Token not found");
+      expect(response.data.error).toBe(ERROR_MESSAGES.TOKEN_NOT_FOUND);
     });
   });
 });

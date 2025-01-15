@@ -156,3 +156,101 @@ resource "google_cloud_scheduler_job" "cleanup" {
   }
 }
 
+# Log bucket for long-term storage
+resource "google_logging_project_bucket_config" "argos_logs" {
+  project        = var.project_id
+  location       = var.region
+  retention_days = 30
+  bucket_id      = "argos_logs"
+}
+
+# Log sink for error monitoring
+resource "google_logging_project_sink" "error_sink" {
+  name        = "argos-error-monitoring"
+  destination = "logging.googleapis.com/projects/${var.project_id}/locations/${var.region}/buckets/argos_logs"
+  filter      = "resource.type=\"cloud_function\" AND severity>=ERROR"
+
+  unique_writer_identity = true
+}
+
+# Log-based metric for error tracking
+resource "google_logging_metric" "error_count" {
+  name   = "argos_error_count"
+  filter = "resource.type=\"cloud_function\" AND severity>=ERROR"
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    labels {
+      key         = "function_name"
+      value_type  = "STRING"
+      description = "The name of the function that generated the error"
+    }
+    labels {
+      key         = "error_type"
+      value_type  = "STRING"
+      description = "The type of error that occurred"
+    }
+  }
+  label_extractors = {
+    "function_name" = "REGEXP_EXTRACT(resource.labels.function_name, \"(.*)\")"
+    "error_type"    = "REGEXP_EXTRACT(jsonPayload.error.type, \"(.*)\")"
+  }
+}
+
+# Log-based metric for ownership checks
+resource "google_logging_metric" "ownership_checks" {
+  name   = "argos_ownership_checks"
+  filter = "resource.type=\"cloud_function\" AND jsonPayload.message=~\"\\[Ownership Check\\]\""
+  metric_descriptor {
+    metric_kind = "DELTA"
+    value_type  = "INT64"
+    labels {
+      key         = "result"
+      value_type  = "STRING"
+      description = "The result of the ownership check (success/failure)"
+    }
+  }
+  label_extractors = {
+    "result" = "REGEXP_EXTRACT(jsonPayload.message, \"Ownership (.*?)\")"
+  }
+}
+
+# Alert policy for high error rates
+resource "google_monitoring_alert_policy" "error_rate" {
+  display_name = "High Error Rate Alert"
+  combiner     = "OR"
+  conditions {
+    display_name = "Error rate too high"
+    condition_threshold {
+      filter          = "metric.type=\"logging.googleapis.com/user/argos_error_count\""
+      duration        = "300s"
+      comparison     = "COMPARISON_GT"
+      threshold_value = 10
+      trigger {
+        count = 1
+      }
+      aggregations {
+        alignment_period   = "60s"
+        per_series_aligner = "ALIGN_RATE"
+      }
+    }
+  }
+
+  notification_channels = [google_monitoring_notification_channel.email.id]
+}
+
+# Email notification channel
+resource "google_monitoring_notification_channel" "email" {
+  display_name = "Argos Error Notifications"
+  type         = "email"
+  labels = {
+    email_address = var.alert_email
+  }
+}
+
+# Add alert_email variable
+variable "alert_email" {
+  description = "Email address for error notifications"
+  type        = string
+}
+

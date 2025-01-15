@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { getCurrentUnixMillis } from "../utils/timestamp";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export type PresenceStatus = "online" | "offline";
 
@@ -29,7 +30,7 @@ export const updatePresence = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const lastUpdated = getCurrentUnixMillis();
@@ -52,7 +53,7 @@ export const updatePresence = async (
       throw error;
     }
     console.error("Error in updatePresence:", error);
-    throw new ApiError(500, "Failed to update presence status");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -66,7 +67,7 @@ export const getPresence = async (fingerprintId: string): Promise<FingerprintPre
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data();
@@ -90,6 +91,6 @@ export const getPresence = async (fingerprintId: string): Promise<FingerprintPre
       throw error;
     }
     console.error("Error in getPresence:", error);
-    throw new ApiError(500, "Failed to get presence status");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { sendSuccess, sendError } from "../utils/response";
 import { calculateStabilityIndex } from "../services/stabilityService";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export const getRealityStabilityIndex = [
   async (req: Request, res: Response): Promise<Response> => {
@@ -14,7 +15,7 @@ export const getRealityStabilityIndex = [
         res,
         error instanceof Error
           ? error
-          : new ApiError(500, "Failed to calculate reality stability index"),
+          : new ApiError(500, ERROR_MESSAGES.FAILED_CALCULATE_STABILITY),
       );
     }
   },

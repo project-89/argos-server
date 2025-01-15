@@ -13,7 +13,8 @@ declare global {
 // Load test environment variables first
 config({ path: path.resolve(__dirname, "../../../.env.test") });
 
-// Set emulator host before initialization
+// Set test environment variables
+process.env.NODE_ENV = "test";
 process.env.FIRESTORE_EMULATOR_HOST = "localhost:8080";
 
 // Initialize Firebase Admin if not already initialized
@@ -44,6 +45,9 @@ beforeAll(async () => {
     });
     await testDoc.delete();
     console.log("✓ Successfully connected to Firestore emulator");
+
+    // Clean database before starting tests
+    await cleanDatabase();
   } catch (error) {
     console.error("✗ Failed to connect to Firestore emulator:", error);
     console.error("Error details:", error instanceof Error ? error.message : error);
@@ -51,11 +55,16 @@ beforeAll(async () => {
   }
 });
 
-// Clean up after each test
-afterEach(async () => {
+// Clean up before each test to ensure a clean state
+beforeEach(async () => {
+  await cleanDatabase();
+});
+
+// Clean up after all tests
+afterAll(async () => {
   try {
     await cleanDatabase();
   } catch (error) {
-    console.error("Error in afterEach:", error);
+    console.error("Error in afterAll:", error);
   }
 });

@@ -183,39 +183,14 @@ app.get("/", (req, res) => {
   }
 });
 
-// Apply public middleware to registration endpoints
-app.use("/fingerprint/register", publicMiddleware);
-app.use("/api-key/register", publicMiddleware);
+// Public routes (with rate limiting but no auth)
+app.use("/", publicMiddleware, publicRouter);
 
-// Public routes (no auth required)
-app.use("/", publicRouter);
+// Protected routes (with auth and rate limiting)
+app.use("/", protectedMiddleware, protectedRouter);
 
-// Protected routes configuration
-const protectedPaths = ["/fingerprint", "/visit", "/api-key", "/role", "/tag", "/impressions"];
-const adminPaths = ["/admin"];
-
-// Apply auth middleware only to protected paths
-app.use((req, res, next) => {
-  // Skip auth for public endpoints
-  if (req.path === "/" || req.path.startsWith("/fingerprint/register")) {
-    return next();
-  }
-
-  // Check if the request path matches any protected paths
-  const isProtectedPath = protectedPaths.some((path) => req.path.startsWith(path));
-  const isAdminPath = adminPaths.some((path) => req.path.startsWith(path));
-
-  if (isProtectedPath || isAdminPath) {
-    return protectedMiddleware(req, res, next);
-  }
-
-  // Not a protected path, continue
-  next();
-});
-
-// Mount route handlers after auth middleware
-app.use("/", protectedRouter);
-app.use("/admin", adminRouter);
+// Admin routes (with auth and rate limiting)
+app.use("/admin", protectedMiddleware, adminRouter);
 
 // CORS error handler
 app.use(
@@ -246,16 +221,6 @@ app.use((req, res) => {
     success: false,
     error: "Not Found",
     message: "The requested endpoint does not exist",
-  });
-});
-
-// Generic error handler
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error("[Error Handler]", err);
-  return sendErrorResponse(res, 500, "500.html", {
-    success: false,
-    error: "Internal Server Error",
-    message: process.env.NODE_ENV === "production" ? "An unexpected error occurred" : err.message,
   });
 });
 

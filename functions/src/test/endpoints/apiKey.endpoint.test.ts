@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("API Key Endpoint", () => {
   let fingerprintId: string;
@@ -96,14 +97,14 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
       expect(response.data.details).toEqual([
         {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
           path: ["fingerprintId"],
-          message: "Fingerprint is required",
+          message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
       ]);
     });
@@ -119,7 +120,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
+      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     });
   });
 
@@ -168,7 +169,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
     });
 
     it("should reject request with invalid API key", async () => {
@@ -185,7 +186,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid API key");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
     });
 
     it("should reject request when API key does not match fingerprint", async () => {
@@ -205,7 +206,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Not authorized to revoke this API key");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     });
   });
 

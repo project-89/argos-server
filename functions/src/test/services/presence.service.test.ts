@@ -3,6 +3,7 @@ import { COLLECTIONS } from "../../constants/collections";
 import { updatePresence, getPresence } from "../../services/presenceService";
 import { ApiError } from "../../utils/error";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 jest.mock("firebase-admin/firestore", () => ({
   getFirestore: jest.fn(),
@@ -68,7 +69,7 @@ describe("Presence Service", () => {
       mockDoc.get.mockResolvedValue({ exists: false });
 
       await expect(updatePresence(fingerprintId, status)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
 
@@ -80,7 +81,7 @@ describe("Presence Service", () => {
       mockDoc.update.mockRejectedValue(new Error("Database error"));
 
       await expect(updatePresence(fingerprintId, status)).rejects.toThrow(
-        new ApiError(500, "Failed to update presence status"),
+        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
       );
     });
   });
@@ -132,7 +133,7 @@ describe("Presence Service", () => {
       mockDoc.get.mockResolvedValue({ exists: false });
 
       await expect(getPresence(fingerprintId)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
 
@@ -142,7 +143,7 @@ describe("Presence Service", () => {
       mockDoc.get.mockRejectedValue(new Error("Database error"));
 
       await expect(getPresence(fingerprintId)).rejects.toThrow(
-        new ApiError(500, "Failed to get presence status"),
+        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
       );
     });
 

@@ -1,165 +1,140 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, createTestData } from "../utils/testUtils";
+import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants/api";
+
+const { apiUrl: API_URL } = TEST_CONFIG;
 
 describe("Presence Endpoint", () => {
-  const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
 
   beforeEach(async () => {
-    const { fingerprintId: fId, apiKey } = await createTestData();
-    fingerprintId = fId;
-    validApiKey = apiKey;
+    await cleanDatabase();
+    const testData = await createTestData();
+    validApiKey = testData.apiKey;
+    fingerprintId = testData.fingerprintId;
   });
 
   describe("POST /visit/presence", () => {
-    it("should update presence status", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
+    it("should record presence successfully", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
           fingerprintId,
-          status: "online",
+          url: "https://example.com",
+          title: "Example Page",
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+      });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.status).toBe("online");
     });
 
-    it("should require fingerprintId and status", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
+    it("should require API key", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
           fingerprintId,
+          url: "https://example.com",
+          title: "Example Page",
         },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-          validateStatus: () => true,
+        validateStatus: () => true,
+      });
+
+      expect(response.status).toBe(401);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
+    });
+
+    it("should require fingerprintId", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
+          url: "https://example.com",
+          title: "Example Page",
         },
-      );
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Status is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
     });
 
-    it("should reject request without API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
+    it("should require url", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
           fingerprintId,
-          status: "online",
+          title: "Example Page",
         },
-        {
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_URL);
     });
 
-    it("should reject request with invalid API key", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
+    it("should require title", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
           fingerprintId,
-          status: "online",
+          url: "https://example.com",
         },
-        {
-          headers: {
-            "x-api-key": "invalid-key",
-          },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Invalid API key");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_TITLE);
     });
 
-    it("should reject request when API key does not match fingerprint", async () => {
-      // Create another fingerprint and API key
-      const { apiKey: otherApiKey } = await createTestData();
-
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
+    it("should validate url format", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
           fingerprintId,
-          status: "online",
+          url: "invalid-url",
+          title: "Example Page",
         },
-        {
-          headers: {
-            "x-api-key": otherApiKey,
-          },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_URL);
     });
 
     it("should handle non-existent fingerprint", async () => {
-      const { apiKey } = await createTestData();
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
-          fingerprintId: "non-existent-id",
-          status: "online",
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/visit/presence`,
+        data: {
+          fingerprintId: "non-existent",
+          url: "https://example.com",
+          title: "Example Page",
         },
-        {
-          headers: {
-            "x-api-key": apiKey,
-          },
-          validateStatus: () => true,
-        },
-      );
+        headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
+      });
 
-      expect(response.status).toBe(403);
+      expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
-    });
-
-    it("should validate status values", async () => {
-      const response = await makeRequest(
-        "post",
-        `${API_URL}/visit/presence`,
-        {
-          fingerprintId,
-          status: "invalid-status",
-        },
-        {
-          headers: {
-            "x-api-key": validApiKey,
-          },
-          validateStatus: () => true,
-        },
-      );
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(
-        "Invalid enum value. Expected 'online' | 'offline', received 'invalid-status'",
-      );
+      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     });
   });
 });

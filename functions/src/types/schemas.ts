@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { ROLE } from "../constants/roles";
+import { ERROR_MESSAGES } from "../constants/api";
 
 // Common sub-schemas
 const tagsSchema = z.record(z.number());
@@ -8,28 +9,56 @@ const tagsSchema = z.record(z.number());
 export const schemas = {
   // Fingerprint schemas
   fingerprintRegister: z.object({
-    fingerprint: z.string(),
+    fingerprint: z.string({
+      required_error: "Fingerprint is required",
+      invalid_type_error: "Fingerprint must be a string",
+    }),
     metadata: z.record(z.any()).optional(),
   }),
 
-  fingerprintUpdate: z.object({
-    metadata: z.record(z.any()),
-  }),
+  fingerprintUpdate: z
+    .object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        invalid_type_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      }),
+      metadata: z.record(z.any()).optional(),
+    })
+    .superRefine((data, ctx) => {
+      if (data.fingerprintId && !data.metadata) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.invalid_type,
+          expected: "object",
+          received: "undefined",
+          path: ["metadata"],
+          message: "Metadata is required",
+        });
+      }
+    }),
 
   // Visit schemas
   visitLog: z.object({
-    fingerprintId: z.string(),
+    fingerprintId: z.string({
+      required_error: "Fingerprint is required",
+      invalid_type_error: "Fingerprint must be a string",
+    }),
     url: z.string().url(),
     title: z.string().optional(),
   }),
 
   updatePresence: z.object({
-    fingerprintId: z.string(),
+    fingerprintId: z.string({
+      required_error: "Fingerprint is required",
+      invalid_type_error: "Fingerprint must be a string",
+    }),
     status: z.string(),
   }),
 
   removeSite: z.object({
-    fingerprintId: z.string(),
+    fingerprintId: z.string({
+      required_error: "Fingerprint is required",
+      invalid_type_error: "Fingerprint must be a string",
+    }),
     siteId: z.string(),
   }),
 
@@ -62,15 +91,24 @@ export const schemas = {
 
   // API Key schemas
   apiKeyRegister: z.object({
-    fingerprintId: z.string(),
+    fingerprintId: z.string({
+      required_error: "Fingerprint is required",
+      invalid_type_error: "Fingerprint must be a string",
+    }),
   }),
 
   apiKeyValidate: z.object({
-    key: z.string(),
+    key: z.string({
+      required_error: "API key is required",
+      invalid_type_error: "API key must be a string",
+    }),
   }),
 
   apiKeyRevoke: z.object({
-    key: z.string(),
+    key: z.string({
+      required_error: "API key is required",
+      invalid_type_error: "API key must be a string",
+    }),
   }),
 
   // Impression schemas

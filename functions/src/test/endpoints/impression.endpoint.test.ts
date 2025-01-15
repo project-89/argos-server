@@ -1,16 +1,17 @@
+import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Impression Endpoint", () => {
-  const API_URL = TEST_CONFIG.apiUrl;
   let validApiKey: string;
   let fingerprintId: string;
 
   beforeEach(async () => {
     await cleanDatabase();
-    const { fingerprintId: fId, apiKey } = await createTestData();
-    fingerprintId = fId;
-    validApiKey = apiKey;
+    const testData = await createTestData();
+    validApiKey = testData.apiKey;
+    fingerprintId = testData.fingerprintId;
   });
 
   describe("POST /impressions", () => {
@@ -26,7 +27,7 @@ describe("Impression Endpoint", () => {
 
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: impressionData,
         headers: {
           "x-api-key": validApiKey,
@@ -41,7 +42,7 @@ describe("Impression Endpoint", () => {
     it("should require API key", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: {
           fingerprintId,
           type: "form_submission",
@@ -54,13 +55,13 @@ describe("Impression Endpoint", () => {
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
     });
 
     it("should validate impression data", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: {
           // Missing required fields
           data: {
@@ -75,6 +76,7 @@ describe("Impression Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_METADATA);
     });
   });
 
@@ -91,7 +93,7 @@ describe("Impression Endpoint", () => {
 
       await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: impressionData,
         headers: {
           "x-api-key": validApiKey,
@@ -100,7 +102,7 @@ describe("Impression Endpoint", () => {
 
       const response = await makeRequest({
         method: "get",
-        url: `${API_URL}/impressions/${fingerprintId}`,
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
         headers: {
           "x-api-key": validApiKey,
         },
@@ -128,7 +130,7 @@ describe("Impression Endpoint", () => {
 
       await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: formSubmission,
         headers: {
           "x-api-key": validApiKey,
@@ -137,7 +139,7 @@ describe("Impression Endpoint", () => {
 
       await makeRequest({
         method: "post",
-        url: `${API_URL}/impressions`,
+        url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: pageView,
         headers: {
           "x-api-key": validApiKey,
@@ -146,7 +148,7 @@ describe("Impression Endpoint", () => {
 
       const response = await makeRequest({
         method: "get",
-        url: `${API_URL}/impressions/${fingerprintId}`,
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
         headers: {
           "x-api-key": validApiKey,
         },
@@ -162,31 +164,59 @@ describe("Impression Endpoint", () => {
     it("should require API key for retrieval", async () => {
       const response = await makeRequest({
         method: "get",
-        url: `${API_URL}/impressions/${fingerprintId}`,
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
         headers: {},
       });
 
       expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
     });
 
     it("should validate fingerprint ownership", async () => {
-      // Create another test fingerprint
-      const { fingerprintId: otherId } = await createTestData();
+      // Create another test fingerprint and API key
+      const { apiKey: otherApiKey } = await createTestData({ skipCleanup: true });
 
-      const response = await makeRequest({
+      // Test with invalid API key - should return 401
+      const invalidResponse = await makeRequest({
         method: "get",
-        url: `${API_URL}/impressions/${otherId}`,
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
         headers: {
-          "x-api-key": validApiKey, // Using first fingerprint's API key
+          "x-api-key": "invalid-key",
         },
         validateStatus: () => true,
       });
 
-      expect(response.status).toBe(403);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("API key does not match fingerprint");
+      expect(invalidResponse.status).toBe(401);
+      expect(invalidResponse.data.success).toBe(false);
+      expect(invalidResponse.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+
+      // Test with mismatched but valid API key - should return 403
+      const mismatchResponse = await makeRequest({
+        method: "get",
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
+        headers: {
+          "x-api-key": otherApiKey,
+        },
+        validateStatus: () => true,
+      });
+
+      expect(mismatchResponse.status).toBe(403);
+      expect(mismatchResponse.data.success).toBe(false);
+      expect(mismatchResponse.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+
+      // Test with correct API key - should return 200
+      const validResponse = await makeRequest({
+        method: "get",
+        url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
+        headers: {
+          "x-api-key": validApiKey,
+        },
+        validateStatus: () => true,
+      });
+
+      expect(validResponse.status).toBe(200);
+      expect(validResponse.data.success).toBe(true);
     });
   });
 });

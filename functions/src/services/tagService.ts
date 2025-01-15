@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export interface FingerprintData {
   tags?: string[];
@@ -51,7 +52,7 @@ export const updateTags = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
@@ -76,7 +77,7 @@ export const updateTags = async (
       throw error;
     }
     console.error("Error in updateTags:", error);
-    throw new ApiError(500, "Failed to update tags");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -91,14 +92,14 @@ export const updateRolesByTags = async (
   try {
     // Prevent self-role modification
     if (fingerprintId === callerFingerprintId) {
-      throw new ApiError(403, "Cannot modify your own roles");
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Check if caller has sufficient privileges for all roles in the rules
     for (const [_, rule] of Object.entries(tagRules)) {
       const hasPermission = await canManageRole(callerFingerprintId, rule.role);
       if (!hasPermission) {
-        throw new ApiError(403, "Insufficient privileges to assign role");
+        throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
       }
     }
 
@@ -108,7 +109,7 @@ export const updateRolesByTags = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
@@ -141,7 +142,7 @@ export const updateRolesByTags = async (
       throw error;
     }
     console.error("Error in updateRolesByTags:", error);
-    throw new ApiError(500, "Failed to update roles based on tags");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -155,7 +156,7 @@ export const getTags = async (fingerprintId: string): Promise<string[]> => {
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
@@ -165,7 +166,7 @@ export const getTags = async (fingerprintId: string): Promise<string[]> => {
       throw error;
     }
     console.error("Error in getTags:", error);
-    throw new ApiError(500, "Failed to get tags");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -182,7 +183,7 @@ export const removeTags = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
@@ -207,6 +208,6 @@ export const removeTags = async (
       throw error;
     }
     console.error("Error in removeTags:", error);
-    throw new ApiError(500, "Failed to remove tags");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

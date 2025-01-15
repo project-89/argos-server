@@ -1,69 +1,36 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
-import { validateApiKey, getApiKeyByKey } from "../services/apiKeyService";
 import { ERROR_MESSAGES } from "../constants/api";
-
-// Extend Express Request type to include fingerprintId
-declare global {
-  namespace Express {
-    interface Request {
-      fingerprintId?: string; // This represents the caller's fingerprint ID
-    }
-  }
-}
-
-// List of public endpoints that don't require an API key
-const PUBLIC_ENDPOINTS = ["/fingerprint/register", "/api-key/register", "/api-key/validate"];
+import { validateApiKey, getApiKeyByKey } from "../services/apiKeyService";
 
 /**
- * Middleware to validate API key and set caller's fingerprintId on request
- * - Public routes: No API key required
- * - All other routes: Require valid API key, sets caller's fingerprintId
+ * Middleware to validate API key and set fingerprintId on request
+ * Only checks if API key exists and is valid (not expired/revoked)
  */
-export const validateApiKeyMiddleware = async (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): Promise<void> => {
+export const validateApiKeyMiddleware = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Check if this is a public endpoint
-    if (PUBLIC_ENDPOINTS.some((endpoint) => req.path.startsWith(endpoint))) {
-      return next();
-    }
+    const apiKey = req.headers["x-api-key"] as string;
 
-    // For all other routes, API key is required
-    const apiKey = req.headers["x-api-key"];
     if (!apiKey) {
       throw new ApiError(401, ERROR_MESSAGES.MISSING_API_KEY);
     }
 
-    // First check if the API key exists and get its details
-    const apiKeyDetails = await getApiKeyByKey(apiKey as string);
+    // First get the API key details to get the fingerprintId
+    const apiKeyDetails = await getApiKeyByKey(apiKey);
     if (!apiKeyDetails) {
       throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
     }
 
-    // Then validate the API key
-    const validationResult = await validateApiKey(apiKey as string);
-    if (!validationResult.isValid && validationResult.needsRefresh) {
-      throw new ApiError(401, "API key needs to be refreshed");
+    // Then validate the API key is active
+    const validationResult = await validateApiKey(apiKey);
+    if (!validationResult.isValid) {
+      throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
     }
 
-    if (!apiKeyDetails.fingerprintId) {
-      throw new ApiError(500, "Invalid API key data");
-    }
-
-    // Set the caller's fingerprint ID - this identifies who is making the request
+    // Set fingerprintId on request for ownership checks
     req.fingerprintId = apiKeyDetails.fingerprintId;
-
     next();
   } catch (error) {
-    // Pass errors to the error handling middleware
-    if (error instanceof ApiError) {
-      next(error);
-    } else {
-      console.error("Auth middleware error:", error);
-      next(new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
-    }
+    next(error);
   }
 };

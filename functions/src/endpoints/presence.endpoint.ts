@@ -4,6 +4,7 @@ import { validateRequest } from "../middleware/validation.middleware";
 import { sendError, sendSuccess } from "../utils/response";
 import { updatePresence, getPresence, PresenceStatus } from "../services/presenceService";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 const router = Router();
 
@@ -30,10 +31,12 @@ router.put("/:fingerprintId", validateRequest(updatePresenceSchema), async (req,
     const presence = await updatePresence(fingerprintId, status as PresenceStatus);
     return sendSuccess(res, presence);
   } catch (error) {
-    if (error instanceof ApiError) {
-      return sendError(res, error);
-    }
-    return sendError(res, new ApiError(500, "Failed to update presence status"));
+    return sendError(
+      res,
+      error instanceof Error
+        ? error
+        : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS),
+    );
   }
 });
 
@@ -43,10 +46,10 @@ router.get("/:fingerprintId", validateRequest(getPresenceSchema), async (req, re
     const presence = await getPresence(fingerprintId);
     return sendSuccess(res, presence);
   } catch (error) {
-    if (error instanceof ApiError) {
-      return sendError(res, error);
-    }
-    return sendError(res, new ApiError(500, "Failed to get presence status"));
+    return sendError(
+      res,
+      error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_PRESENCE),
+    );
   }
 });
 

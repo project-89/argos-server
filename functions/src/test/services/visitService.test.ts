@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import {
   logVisit,
@@ -10,6 +10,7 @@ import {
 } from "../../services/visitService";
 import { ApiError } from "../../utils/error";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 class MockTimestamp {
   private seconds: number;
@@ -400,7 +401,7 @@ describe("Visit Service", () => {
       mockCollection.get.mockRejectedValueOnce(error);
 
       await expect(getVisitHistory(fingerprintId)).rejects.toThrow(
-        new ApiError(500, "Database index not ready. Please try again in a few minutes."),
+        new ApiError(500, ERROR_MESSAGES.DATABASE_NOT_READY),
       );
     });
   });
@@ -444,7 +445,7 @@ describe("Visit Service", () => {
       });
 
       await expect(removeSiteAndVisits(fingerprintId, siteId)).rejects.toThrow(
-        new ApiError(404, "Site not found"),
+        new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND),
       );
     });
 
@@ -460,7 +461,7 @@ describe("Visit Service", () => {
       });
 
       await expect(removeSiteAndVisits(fingerprintId, siteId)).rejects.toThrow(
-        new ApiError(403, "Not authorized to remove this site"),
+        new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
       );
     });
   });
@@ -519,7 +520,7 @@ describe("Visit Service", () => {
       });
 
       await expect(verifyFingerprint(fingerprintId)).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
 
@@ -532,7 +533,7 @@ describe("Visit Service", () => {
       });
 
       await expect(verifyFingerprint(fingerprintId, authenticatedId)).rejects.toThrow(
-        new ApiError(403, "API key does not match fingerprint"),
+        new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS),
       );
     });
   });

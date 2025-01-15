@@ -171,7 +171,7 @@ export const updateFingerprintMetadata = async (
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintDocData;
@@ -191,6 +191,6 @@ export const updateFingerprintMetadata = async (
       throw error;
     }
     console.error("Error in updateFingerprintMetadata:", error);
-    throw new ApiError(500, "Failed to update fingerprint metadata");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

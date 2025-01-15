@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
 import { sendError } from "../utils/response";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export const validateRequest = (schema: z.ZodType) => {
   return (req: Request, res: Response, next: NextFunction): void | Response => {
@@ -34,7 +35,7 @@ export const validateRequest = (schema: z.ZodType) => {
 
         return sendError(res, firstError.message, 400, { details });
       }
-      return sendError(res, "Invalid request data", 400);
+      return sendError(res, ERROR_MESSAGES.INVALID_REQUEST, 400);
     }
   };
 };
@@ -56,7 +57,7 @@ export const validateQuery = (schema: z.ZodType) => {
           })),
         });
       }
-      return sendError(res, "Invalid query parameters", 400);
+      return sendError(res, ERROR_MESSAGES.INVALID_QUERY, 400);
     }
   };
 };
@@ -78,7 +79,7 @@ export const validateParams = (schema: z.ZodType) => {
           })),
         });
       }
-      return sendError(res, "Invalid path parameters", 400);
+      return sendError(res, ERROR_MESSAGES.INVALID_PARAMS, 400);
     }
   };
 };

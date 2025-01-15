@@ -1,6 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import { ROLE } from "../../constants/roles";
+import { ERROR_MESSAGES } from "../../constants/api";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase } from "../utils/testUtils";
 import {
@@ -105,7 +106,17 @@ describe("Tag Service", () => {
 
     it("should throw 404 for non-existent fingerprint", async () => {
       await expect(updateTags("non-existent", ["test"])).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
+      );
+    });
+
+    it("should throw 403 for permission required", async () => {
+      await expect(updateTags(testFingerprints.target, ["test"])).rejects.toThrow(
+        new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
+      );
+
+      await expect(updateTags(testFingerprints.target, ["test"])).rejects.toThrow(
+        new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
       );
     });
   });
@@ -151,19 +162,19 @@ describe("Tag Service", () => {
     it("should not allow self-role modification", async () => {
       await expect(
         updateRolesByTags(testFingerprints.senior, testFingerprints.senior, tagRules),
-      ).rejects.toThrow(new ApiError(403, "Cannot modify your own roles"));
+      ).rejects.toThrow(new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED));
     });
 
     it("should throw 403 if caller lacks privileges", async () => {
       await expect(
         updateRolesByTags(testFingerprints.target, testFingerprints.field, tagRules),
-      ).rejects.toThrow(new ApiError(403, "Insufficient privileges to assign role"));
+      ).rejects.toThrow(new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED));
     });
 
     it("should throw 404 for non-existent fingerprint", async () => {
       await expect(
         updateRolesByTags("non-existent", testFingerprints.admin, tagRules),
-      ).rejects.toThrow(new ApiError(404, "Fingerprint not found"));
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     });
   });
 
@@ -188,7 +199,7 @@ describe("Tag Service", () => {
 
     it("should throw 404 for non-existent fingerprint", async () => {
       await expect(getTags("non-existent")).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
   });
@@ -207,7 +218,7 @@ describe("Tag Service", () => {
 
     it("should throw 404 for non-existent fingerprint", async () => {
       await expect(removeTags("non-existent", ["test"])).rejects.toThrow(
-        new ApiError(404, "Fingerprint not found"),
+        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
   });

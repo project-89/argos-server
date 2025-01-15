@@ -2,6 +2,7 @@ import { Response } from "express";
 import { sendSuccess, sendError, sendWarning } from "../../utils/response";
 import { ApiError } from "../../utils/error";
 import { ApiSuccessResponse, ApiErrorResponse } from "../../types/api.types";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 // Mock Express Response
 const mockResponse = () => {
@@ -65,13 +66,13 @@ describe("Response Utilities", () => {
 
     it("should handle ApiError status codes", () => {
       const res = mockResponse();
-      const error = new ApiError(403, "Not authorized");
+      const error = new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
 
       sendError(res, error);
 
       expect(res.status).toHaveBeenCalledWith(403);
       const response = (res.json as jest.Mock).mock.calls[0][0] as ApiErrorResponse;
-      expect(response.error).toBe("Not authorized");
+      expect(response.error).toBe(ERROR_MESSAGES.PERMISSION_REQUIRED);
     });
 
     it("should standardize common error messages", () => {

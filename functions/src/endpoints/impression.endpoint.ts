@@ -1,14 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 import { z } from "zod";
-import {
-  createImpression,
-  getImpressions,
-  deleteImpressions,
-  verifyFingerprint,
-} from "../services/impressionService";
+import { createImpression, getImpressions, deleteImpressions } from "../services/impressionService";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 // Schemas
 const createImpressionSchema = z.object({
@@ -60,100 +56,59 @@ export const create = [
         req.body,
       );
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
       const impression = await createImpression(fingerprintId, type, data, {
         source,
         sessionId,
       });
-
       return sendSuccess(res, impression, "Impression created successfully", 201);
     } catch (error) {
-      console.error("Error creating impression:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to create impression"),
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_CREATE_IMPRESSION),
       );
     }
   },
 ];
 
 export const get = [
-  // Only validate body if no fingerprintId in params
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.params.fingerprintId) {
-      return validateRequest(getImpressionsSchema)(req, res, next);
-    }
-    next();
-  },
+  validateRequest(getImpressionsSchema),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
-      // Try to get fingerprintId from params first, then body
       const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;
 
       if (!fingerprintId) {
-        throw new ApiError(400, "Fingerprint ID is required");
+        throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
       }
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
-      const { type, startTime, endTime, limit, sessionId } = req.query;
-
-      const options = {
-        type: type as string | undefined,
-        startTime: startTime ? new Date(startTime as string).getTime() : undefined,
-        endTime: endTime ? new Date(endTime as string).getTime() : undefined,
-        limit: limit ? parseInt(limit as string) : undefined,
-        sessionId: sessionId as string | undefined,
-      };
-
-      const impressions = await getImpressions(fingerprintId, options);
+      const impressions = await getImpressions(fingerprintId);
       return sendSuccess(res, impressions, "Impressions retrieved successfully");
     } catch (error) {
-      console.error("Error getting impressions:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to get impressions"),
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_IMPRESSIONS),
       );
     }
   },
 ];
 
 export const remove = [
-  // Only validate body if no fingerprintId in params
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.params.fingerprintId) {
-      return validateRequest(deleteImpressionsSchema)(req, res, next);
-    }
-    next();
-  },
+  validateRequest(deleteImpressionsSchema),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
-      // Try to get fingerprintId from params first, then body
       const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;
 
       if (!fingerprintId) {
-        throw new ApiError(400, "Fingerprint ID is required");
+        throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
       }
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
-      const { type, startTime, endTime, sessionId } = req.query;
-
-      const options = {
-        type: type as string | undefined,
-        startTime: startTime ? new Date(startTime as string).getTime() : undefined,
-        endTime: endTime ? new Date(endTime as string).getTime() : undefined,
-        sessionId: sessionId as string | undefined,
-      };
-
-      const count = await deleteImpressions(fingerprintId, options);
-      return sendSuccess(res, { deletedCount: count }, "Impressions deleted successfully");
+      const count = await deleteImpressions(fingerprintId);
+      return sendSuccess(res, { count }, "Impressions deleted successfully");
     } catch (error) {
-      console.error("Error deleting impressions:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to delete impressions"),
+        error instanceof Error
+          ? error
+          : new ApiError(500, ERROR_MESSAGES.FAILED_DELETE_IMPRESSIONS),
       );
     }
   },

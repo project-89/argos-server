@@ -11,6 +11,7 @@ import {
   verifyFingerprint,
 } from "../services/visitService";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 // Validation schemas
 const visitSchema = z.object({
@@ -59,7 +60,7 @@ export const log = [
       console.error("Error in log visit:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to log visit"),
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_LOG_VISIT),
       );
     }
   },
@@ -82,7 +83,9 @@ export const updatePresence = [
       console.error("Error in update presence:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to update presence"),
+        error instanceof Error
+          ? error
+          : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS),
       );
     }
   },
@@ -105,7 +108,7 @@ export const removeSite = [
       console.error("Error in remove site:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to remove site"),
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_SITE),
       );
     }
   },
@@ -128,7 +131,7 @@ export const getHistory = [
       const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;
 
       if (!fingerprintId) {
-        throw new ApiError(400, "Fingerprint ID is required");
+        throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
       }
 
       await verifyFingerprint(fingerprintId, req.fingerprintId);
@@ -139,7 +142,7 @@ export const getHistory = [
       console.error("Error in get visit history:", error);
       return sendError(
         res,
-        error instanceof Error ? error : new ApiError(500, "Failed to get visit history"),
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_VISIT_HISTORY),
       );
     }
   },

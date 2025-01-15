@@ -1,317 +1,200 @@
-# Argos Server SDK Implementation Guide
+# Argos SDK Implementation Guide
 
 ## Overview
-The Argos Server provides a secure API for digital identity management, visit tracking, and price data analytics. This document outlines everything needed to implement a client SDK.
+This guide details how to implement a client SDK for the Argos server. The SDK should handle fingerprint registration, API key management, and various tracking operations.
 
-## Base Configuration
-- Production Base URL: `https://argos.project89.org`
-- Local Development URL: `http://127.0.0.1:5001/argos-434718/us-central1/api`
-- Emulator UI: `http://127.0.0.1:4000`
-- Emulator Ports:
-  - Functions: 5001
-  - Firestore: 8080
-  - Emulator Hub: 4400
-- Rate Limits:
-  - IP-based: 300 requests per hour
-  - Fingerprint-based: 1000 requests per hour
-- Authentication: API key required in `x-api-key` header
-- Response Format: JSON with standard structure:
-  ```typescript
-  interface ApiResponse<T> {
-    success: boolean;
-    data?: T;
-    error?: string;
-    message?: string;
-  }
-  ```
+## Authentication Flow
 
-## Core Endpoints
+1. **Register Fingerprint**
+   ```typescript
+   POST /fingerprint/register
+   Body: { fingerprint: string, metadata?: Record<string, any> }
+   Response: { success: true, data: { id: string } }
+   ```
 
-### Identity Management
+2. **Register API Key**
+   ```typescript
+   POST /api-key/register
+   Body: { fingerprintId: string }
+   Response: { 
+     success: true, 
+     data: { 
+       key: string,
+       fingerprintId: string 
+     }
+   }
+   ```
 
-#### 1. Register Fingerprint
+3. **Using the API Key**
+   - Include in all protected requests via `x-api-key` header
+   - Store both API key and fingerprint ID securely
+   - API keys are encrypted and cannot be recovered if lost
+
+## Protected Endpoints
+
+### Impressions
 ```typescript
-POST /fingerprint/register
-Body: {
-  fingerprint: string;
-  metadata?: {
-    [key: string]: any;
-  };
-}
-Response: {
-  id: string;
-  fingerprint: string;
-  roles: string[];
-  createdAt: string;
-  metadata: object;
-}
-```
-
-#### 2. Get Fingerprint
-```typescript
-GET /fingerprint/:id
-Headers: {
-  x-api-key: string;
-}
-Response: {
-  id: string;
-  fingerprint: string;
-  roles: string[];
-  createdAt: string;
-  metadata: object;
-}
-```
-
-#### 3. Register API Key
-```typescript
-POST /api-key/register
+// Create impression
+POST /impressions
 Body: {
   fingerprintId: string;
+  type: string;
+  data: Record<string, any>;
+  source?: string;
+  sessionId?: string;
 }
-Response: {
-  key: string;
-  fingerprintId: string;
-  expiresAt: string;
-}
-```
 
-#### 4. Validate API Key
-```typescript
-POST /api-key/validate
-Body: {
-  key: string;
+// Get impressions
+GET /impressions/:fingerprintId
+Query: {
+  type?: string;
+  startTime?: string; // ISO datetime
+  endTime?: string;   // ISO datetime
+  limit?: number;
+  sessionId?: string;
 }
-Response: {
-  valid: boolean;
-  fingerprintId?: string;
-}
-```
 
-#### 5. Revoke API Key
-```typescript
-POST /api-key/revoke
-Headers: {
-  x-api-key: string;
-}
-Body: {
-  key: string;
-}
-Response: {
-  success: boolean;
+// Delete impressions
+DELETE /impressions/:fingerprintId
+Query: {
+  type?: string;
+  startTime?: string;
+  endTime?: string;
+  sessionId?: string;
 }
 ```
 
 ### Visit Tracking
-
-#### 1. Log Visit
 ```typescript
+// Log visit
 POST /visit/log
-Headers: {
-  x-api-key: string;
-}
 Body: {
   fingerprintId: string;
   url: string;
   title?: string;
-  metadata?: {
-    [key: string]: any;
-  };
 }
-Response: {
-  id: string;
-  fingerprintId: string;
-  url: string;
-  title: string;
-  timestamp: string;
-  site: {
-    domain: string;
-    visitCount: number;
-  };
-}
-```
 
-#### 2. Update Presence
-```typescript
+// Update presence
 POST /visit/presence
-Headers: {
-  x-api-key: string;
-}
 Body: {
   fingerprintId: string;
-  status: "active" | "inactive";
-  metadata?: {
-    [key: string]: any;
-  };
+  status: "online" | "offline";
 }
-Response: {
-  success: boolean;
-  timestamp: string;
+
+// Get visit history
+GET /visit/history/:fingerprintId
+
+// Remove site
+POST /visit/site/remove
+Body: {
+  fingerprintId: string;
+  siteId: string;
 }
 ```
 
-#### 3. Get Visit History
+### Fingerprint Management
 ```typescript
-GET /visit/history/:fingerprintId
-Headers: {
-  x-api-key: string;
-}
-Query Parameters: {
-  limit?: number;
-  offset?: number;
-  startDate?: string;
-  endDate?: string;
-}
-Response: {
-  visits: Array<{
-    id: string;
-    fingerprintId: string;
-    url: string;
-    title: string;
-    timestamp: string;
-    site: {
-      domain: string;
-      visitCount: number;
-    };
-  }>;
+// Get fingerprint
+GET /fingerprint/:id
+
+// Update fingerprint metadata
+POST /fingerprint/update
+Body: {
+  metadata: Record<string, any>;
 }
 ```
+
+### API Key Management
+```typescript
+// Validate API key
+POST /api-key/validate
+Body: { key: string }
+Response: { 
+  success: true, 
+  data: { 
+    isValid: boolean,
+    needsRefresh: boolean 
+  }
+}
+
+// Revoke API key
+POST /api-key/revoke
+Body: { key: string }
+```
+
+## Public Endpoints
 
 ### Price Data
-
-#### 1. Get Current Prices
 ```typescript
+// Get current prices
 GET /price/current
-Query Parameters: {
-  tokens?: string[]; // Comma-separated token IDs
-}
-Response: {
-  prices: {
-    [tokenId: string]: {
-      price: number;
-      timestamp: string;
-      change24h?: number;
-    };
-  };
-}
-```
+Query: { symbols?: string } // Comma-separated list
 
-#### 2. Get Price History
-```typescript
+// Get price history
 GET /price/history/:tokenId
-Query Parameters: {
-  interval?: "1h" | "24h" | "7d" | "30d";
-  limit?: number;
-}
-Response: {
-  history: Array<{
-    price: number;
-    timestamp: string;
-  }>;
-}
 ```
 
-### System
-
-#### 1. Health Check
+### Reality Stability
 ```typescript
-GET /health
+GET /reality-stability
 Response: {
-  status: "ok" | "error";
-  version: string;
-  timestamp: string;
-}
-```
-
-#### 2. Available Roles
-```typescript
-GET /role/available
-Response: {
-  roles: string[];
+  success: true,
+  data: {
+    stabilityIndex: number;
+    currentPrice: number;
+    priceChange: number;
+    timestamp: number;
+  }
 }
 ```
 
 ## Error Handling
 
-### Standard Error Codes
-- 400: Bad Request (invalid parameters)
-- 401: Unauthorized (missing or invalid API key)
-- 403: Forbidden (insufficient permissions)
-- 404: Not Found
-- 429: Too Many Requests (rate limit exceeded)
-- 500: Internal Server Error
-
-### Rate Limit Response
+### Response Format
 ```typescript
-Status: 429
+// Success Response
 {
-  success: false;
-  error: "Too many requests, please try again later";
-  retryAfter: number; // Seconds until next allowed request
+  success: true,
+  data: any,
+  message?: string,
+  requestId: string,
+  timestamp: number
+}
+
+// Error Response
+{
+  success: false,
+  error: string,
+  requestId: string,
+  timestamp: number
 }
 ```
 
-## SDK Implementation Requirements
+### Common Error Codes
+- 400: Bad Request (invalid parameters)
+- 401: Unauthorized (missing/invalid API key)
+- 403: Forbidden (API key doesn't match fingerprint)
+- 404: Not Found
+- 429: Rate Limit Exceeded
+- 500: Internal Server Error
 
-1. **Authentication Management**
-   - Store and manage API keys securely
-   - Handle API key rotation and expiration
-   - Implement automatic retry with backoff for rate limits
-
-2. **Request Handling**
-   - Implement proper error handling and type checking
-   - Support request cancellation
-   - Handle network timeouts and retries
-
-3. **Type Safety**
-   - Provide TypeScript definitions for all endpoints
-   - Include runtime type checking for responses
-   - Export proper type definitions for public API
-
-4. **Configuration**
-   - Allow base URL configuration
-   - Support custom headers and timeout settings
-   - Enable debug mode for detailed logging
-
-5. **Browser Support**
-   - Support modern browsers (last 2 versions)
-   - Handle CORS properly
-   - Implement proper cleanup for browser environments
-
-6. **Testing Requirements**
-   - Include unit tests for all endpoints
-   - Provide mocking utilities for testing
-   - Include integration test examples
+## Rate Limiting
+- Public endpoints: 100 requests per hour per IP
+- Protected endpoints: 1000 requests per hour per API key
+- Health endpoints: 60 requests per minute per IP
 
 ## Security Considerations
+1. Store API keys securely
+2. Always use HTTPS in production
+3. Validate fingerprint ownership before operations
+4. Handle rate limits gracefully
+5. Implement proper error handling
+6. Use appropriate CORS origins
 
-1. **API Key Handling**
-   - Never store API keys in localStorage/sessionStorage
-   - Implement secure key rotation
-   - Clear keys on session end
-
-2. **Request Security**
-   - Use HTTPS only
-   - Validate all input data
-   - Sanitize URLs and metadata
-
-3. **Error Handling**
-   - Never expose sensitive data in errors
-   - Implement proper error recovery
-   - Log security-related errors
-
-## Best Practices
-
-1. **Rate Limiting**
-   - Implement client-side rate limiting
-   - Queue requests when approaching limits
-   - Provide rate limit status to applications
-
-2. **Caching**
-   - Cache price data appropriately
-   - Implement proper cache invalidation
-   - Support custom cache configurations
-
-3. **Performance**
-   - Minimize bundle size
-   - Support tree shaking
-   - Implement request batching where appropriate 
+## SDK Implementation Tips
+1. Implement automatic API key refresh when `needsRefresh: true`
+2. Use exponential backoff for retries
+3. Cache fingerprint ID with API key
+4. Implement proper request queuing
+5. Handle concurrent requests efficiently
+6. Provide TypeScript types for all endpoints 

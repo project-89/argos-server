@@ -3,24 +3,17 @@ import { COLLECTIONS } from "../constants/collections";
 import { Impression } from "../types/models";
 import { ApiError } from "../utils/error";
 import { getCurrentTimestamp } from "../utils/timestamp";
+import { ERROR_MESSAGES } from "../constants/api";
 
 /**
- * Verifies fingerprint exists and ownership
+ * Verifies fingerprint ownership
  */
 export const verifyFingerprint = async (
   fingerprintId: string,
   authenticatedId?: string,
 ): Promise<void> => {
-  const db = getFirestore();
-  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-  const fingerprintDoc = await fingerprintRef.get();
-
-  if (!fingerprintDoc.exists) {
-    throw new ApiError(404, "Fingerprint not found");
-  }
-
   if (authenticatedId && fingerprintId !== authenticatedId) {
-    throw new ApiError(403, "API key does not match fingerprint");
+    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 };
 

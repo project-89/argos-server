@@ -10,6 +10,7 @@ import {
 } from "../../services/apiKeyService";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 const db = getFirestore();
 
@@ -79,7 +80,7 @@ describe("API Key Service", () => {
 
     it("should throw error for unregistered fingerprint", async () => {
       await expect(createApiKey("unregistered-fingerprint")).rejects.toThrow(
-        "Fingerprint not found",
+        ERROR_MESSAGES.FINGERPRINT_NOT_FOUND,
       );
     });
   });
@@ -212,7 +213,7 @@ describe("API Key Service", () => {
 
     it("should throw error for non-existent key", async () => {
       await expect(deactivateApiKey("test-fingerprint", "non-existent-id")).rejects.toThrow(
-        "API key not found",
+        ERROR_MESSAGES.NOT_FOUND,
       );
     });
 
@@ -222,7 +223,7 @@ describe("API Key Service", () => {
       const created = await createApiKey(fingerprintId);
 
       await expect(deactivateApiKey("different-fingerprint", created.id)).rejects.toThrow(
-        "API key does not belong to fingerprint",
+        ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS,
       );
     });
   });
@@ -247,7 +248,7 @@ describe("API Key Service", () => {
 
     it("should throw error for non-existent key", async () => {
       await expect(revokeApiKey("non-existent-key", "test-fingerprint")).rejects.toThrow(
-        "Invalid API key",
+        ERROR_MESSAGES.INVALID_API_KEY,
       );
     });
 
@@ -257,7 +258,7 @@ describe("API Key Service", () => {
       const created = await createApiKey(fingerprintId);
 
       await expect(revokeApiKey(created.key, "different-fingerprint")).rejects.toThrow(
-        "Not authorized to revoke this API key",
+        ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS,
       );
     });
   });

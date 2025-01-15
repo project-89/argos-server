@@ -6,21 +6,24 @@ import { Agent as HttpAgent } from "http";
 
 // Create a custom agent with a small keepAlive timeout
 const agent = new HttpAgent({
-  keepAlive: true,
-  keepAliveMsecs: 100,
+  keepAlive: false,
   maxSockets: 1,
+  timeout: 1000,
 });
 
 /**
  * Destroy the HTTP agent to clean up any remaining connections
  */
 export const destroyAgent = () => {
-  agent.destroy();
+  if (agent) {
+    agent.destroy();
+  }
 };
 
 interface TestDataOptions {
   metadata?: Record<string, any>;
   roles?: string[];
+  skipCleanup?: boolean;
 }
 
 export const makeRequest = async (config: {
@@ -50,13 +53,13 @@ export const makeRequest = async (config: {
       agent, // Use our custom agent
     };
 
-    console.log(`📤 Request config:`, {
-      method: config.method,
-      url: urlWithParams,
-      headers: requestConfig.headers,
-      data: config.data,
-      params: config.params,
-    });
+    // console.log(`📤 Request config:`, {
+    //   method: config.method,
+    //   url: urlWithParams,
+    //   headers: requestConfig.headers,
+    //   data: config.data,
+    //   params: config.params,
+    // });
 
     const response = await fetch(urlWithParams, requestConfig);
     let data;
@@ -83,7 +86,7 @@ export const makeRequest = async (config: {
       headers,
     };
 
-    console.log(`📥 Response:`, result);
+    // console.log(`📥 Response:`, result);
 
     return result;
   } catch (error) {
@@ -97,6 +100,11 @@ export const makeRequest = async (config: {
  */
 export const createTestData = async (options: TestDataOptions = {}) => {
   console.log("Creating test data with options:", options);
+
+  // Clean database first unless skipCleanup is true
+  if (!options.skipCleanup) {
+    await cleanDatabase();
+  }
 
   // Register fingerprint
   const fingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -176,7 +184,7 @@ export const cleanDatabase = async () => {
     console.log("🧹 Cleaning test database...");
     const db = getFirestore();
     const collections = Object.values(COLLECTIONS);
-    console.log("📚 Cleaning test collections:", collections);
+    // console.log("📚 Cleaning test collections:", collections);
 
     const promises = collections.map(async (collection) => {
       const snapshot = await db.collection(collection).get();

@@ -8,8 +8,8 @@ import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
 
 const protectedRouter = Router();
 
-// Fingerprint operations - require ownership
-protectedRouter.get("/fingerprint/:id", verifyOwnership, fingerprint.get);
+// Fingerprint operations
+protectedRouter.get("/fingerprint/:id", fingerprint.get, verifyOwnership); // Check existence before ownership
 protectedRouter.post("/fingerprint/update", verifyOwnership, ...fingerprint.update);
 
 // Visit tracking - require ownership

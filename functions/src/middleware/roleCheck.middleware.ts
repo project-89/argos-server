@@ -3,6 +3,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { ROLE, ROLE_PERMISSIONS, Permission } from "../constants/roles";
+import { ERROR_MESSAGES } from "../constants/api";
 
 /**
  * Creates middleware to check if the user has the required permission
@@ -18,7 +19,7 @@ export const requirePermission = (requiredPermission: Permission) => {
 
       const fingerprintId = req.fingerprintId;
       if (!fingerprintId) {
-        throw new ApiError(401, "Authentication required");
+        throw new ApiError(401, ERROR_MESSAGES.AUTHENTICATION_REQUIRED);
       }
 
       const db = getFirestore();
@@ -26,12 +27,12 @@ export const requirePermission = (requiredPermission: Permission) => {
 
       // Check fingerprint existence first
       if (!fingerprintDoc.exists) {
-        throw new ApiError(404, "Fingerprint not found");
+        throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
       }
 
       const fingerprint = fingerprintDoc.data();
       if (!fingerprint) {
-        throw new ApiError(500, "Invalid fingerprint data");
+        throw new ApiError(500, ERROR_MESSAGES.INVALID_FINGERPRINT_DATA);
       }
 
       const roles = Array.isArray(fingerprint.roles) ? fingerprint.roles : [];
@@ -50,9 +51,9 @@ export const requirePermission = (requiredPermission: Permission) => {
       if (!hasPermission) {
         // For admin permission, use a specific error message
         if (requiredPermission === "admin") {
-          throw new ApiError(403, "Admin role required");
+          throw new ApiError(403, ERROR_MESSAGES.ADMIN_REQUIRED);
         }
-        throw new ApiError(403, `Required permission '${requiredPermission}' not found`);
+        throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
       }
 
       next();
@@ -60,7 +61,7 @@ export const requirePermission = (requiredPermission: Permission) => {
       if (error instanceof Error) {
         return next(error instanceof ApiError ? error : new ApiError(500, error.message));
       }
-      return next(new ApiError(500, "Unknown error occurred"));
+      return next(new ApiError(500, ERROR_MESSAGES.UNKNOWN_ERROR));
     }
   };
 };

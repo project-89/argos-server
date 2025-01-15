@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 import { ROLE } from "../../constants/roles";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Tag Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -112,7 +113,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("At least one tag must be provided");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_TAGS);
     });
 
     it("should handle non-existent fingerprint", async () => {
@@ -130,7 +131,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
+      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     });
 
     it("should require fingerprintId", async () => {
@@ -147,7 +148,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint ID is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
     });
 
     it("should require tags", async () => {
@@ -164,7 +165,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Tags array is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_TAGS);
     });
 
     it("should validate tag values", async () => {
@@ -182,7 +183,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Expected string, received number");
+      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_TAG_TYPE);
     });
 
     it("should reject request from non-admin user", async () => {
@@ -200,7 +201,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("admin role required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.ADMIN_REQUIRED);
     });
   });
 
@@ -309,7 +310,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint not found");
+      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     });
 
     it("should require fingerprintId", async () => {
@@ -331,7 +332,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Fingerprint ID is required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
     });
 
     it("should require tagRules", async () => {
@@ -420,7 +421,7 @@ describe("Tag Endpoint", () => {
 
       expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("admin role required");
+      expect(response.data.error).toBe(ERROR_MESSAGES.ADMIN_REQUIRED);
     });
   });
 });

@@ -4,6 +4,7 @@ import { ApiError } from "../utils/error";
 import { updatePresence } from "./presenceService";
 import type { PresenceStatus } from "./presenceService";
 import { Visit, Site, VisitHistoryResponse, SiteModel } from "../types/api.types";
+import { ERROR_MESSAGES } from "../constants/api";
 
 /**
  * Extracts domain from URL
@@ -29,11 +30,11 @@ export const verifyFingerprint = async (
   const fingerprintDoc = await fingerprintRef.get();
 
   if (!fingerprintDoc.exists) {
-    throw new ApiError(404, "Fingerprint not found");
+    throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
   }
 
   if (authenticatedId && fingerprintId !== authenticatedId) {
-    throw new ApiError(403, "API key does not match fingerprint");
+    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 };
 
@@ -154,12 +155,12 @@ export const removeSiteAndVisits = async (
   const siteDoc = await siteRef.get();
 
   if (!siteDoc.exists) {
-    throw new ApiError(404, "Site not found");
+    throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
   }
 
   const siteData = siteDoc.data() as Site;
   if (siteData.fingerprintId !== fingerprintId) {
-    throw new ApiError(403, "Not authorized to remove this site");
+    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 
   // Delete all visits for this site

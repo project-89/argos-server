@@ -5,6 +5,7 @@ import { ApiError } from "../utils/error";
 import { generateApiKey } from "../utils/api-key";
 import { toUnixMillis } from "../utils/timestamp";
 import { ApiKeyValidationResponse } from "../types/api.types";
+import { ERROR_MESSAGES } from "../constants/api";
 
 // Type for API response that converts Timestamp to Unix time
 type ApiKeyResponse = Omit<ApiKey, "createdAt"> & { createdAt: number };
@@ -181,7 +182,7 @@ export const validateApiKey = async (key: string): Promise<ApiKeyValidationRespo
       error,
       stack: error instanceof Error ? error.stack : undefined,
     });
-    throw new ApiError(500, "Failed to validate API key");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -194,11 +195,11 @@ export const deactivateApiKey = async (fingerprintId: string, keyId: string): Pr
   const keyDoc = await keyRef.get();
 
   if (!keyDoc.exists) {
-    throw new ApiError(404, "API key not found");
+    throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
   }
 
   if (keyDoc.data()?.fingerprintId !== fingerprintId) {
-    throw new ApiError(403, "API key does not belong to fingerprint");
+    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 
   await keyRef.update({
@@ -217,7 +218,7 @@ export const revokeApiKey = async (key: string, fingerprintId: string): Promise<
     console.log("[revokeApiKey] Key lookup result:", { found: !snapshot.empty });
 
     if (snapshot.empty) {
-      throw new ApiError(401, "Invalid API key");
+      throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
     }
 
     const doc = snapshot.docs[0];
@@ -230,7 +231,7 @@ export const revokeApiKey = async (key: string, fingerprintId: string): Promise<
 
     // Check ownership first
     if (data.fingerprintId !== fingerprintId) {
-      throw new ApiError(403, "Not authorized to revoke this API key");
+      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     }
 
     // Finally revoke
@@ -249,6 +250,6 @@ export const revokeApiKey = async (key: string, fingerprintId: string): Promise<
     if (error instanceof ApiError) {
       throw error;
     }
-    throw new ApiError(500, "Failed to revoke API key");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

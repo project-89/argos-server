@@ -2,10 +2,16 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // Common validation functions
-    function isValidTime(timeInMillis) {
+    function isValidUnixTime(timeInMillis) {
       return timeInMillis is number 
         && timeInMillis <= request.time.toMillis() + 60000  // Within 1 minute future
         && timeInMillis >= request.time.toMillis() - 60000; // Within 1 minute past
+    }
+
+    function isValidFirestoreTimestamp(firestoreTimestamp) {
+      return firestoreTimestamp is timestamp
+        && firestoreTimestamp.toMillis() <= request.time.toMillis() + 60000
+        && firestoreTimestamp.toMillis() >= request.time.toMillis() - 60000;
     }
 
     function isValidRole(role) {
@@ -18,31 +24,77 @@ service cloud.firestore {
 
     // Rules for fingerprints collection
     match /fingerprints/{fingerprintId} {
-      // Only allow read for registration validation
-      allow read: if request.path.matches('/fingerprints/[^/]+$');  // Only direct document reads
+      allow read: if request.path.matches('/fingerprints/[^/]+$');
       allow write: if false;  // Only Cloud Functions can write
 
-      // Validate fingerprint roles
-      match /roles/{roleId} {
-        allow read: if true;  // Roles need to be readable for validation
-        allow write: if false;  // Only Cloud Functions can write
-        allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
+      function isValidFingerprintData() {
+        let data = request.resource.data;
+        return data.createdAt is timestamp
+          && (!data.keys().hasAny(['ipMetadata']) 
+              || (data.ipMetadata.lastSeenAt is map 
+                  && data.ipMetadata.lastSeenAt.values().hasAll([request.time])));
       }
     }
 
-    // Rules for visits collection - private data
+    // Rules for visits collection
     match /visits/{visitId} {
       allow read, write: if false;  // Only Cloud Functions can access
+
+      function isValidVisitData() {
+        let data = request.resource.data;
+        return data.unixTime is number  // Unix timestamp
+          && isValidUnixTime(data.unixTime);
+      }
     }
 
-    // Rules for presence tracking - private data
+    // Rules for presence tracking
     match /presence/{fingerprintId} {
       allow read, write: if false;  // Only Cloud Functions can access
+
+      function isValidPresenceData() {
+        let data = request.resource.data;
+        return data.unixTime is number  // Unix timestamp
+          && isValidUnixTime(data.unixTime);
+      }
     }
 
-    // Rules for API keys - most sensitive collection
+    // Rules for API keys
     match /apiKeys/{keyId} {
       allow read, write: if false;  // Strictly Cloud Functions only
+
+      function isValidApiKeyData() {
+        let data = request.resource.data;
+        return data.createdAt is timestamp
+          && data.expiresAt is timestamp
+          && (!data.keys().hasAny(['revokedAt']) || data.revokedAt is timestamp)
+          && isValidFirestoreTimestamp(data.createdAt)
+          && isValidFirestoreTimestamp(data.expiresAt);
+      }
+    }
+
+    // Rules for impressions
+    match /impressions/{impressionId} {
+      allow read, write: if false;  // Only Cloud Functions can access
+
+      function isValidImpressionData() {
+        let data = request.resource.data;
+        return data.fingerprintId is string
+          && data.type is string
+          && data.data is map
+          && data.createdAt is timestamp
+          && isValidFirestoreTimestamp(data.createdAt);
+      }
+    }
+
+    // Rules for price cache
+    match /priceCache/{docId} {
+      allow read, write: if false;  // Only Cloud Functions can access
+
+      function isValidPriceCacheData() {
+        let data = request.resource.data;
+        return data.unixTime is number  // Unix timestamp
+          && isValidUnixTime(data.unixTime);
+      }
     }
 
     // Rules for price history - public data
@@ -72,18 +124,6 @@ service cloud.firestore {
     match /roles/{roleId} {
       allow read, write: if false;  // Only Cloud Functions can access
       allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
-    }
-
-    // Rules for impressions - private data tied to fingerprints
-    match /impressions/{impressionId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-
-      // Additional validation even though write is false
-      allow create: if false && 
-        request.resource.data.fingerprintId is string &&
-        request.resource.data.type is string &&
-        request.resource.data.data is map &&
-        request.resource.data.createdAt is timestamp;
     }
   }
 }
