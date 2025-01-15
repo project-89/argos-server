@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 import { ROLE } from "../../constants/roles";
+import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Ownership Check Middleware Test Suite", () => {
   let validApiKey: string;
@@ -72,9 +73,9 @@ describe("Ownership Check Middleware Test Suite", () => {
       validateStatus: () => true,
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
+    expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
   });
 
   it("should deny access to other user's data via request body", async () => {
@@ -106,9 +107,9 @@ describe("Ownership Check Middleware Test Suite", () => {
       validateStatus: () => true,
     });
 
-    expect(response.status).toBe(403);
+    expect(response.status).toBe(401);
     expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
+    expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
   });
 
   it("should deny when second user tries to access first user's data via request body", async () => {
@@ -269,5 +270,73 @@ describe("Ownership Check Middleware Test Suite", () => {
     expect(response.status).toBe(403);
     expect(response.data.success).toBe(false);
     expect(response.data.error).toBe("API key does not match fingerprint");
+  });
+
+  it("should return 401 for GET requests when API key does not match fingerprint", async () => {
+    const response = await makeRequest({
+      method: "get",
+      url: `${TEST_CONFIG.apiUrl}/visit/history/${otherFingerprintId}`,
+      headers: {
+        "x-api-key": validApiKey,
+      },
+      validateStatus: () => true,
+    });
+
+    expect(response.status).toBe(401);
+    expect(response.data.success).toBe(false);
+    expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+  });
+
+  it("should return 403 for POST requests when API key does not match fingerprint", async () => {
+    const response = await makeRequest({
+      method: "post",
+      url: `${TEST_CONFIG.apiUrl}/visit/presence`,
+      data: {
+        fingerprintId: otherFingerprintId,
+        status: "online",
+      },
+      headers: {
+        "x-api-key": validApiKey,
+      },
+      validateStatus: () => true,
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.data.success).toBe(false);
+    expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+  });
+
+  it("should return 403 for POST requests to /fingerprint/update when API key does not match fingerprint", async () => {
+    const response = await makeRequest({
+      method: "post",
+      url: `${TEST_CONFIG.apiUrl}/fingerprint/update`,
+      data: {
+        fingerprintId: otherFingerprintId,
+        metadata: { test: true },
+      },
+      headers: {
+        "x-api-key": validApiKey,
+      },
+      validateStatus: () => true,
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.data.success).toBe(false);
+    expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+  });
+
+  it("should return 403 for DELETE requests when API key does not match fingerprint", async () => {
+    const response = await makeRequest({
+      method: "delete",
+      url: `${TEST_CONFIG.apiUrl}/impressions/${otherFingerprintId}`,
+      headers: {
+        "x-api-key": validApiKey,
+      },
+      validateStatus: () => true,
+    });
+
+    expect(response.status).toBe(403);
+    expect(response.data.success).toBe(false);
+    expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   });
 });

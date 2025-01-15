@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 import { validateApiKey, getApiKeyByKey } from "../services/apiKeyService";
+import { getFirestore } from "firebase-admin/firestore";
+import { COLLECTIONS } from "../constants/collections";
 
 /**
  * Middleware to validate API key and set fingerprintId on request
@@ -18,6 +20,16 @@ export const validateApiKeyMiddleware = async (req: Request, res: Response, next
     // First get the API key details to get the fingerprintId
     const apiKeyDetails = await getApiKeyByKey(apiKey);
     if (!apiKeyDetails) {
+      throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
+    }
+
+    // Verify the fingerprint still exists
+    const db = getFirestore();
+    const fingerprintDoc = await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .doc(apiKeyDetails.fingerprintId)
+      .get();
+    if (!fingerprintDoc.exists) {
       throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
     }
 

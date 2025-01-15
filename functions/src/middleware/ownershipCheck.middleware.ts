@@ -58,7 +58,14 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
         callerFingerprintId,
         targetFingerprintId,
       });
-      return sendError(res, new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS));
+
+      // For GET requests, return 401 as it's an authentication issue
+      // For modification requests, return 403 as it's a permissions issue
+      if (req.method === "GET") {
+        return sendError(res, new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY));
+      } else {
+        return sendError(res, new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS));
+      }
     }
 
     next();
