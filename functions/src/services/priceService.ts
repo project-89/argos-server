@@ -13,7 +13,7 @@ export interface PriceData {
   };
 }
 
-const DEFAULT_TOKENS = ["bitcoin", "ethereum"];
+const DEFAULT_TOKENS = ["project89"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Get Coingecko configuration

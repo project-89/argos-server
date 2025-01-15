@@ -84,14 +84,12 @@ describe("Price Service", () => {
     it("should use default tokens if none provided", async () => {
       mockedAxios.get.mockResolvedValue({
         data: {
-          bitcoin: testPrice,
-          ethereum: { ...testPrice, usd: 3000 },
+          project89: testPrice,
         },
       });
 
       const prices = await getCurrentPrices();
-      expect(Object.keys(prices)).toContain("bitcoin");
-      expect(Object.keys(prices)).toContain("ethereum");
+      expect(Object.keys(prices)).toContain("project89");
     });
 
     it("should handle API errors gracefully", async () => {
