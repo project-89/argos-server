@@ -52,6 +52,7 @@ export const ERROR_MESSAGES = {
   FAILED_REMOVE_SITE: "Failed to remove site",
   FAILED_GET_VISIT_HISTORY: "Failed to get visit history",
   FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
+  FAILED_GET_TOKEN_PRICE: "Failed to get token price data",
 
   // Validation errors
   INVALID_REQUEST: "Invalid request data",

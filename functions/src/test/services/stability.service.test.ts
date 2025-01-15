@@ -13,7 +13,7 @@ describe("Stability Service", () => {
   describe("calculateStabilityIndex", () => {
     it("should calculate stability index correctly", async () => {
       const mockPrices = {
-        solana: {
+        project89: {
           usd: 100,
           usd_24h_change: -5,
         },
@@ -29,14 +29,14 @@ describe("Stability Service", () => {
         priceChange: -5,
         timestamp: expect.any(Number),
       });
-      expect(getCurrentPrices).toHaveBeenCalledWith(["solana"]);
+      expect(getCurrentPrices).toHaveBeenCalledWith(["project89"]);
     });
 
-    it("should handle missing Solana price data", async () => {
+    it("should handle missing token price data", async () => {
       (getCurrentPrices as jest.Mock).mockResolvedValue({});
 
       await expect(calculateStabilityIndex()).rejects.toThrow(
-        new ApiError(500, "Failed to get Solana price data"),
+        new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE),
       );
     });
 
@@ -50,7 +50,7 @@ describe("Stability Service", () => {
 
     it("should handle extreme price changes", async () => {
       const mockPrices = {
-        solana: {
+        project89: {
           usd: 100,
           usd_24h_change: -150, // Extreme price change
         },

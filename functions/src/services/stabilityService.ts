@@ -1,5 +1,6 @@
 import { getCurrentPrices } from "./priceService";
 import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api";
 
 export interface StabilityData {
   stabilityIndex: number;
@@ -9,24 +10,24 @@ export interface StabilityData {
 }
 
 /**
- * Calculate reality stability index based on price data
+ * Calculate reality stability index based on Project89 token price data
  */
 export const calculateStabilityIndex = async (): Promise<StabilityData> => {
   try {
-    // Get current price data
-    const prices = await getCurrentPrices(["solana"]);
-    if (!prices.solana) {
-      throw new ApiError(500, "Failed to get Solana price data");
+    // Get current price data for Project89
+    const prices = await getCurrentPrices(["project89"]);
+    if (!prices.project89) {
+      throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
     }
 
     // Calculate a simple stability index based on 24h price change
-    const priceChange = Math.abs(prices.solana.usd_24h_change);
+    const priceChange = Math.abs(prices.project89.usd_24h_change);
     const stabilityIndex = Math.max(0, 100 - priceChange);
 
     return {
       stabilityIndex,
-      currentPrice: prices.solana.usd,
-      priceChange: prices.solana.usd_24h_change,
+      currentPrice: prices.project89.usd,
+      priceChange: prices.project89.usd_24h_change,
       timestamp: Date.now(),
     };
   } catch (error) {
@@ -34,6 +35,6 @@ export const calculateStabilityIndex = async (): Promise<StabilityData> => {
       throw error;
     }
     console.error("Error calculating reality stability index:", error);
-    throw new ApiError(500, "Failed to calculate reality stability index");
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
