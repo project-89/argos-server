@@ -62,17 +62,22 @@ describe("Error Middleware", () => {
   });
 
   it("should handle CORS error with 403 status", () => {
-    const error = new Error("Not allowed by CORS");
-    error.name = "CORS Error";
+    const mockRequest = {} as Request;
+    const mockResponse = {
+      status: jest.fn().mockReturnThis(),
+      json: jest.fn(),
+    } as unknown as Response;
+    const mockNext = jest.fn();
 
-    errorHandler(error, mockRequest as Request, mockResponse as Response, nextFunction);
+    const corsError = new ApiError(403, ERROR_MESSAGES.CORS_ERROR);
+    errorHandler(corsError, mockRequest, mockResponse, mockNext);
 
     expect(mockResponse.status).toHaveBeenCalledWith(403);
     expect(mockResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,
         code: "ApiError",
-        error: "Not allowed by CORS",
+        error: ERROR_MESSAGES.CORS_ERROR,
         requestId: expect.any(String),
         timestamp: expect.any(Number),
       }),
