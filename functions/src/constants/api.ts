@@ -38,6 +38,11 @@ export const ERROR_MESSAGES = {
   CANNOT_REMOVE_USER_ROLE: "Cannot remove user role",
   DATABASE_NOT_READY: "Database index not ready. Please try again in a few minutes.",
   SITE_NOT_FOUND: "Site not found",
+  TAGGER_NOT_FOUND: "Tagger fingerprint not found",
+
+  // Tag game errors
+  CANNOT_TAG_SELF: "Cannot tag yourself as 'it'",
+  ALREADY_TAGGED: "User is already tagged as 'it'",
 
   // Operation errors
   FAILED_CREATE_IMPRESSION: "Failed to create impression",

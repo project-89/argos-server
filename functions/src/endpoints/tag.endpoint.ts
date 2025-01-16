@@ -1,89 +1,71 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
+import {
+  tagUser as tagUserService,
+  isUserIt as isUserItService,
+  getTagHistory as getTagHistoryService,
+} from "../services/tagService";
+import { sendSuccess } from "../utils/response";
+import { ERROR_MESSAGES } from "../constants/api";
+import { ApiError } from "../utils/error";
 import { validateRequest } from "../middleware/validation.middleware";
-import { z } from "zod";
-import { ROLE } from "../constants/roles";
-import { updateTags, updateRolesByTags } from "../services/tagService";
-import { sendSuccess, sendError } from "../utils/response";
+import { schemas } from "../types/schemas";
 
-const tagSchema = z
-  .array(z.string(), {
-    required_error: "Tags array is required",
-    invalid_type_error: "Tags must be an array of strings",
-  })
-  .min(1, "At least one tag must be provided");
-
-const tagRuleSchema = z.record(
-  z.object({
-    tags: z
-      .array(z.string(), {
-        required_error: "Tag rule tags array is required",
-        invalid_type_error: "Tag rule tags must be an array of strings",
-      })
-      .min(1, "At least one tag must be provided in rule"),
-    role: z.nativeEnum(ROLE, {
-      required_error: "Role is required",
-      invalid_type_error: "Invalid role",
-    }),
-  }),
-  {
-    required_error: "Tag rules object is required",
-    invalid_type_error: "Tag rules must be an object",
-  },
-);
+const LOG_PREFIX = "[Tag Endpoint]";
 
 /**
- * Add or update tags for a fingerprint
+ * Tag another user as "it"
  */
-export const addOrUpdateTags = [
-  validateRequest(
-    z.object({
-      fingerprintId: z
-        .string({
-          required_error: "Fingerprint ID is required",
-        })
-        .min(1, "Fingerprint ID cannot be empty"),
-      tags: tagSchema,
-    }),
-  ),
-  async (req: Request, res: Response): Promise<Response> => {
+export const tagUser = [
+  validateRequest(schemas.tagUser),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { fingerprintId, tags } = req.body;
-      const result = await updateTags(fingerprintId, tags);
-      return sendSuccess(res, result);
+      console.log(`${LOG_PREFIX} Processing tag request`);
+      const { targetFingerprintId } = req.body;
+      const taggerFingerprintId = req.fingerprintId as string;
+
+      const result = await tagUserService(taggerFingerprintId, targetFingerprintId);
+      sendSuccess(res, result);
     } catch (error) {
-      console.error("Error updating tags:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to update tags");
+      console.error(`${LOG_PREFIX} Error in tagUser:`, error);
+      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
     }
   },
 ];
 
 /**
- * Update roles based on tag rules
+ * Check if a user is currently "it"
  */
-export const updateRolesBasedOnTags = [
-  validateRequest(
-    z.object({
-      fingerprintId: z
-        .string({
-          required_error: "Fingerprint ID is required",
-        })
-        .min(1, "Fingerprint ID cannot be empty"),
-      tagRules: tagRuleSchema,
-    }),
-  ),
-  async (req: Request, res: Response): Promise<Response> => {
+export const isUserIt = [
+  validateRequest(schemas.presenceGet), // Reuse existing schema since we just need fingerprintId param
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { fingerprintId, tagRules } = req.body;
-      const callerFingerprintId = req.fingerprintId as string;
+      console.log(`${LOG_PREFIX} Checking if user is "it"`);
+      const fingerprintId = req.params.fingerprintId;
 
-      const result = await updateRolesByTags(fingerprintId, callerFingerprintId, tagRules);
-      return sendSuccess(res, result);
+      const isIt = await isUserItService(fingerprintId);
+      sendSuccess(res, { isIt });
     } catch (error) {
-      console.error("Error updating roles based on tags:", error);
-      return sendError(
-        res,
-        error instanceof Error ? error : "Failed to update roles based on tags",
-      );
+      console.error(`${LOG_PREFIX} Error in isUserIt:`, error);
+      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
+    }
+  },
+];
+
+/**
+ * Get tag history for a user
+ */
+export const getTagHistory = [
+  validateRequest(schemas.presenceGet), // Reuse existing schema since we just need fingerprintId param
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      console.log(`${LOG_PREFIX} Getting tag history`);
+      const fingerprintId = req.params.fingerprintId;
+
+      const tags = await getTagHistoryService(fingerprintId);
+      sendSuccess(res, { tags });
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
+      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
     }
   },
 ];

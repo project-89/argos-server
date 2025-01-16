@@ -250,6 +250,32 @@ export interface VisitAnalysis {
 }
 
 /**
+ * Tag Game Types
+ */
+export interface TagData {
+  tag: "it";
+  taggedBy: string;
+  taggedAt: Timestamp;
+}
+
+export interface TagUserRequest {
+  targetFingerprintId: string;
+}
+
+export interface TagUserResponse {
+  success: boolean;
+  message: string;
+}
+
+export interface TagHistoryResponse {
+  tags: TagData[];
+}
+
+export interface IsUserItResponse {
+  isIt: boolean;
+}
+
+/**
  * API Endpoints Configuration
  */
 export const API_ENDPOINTS = {

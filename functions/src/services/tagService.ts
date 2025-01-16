@@ -1,52 +1,91 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
-import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
+import { TagData, TagUserResponse } from "../types/api.types";
 
 export interface FingerprintData {
-  tags?: string[];
-  roles?: ROLE[];
+  tags?: TagData[];
 }
 
+const LOG_PREFIX = "[Tag Service]";
+
 /**
- * Check if the caller has sufficient privileges to manage the target role
+ * Tag another user as "it"
  */
-export const canManageRole = async (
-  callerFingerprintId: string,
-  targetRole: ROLE,
-): Promise<boolean> => {
-  const db = getFirestore();
-  const callerDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(callerFingerprintId).get();
+export const tagUser = async (
+  taggerFingerprintId: string,
+  targetFingerprintId: string,
+): Promise<TagUserResponse> => {
+  try {
+    console.log(
+      `${LOG_PREFIX} Attempting to tag user ${targetFingerprintId} as "it" by ${taggerFingerprintId}`,
+    );
 
-  if (!callerDoc.exists) {
-    return false;
+    // Validate inputs
+    if (taggerFingerprintId === targetFingerprintId) {
+      throw new ApiError(400, ERROR_MESSAGES.CANNOT_TAG_SELF);
+    }
+
+    const db = getFirestore();
+
+    // Get target fingerprint
+    const targetRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId);
+    const targetDoc = await targetRef.get();
+
+    if (!targetDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+    }
+
+    // Get tagger fingerprint to verify they exist
+    const taggerRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(taggerFingerprintId);
+    const taggerDoc = await taggerRef.get();
+
+    if (!taggerDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.TAGGER_NOT_FOUND);
+    }
+
+    const targetData = targetDoc.data() as FingerprintData;
+    const currentTags = targetData?.tags || [];
+
+    // Check if target is already "it"
+    if (currentTags.some((tag) => tag.tag === "it")) {
+      throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
+    }
+
+    // Create new tag
+    const newTag: TagData = {
+      tag: "it",
+      taggedBy: taggerFingerprintId,
+      taggedAt: Timestamp.now(),
+    };
+
+    // Update target's tags
+    await targetRef.update({
+      tags: [...currentTags, newTag],
+    });
+
+    console.log(`${LOG_PREFIX} Successfully tagged user ${targetFingerprintId} as "it"`);
+    return {
+      success: true,
+      message: "Successfully tagged user as 'it'",
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in tagUser:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  const callerData = callerDoc.data() as FingerprintData;
-  const callerRoles = callerData?.roles || [ROLE.USER];
-
-  // Admin can manage any role
-  if (callerRoles.includes(ROLE.ADMIN)) {
-    return true;
-  }
-
-  // Get the highest role level of the caller
-  const callerLevel = Math.max(...callerRoles.map((role) => ROLE_HIERARCHY[role] || 0));
-  const targetLevel = ROLE_HIERARCHY[targetRole];
-
-  // Caller must have a higher role level to manage the target role
-  return callerLevel > targetLevel;
 };
 
 /**
- * Add or update tags for a fingerprint
+ * Check if a user is currently "it"
  */
-export const updateTags = async (
-  fingerprintId: string,
-  newTags: string[],
-): Promise<{ fingerprintId: string; tags: string[] }> => {
+export const isUserIt = async (fingerprintId: string): Promise<boolean> => {
   try {
+    console.log(`${LOG_PREFIX} Checking if user ${fingerprintId} is "it"`);
+
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
     const fingerprintDoc = await fingerprintRef.get();
@@ -56,101 +95,25 @@ export const updateTags = async (
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
-    const currentTags = new Set<string>(data?.tags || []);
+    const currentTags = data?.tags || [];
 
-    // Add new tags to the set
-    newTags.forEach((tag) => currentTags.add(tag));
-
-    // Convert set back to array
-    const updatedTags = Array.from(currentTags);
-
-    await fingerprintRef.update({
-      tags: updatedTags,
-    });
-
-    return {
-      fingerprintId,
-      tags: updatedTags,
-    };
+    return currentTags.some((tag) => tag.tag === "it");
   } catch (error) {
+    console.error(`${LOG_PREFIX} Error in isUserIt:`, error);
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error("Error in updateTags:", error);
     throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
 /**
- * Update roles based on tag rules
+ * Get tag history for a user
  */
-export const updateRolesByTags = async (
-  fingerprintId: string,
-  callerFingerprintId: string,
-  tagRules: Record<string, { tags: string[]; role: ROLE }>,
-): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
+export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> => {
   try {
-    // Prevent self-role modification
-    if (fingerprintId === callerFingerprintId) {
-      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-    }
+    console.log(`${LOG_PREFIX} Getting tag history for user ${fingerprintId}`);
 
-    // Check if caller has sufficient privileges for all roles in the rules
-    for (const [_, rule] of Object.entries(tagRules)) {
-      const hasPermission = await canManageRole(callerFingerprintId, rule.role);
-      if (!hasPermission) {
-        throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-      }
-    }
-
-    // Get fingerprint document
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-
-    if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    }
-
-    const data = fingerprintDoc.data() as FingerprintData;
-    const currentTags = new Set<string>(data?.tags || []);
-    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
-
-    // Always ensure user role is present
-    currentRoles.add(ROLE.USER);
-
-    // Add new roles based on tag rules
-    for (const [_, rule] of Object.entries(tagRules)) {
-      // Check if fingerprint has all required tags
-      if (rule.tags.every((tag) => currentTags.has(tag))) {
-        currentRoles.add(rule.role);
-      }
-    }
-
-    // Update fingerprint document
-    const updatedRoles = Array.from(currentRoles);
-    await fingerprintRef.update({
-      roles: updatedRoles,
-    });
-
-    return {
-      fingerprintId,
-      roles: updatedRoles,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in updateRolesByTags:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
-
-/**
- * Get all tags for a fingerprint
- */
-export const getTags = async (fingerprintId: string): Promise<string[]> => {
-  try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
     const fingerprintDoc = await fingerprintRef.get();
@@ -162,52 +125,10 @@ export const getTags = async (fingerprintId: string): Promise<string[]> => {
     const data = fingerprintDoc.data() as FingerprintData;
     return data?.tags || [];
   } catch (error) {
+    console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error("Error in getTags:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
-
-/**
- * Remove tags from a fingerprint
- */
-export const removeTags = async (
-  fingerprintId: string,
-  tagsToRemove: string[],
-): Promise<{ fingerprintId: string; tags: string[] }> => {
-  try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-
-    if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    }
-
-    const data = fingerprintDoc.data() as FingerprintData;
-    const currentTags = new Set<string>(data?.tags || []);
-
-    // Remove specified tags
-    tagsToRemove.forEach((tag) => currentTags.delete(tag));
-
-    // Convert set back to array
-    const updatedTags = Array.from(currentTags);
-
-    await fingerprintRef.update({
-      tags: updatedTags,
-    });
-
-    return {
-      fingerprintId,
-      tags: updatedTags,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in removeTags:", error);
     throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

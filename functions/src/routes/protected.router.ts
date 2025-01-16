@@ -4,6 +4,7 @@ import * as visit from "../endpoints/visit.endpoint";
 import * as apiKey from "../endpoints/apiKey.endpoint";
 import * as role from "../endpoints/role.endpoint";
 import * as impression from "../endpoints/impression.endpoint";
+import * as tag from "../endpoints/tag.endpoint";
 import presence from "../endpoints/presence.endpoint";
 import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
 
@@ -32,5 +33,10 @@ protectedRouter.delete("/impressions/:fingerprintId", verifyOwnership, ...impres
 
 // Presence tracking - require ownership
 protectedRouter.use("/presence", presence);
+
+// Tag game endpoints
+protectedRouter.post("/tag", verifyOwnership, ...tag.tagUser); // Verify tagger's API key ownership
+protectedRouter.get("/tag/is-it/:fingerprintId", verifyOwnership, ...tag.isUserIt); // Check own status only
+protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, ...tag.getTagHistory); // View own history only
 
 export default protectedRouter;

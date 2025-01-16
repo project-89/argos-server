@@ -235,4 +235,16 @@ export const schemas = {
       }),
     }),
   }),
+
+  // Tag game schemas
+  tagUser: z.object({
+    body: z.object({
+      targetFingerprintId: z.string({
+        required_error: "Target fingerprint ID is required",
+        invalid_type_error: "Target fingerprint ID must be a string",
+      }),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  }),
 } as const;

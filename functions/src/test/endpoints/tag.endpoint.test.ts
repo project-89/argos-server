@@ -1,427 +1,217 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
-import { ROLE } from "../../constants/roles";
 import { ERROR_MESSAGES } from "../../constants/api";
 
-describe("Tag Endpoint", () => {
+describe("Tag Game Endpoints", () => {
   const API_URL = TEST_CONFIG.apiUrl;
-  let adminApiKey: string;
-  let userApiKey: string;
-  let userFingerprintId: string;
+  let user1ApiKey: string;
+  let user1FingerprintId: string;
+  let user2ApiKey: string;
+  let user2FingerprintId: string;
 
   beforeEach(async () => {
-    console.log("Starting test setup...");
     await cleanDatabase();
 
-    // Create admin user with ADMIN role
-    const adminData = await createTestData({
-      roles: [ROLE.ADMIN, ROLE.USER],
+    // Create two test users
+    const user1Data = await createTestData({
       metadata: {
-        name: "Admin User",
+        name: "User 1",
         test: true,
       },
+      skipCleanup: true,
     });
-    adminApiKey = adminData.apiKey;
-    console.log("Created admin user with key:", { adminApiKey });
+    user1ApiKey = user1Data.apiKey;
+    user1FingerprintId = user1Data.fingerprintId;
 
-    // Create regular user with default USER role
-    const userData = await createTestData({
+    const user2Data = await createTestData({
       metadata: {
-        name: "Regular User",
+        name: "User 2",
         test: true,
       },
+      skipCleanup: true,
     });
-    userApiKey = userData.apiKey;
-    userFingerprintId = userData.fingerprintId;
-    console.log("Created regular user:", { userFingerprintId });
+    user2ApiKey = user2Data.apiKey;
+    user2FingerprintId = user2Data.fingerprintId;
 
-    // Wait for a short time to ensure roles are set
+    // Wait for a short time to ensure all database operations are complete
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    console.log("Test setup complete");
   });
 
   afterEach(async () => {
     await cleanDatabase();
   });
 
-  describe("POST /admin/tag/update", () => {
-    it("should update tags for a fingerprint", async () => {
+  describe("POST /tag", () => {
+    it("should successfully tag another user as 'it'", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/update`,
+        url: `${API_URL}/tag`,
         headers: {
-          "x-api-key": adminApiKey,
+          "x-api-key": user1ApiKey,
         },
         data: {
-          fingerprintId: userFingerprintId,
-          tags: ["puzzle-master", "early-adopter"],
+          targetFingerprintId: user2FingerprintId,
         },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.tags).toContain("puzzle-master");
-      expect(response.data.data.tags).toContain("early-adopter");
+      expect(response.data.data.success).toBe(true);
+      expect(response.data.data.message).toBe("Successfully tagged user as 'it'");
     });
 
-    it("should merge with existing tags", async () => {
-      // First update
+    it("should prevent self-tagging", async () => {
+      const response = await makeRequest({
+        method: "post",
+        url: `${API_URL}/tag`,
+        headers: {
+          "x-api-key": user1ApiKey,
+        },
+        data: {
+          targetFingerprintId: user1FingerprintId,
+        },
+        validateStatus: () => true,
+      });
+
+      expect(response.status).toBe(400);
+      expect(response.data.success).toBe(false);
+      expect(response.data.error).toBe(ERROR_MESSAGES.CANNOT_TAG_SELF);
+    });
+
+    it("should prevent tagging a user who is already it", async () => {
+      // First tag
       await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/update`,
+        url: `${API_URL}/tag`,
         headers: {
-          "x-api-key": adminApiKey,
+          "x-api-key": user1ApiKey,
         },
         data: {
-          fingerprintId: userFingerprintId,
-          tags: ["puzzle-master"],
+          targetFingerprintId: user2FingerprintId,
         },
       });
 
-      // Second update
+      // Try to tag again
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/update`,
+        url: `${API_URL}/tag`,
         headers: {
-          "x-api-key": adminApiKey,
+          "x-api-key": user1ApiKey,
         },
         data: {
-          fingerprintId: userFingerprintId,
-          tags: ["early-adopter"],
+          targetFingerprintId: user2FingerprintId,
         },
-      });
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data.tags).toContain("puzzle-master");
-      expect(response.data.data.tags).toContain("early-adopter");
-    });
-
-    it("should handle empty tags array", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tags: [],
-        },
+        validateStatus: () => true,
       });
 
       expect(response.status).toBe(400);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_TAGS);
+      expect(response.data.error).toBe(ERROR_MESSAGES.ALREADY_TAGGED);
     });
 
-    it("should handle non-existent fingerprint", async () => {
+    it("should require authentication", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
+        url: `${API_URL}/tag`,
         data: {
-          fingerprintId: "non-existent-id",
-          tags: ["puzzle-master"],
+          targetFingerprintId: user2FingerprintId,
         },
+        validateStatus: () => true,
       });
 
-      expect(response.status).toBe(404);
+      expect(response.status).toBe(401);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    });
-
-    it("should require fingerprintId", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          tags: ["puzzle-master"],
-        },
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
-    });
-
-    it("should require tags", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-        },
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_TAGS);
-    });
-
-    it("should validate tag values", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tags: [123],
-        },
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_TAG_TYPE);
-    });
-
-    it("should reject request from non-admin user", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/update`,
-        headers: {
-          "x-api-key": userApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tags: ["puzzle-master"],
-        },
-      });
-
-      expect(response.status).toBe(403);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.ADMIN_REQUIRED);
+      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_API_KEY);
     });
   });
 
-  describe("POST /admin/tag/rules", () => {
-    it("should update roles based on tags", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag": {
-              tags: ["puzzle-master"],
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
-        },
-      });
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toContain(ROLE.AGENT_INITIATE);
-    });
-
-    it("should preserve existing roles while adding new ones", async () => {
-      // First update
+  describe("GET /tag/is-it/:fingerprintId", () => {
+    it("should return true for tagged user", async () => {
+      // First tag the user
       await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        url: `${API_URL}/tag`,
         headers: {
-          "x-api-key": adminApiKey,
+          "x-api-key": user1ApiKey,
         },
         data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag-1": {
-              tags: ["puzzle-master"],
-              role: ROLE.AGENT_FIELD,
-            },
-          },
+          targetFingerprintId: user2FingerprintId,
         },
       });
 
-      // Second update
+      // Check if they're it
       const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        method: "get",
+        url: `${API_URL}/tag/is-it/${user2FingerprintId}`,
         headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag-2": {
-              tags: ["early-adopter"],
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
+          "x-api-key": user2ApiKey,
         },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toContain(ROLE.AGENT_FIELD);
-      expect(response.data.data.roles).toContain(ROLE.AGENT_INITIATE);
+      expect(response.data.data.isIt).toBe(true);
     });
 
-    it("should handle empty tagRules object", async () => {
+    it("should return false for untagged user", async () => {
       const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        method: "get",
+        url: `${API_URL}/tag/is-it/${user1FingerprintId}`,
         headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {},
+          "x-api-key": user1ApiKey,
         },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.roles).toEqual([ROLE.USER]);
+      expect(response.data.data.isIt).toBe(false);
     });
+  });
 
-    it("should handle non-existent fingerprint", async () => {
-      const response = await makeRequest({
+  describe("GET /tag/history/:fingerprintId", () => {
+    it("should return tag history for user", async () => {
+      // First tag the user
+      await makeRequest({
         method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        url: `${API_URL}/tag`,
         headers: {
-          "x-api-key": adminApiKey,
+          "x-api-key": user1ApiKey,
         },
         data: {
-          fingerprintId: "non-existent-id",
-          tagRules: {
-            "test-tag": {
-              tags: ["puzzle-master"],
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
+          targetFingerprintId: user2FingerprintId,
         },
       });
 
-      expect(response.status).toBe(404);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    });
-
-    it("should require fingerprintId", async () => {
+      // Get history
       const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        method: "get",
+        url: `${API_URL}/tag/history/${user2FingerprintId}`,
         headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          tagRules: {
-            "test-tag": {
-              tags: ["puzzle-master"],
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
+          "x-api-key": user2ApiKey,
         },
       });
 
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.MISSING_FINGERPRINT);
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.tags).toHaveLength(1);
+      expect(response.data.data.tags[0].tag).toBe("it");
+      expect(response.data.data.tags[0].taggedBy).toBe(user1FingerprintId);
+      expect(response.data.data.tags[0].taggedAt).toBeDefined();
     });
 
-    it("should require tagRules", async () => {
+    it("should return empty array for user with no tags", async () => {
       const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
+        method: "get",
+        url: `${API_URL}/tag/history/${user1FingerprintId}`,
         headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
+          "x-api-key": user1ApiKey,
         },
       });
 
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Tag rules object is required");
-    });
-
-    it("should validate tag rule format", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag": {
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
-        },
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe("Tag rule tags array is required");
-    });
-
-    it("should validate role names", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
-        headers: {
-          "x-api-key": adminApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag": {
-              tags: ["puzzle-master"],
-              role: "invalid-role",
-            },
-          },
-        },
-      });
-
-      expect(response.status).toBe(400);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(
-        `Invalid enum value. Expected ${Object.values(ROLE)
-          .map((r) => `'${r}'`)
-          .join(" | ")}, received 'invalid-role'`,
-      );
-    });
-
-    it("should reject request from non-admin user", async () => {
-      const response = await makeRequest({
-        method: "post",
-        url: `${API_URL}/admin/tag/rules`,
-        headers: {
-          "x-api-key": userApiKey,
-        },
-        data: {
-          fingerprintId: userFingerprintId,
-          tagRules: {
-            "test-tag": {
-              tags: ["puzzle-master"],
-              role: ROLE.AGENT_INITIATE,
-            },
-          },
-        },
-      });
-
-      expect(response.status).toBe(403);
-      expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.ADMIN_REQUIRED);
+      expect(response.status).toBe(200);
+      expect(response.data.success).toBe(true);
+      expect(response.data.data.tags).toEqual([]);
     });
   });
 });
