@@ -1,29 +1,26 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import axios from "axios";
 import { COLLECTIONS } from "../../constants/collections";
 import { getCurrentPrices, getPriceHistory } from "../../services/priceService";
-import { ApiError } from "../../utils/error";
-import { cleanDatabase } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants/api";
 
-// Mock axios
-jest.mock("axios");
-const mockedAxios = axios as jest.Mocked<typeof axios>;
+jest.mock("node-fetch", () => {
+  return jest.fn();
+});
+
+// Get the mocked fetch function
+const mockFetch = jest.requireMock("node-fetch");
 
 describe("Price Service", () => {
   const db = getFirestore();
-  const testSymbol = "bitcoin";
+  const testSymbol = "project89";
   const testPrice = {
     usd: 50000,
     usd_24h_change: 2.5,
   };
 
   beforeEach(async () => {
-    await cleanDatabase();
     jest.clearAllMocks();
-  });
-
-  afterEach(async () => {
-    await cleanDatabase();
+    mockFetch.mockReset();
   });
 
   describe("getCurrentPrices", () => {
@@ -38,7 +35,7 @@ describe("Price Service", () => {
 
       const prices = await getCurrentPrices([testSymbol]);
       expect(prices[testSymbol]).toEqual(testPrice);
-      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(mockFetch).not.toHaveBeenCalled();
     });
 
     it("should fetch prices from API if cache is expired", async () => {
@@ -51,15 +48,14 @@ describe("Price Service", () => {
       });
 
       // Mock API response
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          [testSymbol]: testPrice,
-        },
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ [testSymbol]: testPrice }),
       });
 
       const prices = await getCurrentPrices([testSymbol]);
       expect(prices[testSymbol]).toEqual(testPrice);
-      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // Verify cache was updated
       const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).doc(testSymbol).get();
@@ -70,40 +66,54 @@ describe("Price Service", () => {
     });
 
     it("should fetch prices from API if not in cache", async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {
-          [testSymbol]: testPrice,
-        },
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ [testSymbol]: testPrice }),
       });
 
       const prices = await getCurrentPrices([testSymbol]);
       expect(prices[testSymbol]).toEqual(testPrice);
-      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it("should use default tokens if none provided", async () => {
-      mockedAxios.get.mockResolvedValue({
-        data: {
-          project89: testPrice,
-        },
+      // Mock API response with project89 price data
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            project89: {
+              usd: testPrice.usd,
+              usd_24h_change: testPrice.usd_24h_change,
+            },
+          }),
       });
 
       const prices = await getCurrentPrices();
-      expect(Object.keys(prices)).toContain("project89");
+      expect(prices["project89"]).toEqual(testPrice);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it("should handle API errors gracefully", async () => {
-      mockedAxios.get.mockRejectedValueOnce(new Error("API Error"));
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
 
-      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(ApiError);
+      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(
+        ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE,
+      );
     });
 
     it("should handle missing price data", async () => {
-      mockedAxios.get.mockResolvedValueOnce({
-        data: {},
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({}),
       });
 
-      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(ApiError);
+      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(
+        ERROR_MESSAGES.PRICE_DATA_NOT_FOUND,
+      );
     });
   });
 
@@ -115,12 +125,9 @@ describe("Price Service", () => {
     ];
 
     it("should fetch price history from API", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            prices: testHistory,
-          }),
+        json: () => Promise.resolve({ prices: testHistory }),
       });
 
       const history = await getPriceHistory(testSymbol);
@@ -132,31 +139,41 @@ describe("Price Service", () => {
     });
 
     it("should handle API errors gracefully", async () => {
-      global.fetch = jest.fn().mockRejectedValueOnce(new Error("API Error"));
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+      });
 
-      await expect(getPriceHistory(testSymbol)).rejects.toThrow(ApiError);
+      await expect(getPriceHistory(testSymbol)).rejects.toThrow(
+        ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE,
+      );
     });
 
     it("should handle 404 responses", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: false,
         status: 404,
-        statusText: "Not Found",
       });
 
-      await expect(getPriceHistory(testSymbol)).rejects.toThrow("Token not found");
+      await expect(getPriceHistory(testSymbol)).rejects.toThrow(ERROR_MESSAGES.TOKEN_NOT_FOUND);
+    });
+
+    it("should handle rate limit responses", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+      });
+
+      await expect(getPriceHistory(testSymbol)).rejects.toThrow(ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
     });
 
     it("should handle invalid response data", async () => {
-      global.fetch = jest.fn().mockResolvedValueOnce({
+      mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({
-            prices: null,
-          }),
+        json: () => Promise.resolve({ prices: null }),
       });
 
-      await expect(getPriceHistory(testSymbol)).rejects.toThrow(ApiError);
+      await expect(getPriceHistory(testSymbol)).rejects.toThrow(ERROR_MESSAGES.INVALID_REQUEST);
     });
   });
 });

@@ -3,9 +3,10 @@ import { getCurrentPrices, getPriceHistory } from "../services/priceService";
 import { validateQuery, validateParams } from "../middleware/validation.middleware";
 import { z } from "zod";
 import { sendSuccess, sendError } from "../utils/response";
-import { toUnixMillis } from "../utils/timestamp";
 import { ERROR_MESSAGES } from "../constants/api";
 import { ApiError } from "../utils/error";
+
+const LOG_PREFIX = "[Price Endpoint]";
 
 export const getCurrent = [
   validateQuery(
@@ -15,6 +16,7 @@ export const getCurrent = [
   ),
   async (req: Request, res: Response): Promise<Response> => {
     try {
+      console.log(`${LOG_PREFIX} Starting current price retrieval`);
       const { symbols } = req.query;
       const tokenSymbols = symbols
         ? symbols
@@ -25,15 +27,14 @@ export const getCurrent = [
         : [];
 
       const prices = await getCurrentPrices(tokenSymbols);
+      console.log(`${LOG_PREFIX} Successfully retrieved current prices`);
       return sendSuccess(res, prices);
     } catch (error) {
-      console.error("Error in get current prices:", error);
-      return sendError(
-        res,
-        error instanceof ApiError
-          ? error
-          : new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE),
-      );
+      console.error(`${LOG_PREFIX} Error in get current prices:`, error);
+      if (error instanceof ApiError) {
+        return sendError(res, error);
+      }
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE));
     }
   },
 ];
@@ -46,16 +47,13 @@ export const getHistory = [
   ),
   async (req: Request, res: Response): Promise<Response> => {
     try {
+      console.log(`${LOG_PREFIX} Starting price history retrieval`);
       const { tokenId } = req.params;
       const history = await getPriceHistory(tokenId);
-      const formattedHistory = history.map((item) => ({
-        ...item,
-        timestamp: toUnixMillis(item.createdAt),
-        createdAt: undefined,
-      }));
-      return sendSuccess(res, formattedHistory);
+      console.log(`${LOG_PREFIX} Successfully retrieved price history`);
+      return sendSuccess(res, history);
     } catch (error) {
-      console.error("Error in get token price history:", error);
+      console.error(`${LOG_PREFIX} Error in get token price history:`, error);
       if (error instanceof ApiError) {
         return sendError(res, error);
       }

@@ -1,5 +1,5 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import axios from "axios";
+import fetch from "node-fetch";
 import { COLLECTIONS } from "../constants/collections";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
@@ -53,18 +53,28 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
         }
 
         // Fetch from CoinGecko if not in cache or cache expired
-        const response = await axios.get(
+        const headers: Record<string, string> = {};
+        if (apiKey) {
+          headers["x-cg-pro-api-key"] = apiKey;
+        }
+
+        const response = await fetch(
           `${apiUrl}/simple/price?ids=${symbol}&vs_currencies=usd&include_24hr_change=true`,
-          apiKey
-            ? {
-                headers: {
-                  "x-cg-pro-api-key": apiKey,
-                },
-              }
-            : undefined,
+          { headers },
         );
 
-        const data = response.data[symbol] as TokenPriceData;
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
+          }
+          if (response.status === 429) {
+            throw new ApiError(429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+          }
+          throw new ApiError(response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+        }
+
+        const responseData = await response.json();
+        const data = responseData[symbol] as TokenPriceData;
         if (!data) {
           throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
         }
@@ -108,12 +118,42 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
  */
 export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> => {
   try {
-    const { apiUrl } = getCoingeckoConfig();
-    const response = await fetch(`${apiUrl}/coins/${symbol}/market_chart?vs_currency=usd&days=30`);
+    const db = getFirestore();
+    const now = Timestamp.now();
+    const cacheRef = db.collection(COLLECTIONS.PRICE_CACHE).doc(symbol);
+    const cacheDoc = await cacheRef.get();
+
+    // Check cache first
+    if (cacheDoc.exists) {
+      const cacheData = cacheDoc.data();
+      if (
+        cacheData &&
+        cacheData.history &&
+        Array.isArray(cacheData.history) &&
+        cacheData.history.length > 0 &&
+        now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION
+      ) {
+        return cacheData.history;
+      }
+    }
+
+    // If not in cache or cache expired, fetch from CoinGecko
+    const { apiUrl, apiKey } = getCoingeckoConfig();
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers["x-cg-pro-api-key"] = apiKey;
+    }
+
+    const response = await fetch(`${apiUrl}/coins/${symbol}/market_chart?vs_currency=usd&days=30`, {
+      headers,
+    });
 
     if (!response.ok) {
       if (response.status === 404) {
         throw new ApiError(404, ERROR_MESSAGES.TOKEN_NOT_FOUND);
+      }
+      if (response.status === 429) {
+        throw new ApiError(429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
       }
       throw new ApiError(response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
     }
@@ -123,10 +163,21 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
       throw new ApiError(500, ERROR_MESSAGES.INVALID_REQUEST);
     }
 
-    return data.prices.map(([timestamp, price]: [number, number]) => ({
+    const history = data.prices.map(([timestamp, price]: [number, number]) => ({
       price,
       createdAt: Timestamp.fromMillis(timestamp),
     }));
+
+    // Update cache
+    await cacheRef.set(
+      {
+        history,
+        createdAt: now,
+      },
+      { merge: true },
+    );
+
+    return history;
   } catch (error) {
     if (error instanceof ApiError) {
       throw error;
