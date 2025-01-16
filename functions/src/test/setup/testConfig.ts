@@ -1,4 +1,4 @@
-import { PriceData } from "../../services/priceService";
+import { PriceResponse } from "../../types/api.types";
 
 export interface TestConfig {
   projectId: string;
@@ -75,8 +75,8 @@ export const TEST_CONFIG: TestConfig = {
   ],
 };
 
-export const MOCK_PRICES: PriceData = {
-  Project89: {
+export const MOCK_PRICES: PriceResponse = {
+  project89: {
     usd: 0.15,
     usd_24h_change: 2.5,
   },

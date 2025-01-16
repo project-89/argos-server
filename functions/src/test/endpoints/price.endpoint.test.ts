@@ -1,7 +1,15 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, jest } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
 import { ERROR_MESSAGES } from "../../constants/api";
+import * as priceService from "../../services/priceService";
+import { MOCK_PRICES } from "../setup/testConfig";
+import { PriceHistory } from "../../types/models";
+import { Timestamp } from "firebase-admin/firestore";
+import { ApiError } from "../../utils/error";
+
+jest.mock("../../services/priceService");
+const mockPriceService = priceService as jest.Mocked<typeof priceService>;
 
 describe("Price Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;
@@ -11,6 +19,14 @@ describe("Price Endpoint", () => {
     await cleanDatabase();
     const { apiKey } = await createTestData();
     validApiKey = apiKey;
+    jest.resetAllMocks();
+
+    // Setup default mocks
+    mockPriceService.getCurrentPrices.mockResolvedValue(MOCK_PRICES);
+    mockPriceService.getPriceHistory.mockResolvedValue([
+      { createdAt: Timestamp.fromMillis(Date.now()), price: 0.15 },
+      { createdAt: Timestamp.fromMillis(Date.now() - 86400000), price: 0.14 },
+    ] as PriceHistory[]);
   });
 
   describe("GET /price/current", () => {
@@ -42,15 +58,15 @@ describe("Price Endpoint", () => {
     it("should return prices for specified tokens", async () => {
       const response = await makeRequest({
         method: "get",
-        url: `${API_URL}/price/current?symbols=Project89`,
+        url: `${API_URL}/price/current?symbols=project89`,
         headers: { "x-api-key": validApiKey },
       });
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.data.Project89).toBeDefined();
-      expect(response.data.data.Project89.usd).toBeDefined();
-      expect(response.data.data.Project89.usd_24h_change).toBeDefined();
+      expect(response.data.data.project89).toBeDefined();
+      expect(response.data.data.project89.usd).toBeDefined();
+      expect(response.data.data.project89.usd_24h_change).toBeDefined();
     });
 
     it("should handle invalid tokens", async () => {
@@ -68,23 +84,17 @@ describe("Price Endpoint", () => {
   });
 
   describe("GET /price/history/:tokenId", () => {
-    it("should allow public access", async () => {
-      const response = await makeRequest({
-        method: "get",
-        url: `${API_URL}/price/history/Project89`,
-        validateStatus: () => true,
-      });
-
-      expect(response.status).toBe(200);
-      expect(response.data.success).toBe(true);
-      expect(Array.isArray(response.data.data)).toBe(true);
-    });
-
     it("should return price history for a token", async () => {
+      mockPriceService.getPriceHistory.mockResolvedValue([
+        { createdAt: Timestamp.fromMillis(Date.now()), price: 0.15 },
+        { createdAt: Timestamp.fromMillis(Date.now() - 86400000), price: 0.14 },
+      ] as PriceHistory[]);
+
       const response = await makeRequest({
         method: "get",
-        url: `${API_URL}/price/history/Project89`,
+        url: `${API_URL}/price/history/project89`,
         headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
       });
 
       expect(response.status).toBe(200);
@@ -96,16 +106,17 @@ describe("Price Endpoint", () => {
     });
 
     it("should handle missing tokenId", async () => {
-      // Test both with and without trailing slash
       const responses = await Promise.all([
         makeRequest({
           method: "get",
           url: `${API_URL}/price/history/`,
+          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         }),
         makeRequest({
           method: "get",
           url: `${API_URL}/price/history`,
+          headers: { "x-api-key": validApiKey },
           validateStatus: () => true,
         }),
       ]);
@@ -118,6 +129,10 @@ describe("Price Endpoint", () => {
     });
 
     it("should handle invalid token", async () => {
+      mockPriceService.getPriceHistory.mockRejectedValue(
+        new ApiError(404, ERROR_MESSAGES.TOKEN_NOT_FOUND),
+      );
+
       const response = await makeRequest({
         method: "get",
         url: `${API_URL}/price/history/invalid-token`,

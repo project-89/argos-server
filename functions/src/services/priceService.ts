@@ -5,13 +5,8 @@ import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
 import { PriceHistory } from "../types/models";
-
-export interface PriceData {
-  [symbol: string]: {
-    usd: number;
-    usd_24h_change: number;
-  };
-}
+import { ERROR_MESSAGES } from "../constants/api";
+import { TokenPriceData, PriceResponse } from "../types/api.types";
 
 const DEFAULT_TOKENS = ["project89"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -28,7 +23,7 @@ const getCoingeckoConfig = () => {
 /**
  * Get current prices for specified tokens
  */
-export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceData> => {
+export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceResponse> => {
   try {
     const { apiUrl, apiKey } = getCoingeckoConfig();
 
@@ -37,7 +32,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
 
     const db = getFirestore();
     const now = Timestamp.now();
-    const prices: PriceData = {};
+    const prices: PriceResponse = {};
     const errors: string[] = [];
 
     for (const symbol of tokenSymbols) {
@@ -69,9 +64,9 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
             : undefined,
         );
 
-        const data = response.data[symbol] as { usd: number; usd_24h_change: number };
+        const data = response.data[symbol] as TokenPriceData;
         if (!data) {
-          throw new ApiError(404, `No price data found for ${symbol}`);
+          throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
         }
 
         prices[symbol] = {
@@ -89,7 +84,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
         if (error instanceof ApiError) {
           errors.push(error.message);
         } else {
-          errors.push(`No price data found for ${symbol}`);
+          errors.push(ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
         }
       }
     }
@@ -104,7 +99,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceDat
       throw error;
     }
     console.error("Error fetching prices:", error);
-    throw new ApiError(500, "Failed to fetch current prices");
+    throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };
 
@@ -118,14 +113,14 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
 
     if (!response.ok) {
       if (response.status === 404) {
-        throw new ApiError(404, "Token not found");
+        throw new ApiError(404, ERROR_MESSAGES.TOKEN_NOT_FOUND);
       }
-      throw new ApiError(response.status, `Failed to fetch price history: ${response.statusText}`);
+      throw new ApiError(response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
     }
 
     const data = await response.json();
     if (!data || !Array.isArray(data.prices)) {
-      throw new ApiError(500, "Invalid response data");
+      throw new ApiError(500, ERROR_MESSAGES.INVALID_REQUEST);
     }
 
     return data.prices.map(([timestamp, price]: [number, number]) => ({
@@ -137,6 +132,6 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
       throw error;
     }
     console.error("Unexpected error fetching price history:", error);
-    throw new ApiError(500, "Unexpected error fetching price history");
+    throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };

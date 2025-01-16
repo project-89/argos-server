@@ -4,6 +4,8 @@ import { validateQuery, validateParams } from "../middleware/validation.middlewa
 import { z } from "zod";
 import { sendSuccess, sendError } from "../utils/response";
 import { toUnixMillis } from "../utils/timestamp";
+import { ERROR_MESSAGES } from "../constants/api";
+import { ApiError } from "../utils/error";
 
 export const getCurrent = [
   validateQuery(
@@ -26,7 +28,12 @@ export const getCurrent = [
       return sendSuccess(res, prices);
     } catch (error) {
       console.error("Error in get current prices:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to fetch current prices");
+      return sendError(
+        res,
+        error instanceof ApiError
+          ? error
+          : new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE),
+      );
     }
   },
 ];
@@ -34,7 +41,7 @@ export const getCurrent = [
 export const getHistory = [
   validateParams(
     z.object({
-      tokenId: z.string().min(1, "Token ID is required"),
+      tokenId: z.string().min(1, ERROR_MESSAGES.NOT_FOUND),
     }),
   ),
   async (req: Request, res: Response): Promise<Response> => {
@@ -49,7 +56,13 @@ export const getHistory = [
       return sendSuccess(res, formattedHistory);
     } catch (error) {
       console.error("Error in get token price history:", error);
-      return sendError(res, error instanceof Error ? error : "Failed to fetch token price history");
+      if (error instanceof ApiError) {
+        return sendError(res, error);
+      }
+      if (error instanceof Error && error.message.includes("rate limit")) {
+        return sendError(res, new ApiError(429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED));
+      }
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE));
     }
   },
 ];

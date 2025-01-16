@@ -1,11 +1,11 @@
-import { PriceData } from "../services/priceService";
 import { getCurrentUnixMillis } from "../utils/timestamp";
 import { ROLE } from "../constants/roles";
 import { Fingerprint } from "../types/models";
 import { Timestamp } from "firebase-admin/firestore";
+import { PriceResponse } from "../types/api.types";
 
-export const MOCK_PRICE_DATA: PriceData = {
-  Project89: {
+export const MOCK_PRICE_DATA: PriceResponse = {
+  project89: {
     usd: 0.15,
     usd_24h_change: 2.5,
   },
