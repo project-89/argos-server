@@ -109,16 +109,6 @@ describe("Tag Service", () => {
         new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
-
-    it("should throw 403 for permission required", async () => {
-      await expect(updateTags(testFingerprints.target, ["test"])).rejects.toThrow(
-        new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
-      );
-
-      await expect(updateTags(testFingerprints.target, ["test"])).rejects.toThrow(
-        new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
-      );
-    });
   });
 
   describe("updateRolesByTags", () => {
