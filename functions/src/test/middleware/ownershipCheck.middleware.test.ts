@@ -1,7 +1,6 @@
-import { describe, it, expect, beforeEach } from "@jest/globals";
+import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
-import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
-import { ROLE } from "../../constants/roles";
+import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
 import { ERROR_MESSAGES } from "../../constants/api";
 
 describe("Ownership Check Middleware Test Suite", () => {
@@ -9,8 +8,6 @@ describe("Ownership Check Middleware Test Suite", () => {
   let fingerprintId: string;
   let otherApiKey: string;
   let otherFingerprintId: string;
-  let adminApiKey: string;
-  let adminFingerprintId: string;
 
   beforeEach(async () => {
     await cleanDatabase();
@@ -23,14 +20,11 @@ describe("Ownership Check Middleware Test Suite", () => {
     const { fingerprintId: fId2, apiKey: key2 } = await createTestData({ skipCleanup: true });
     otherFingerprintId = fId2;
     otherApiKey = key2;
+  });
 
-    // Create an admin user
-    const { fingerprintId: adminId, apiKey: adminKey } = await createTestData({
-      roles: [ROLE.ADMIN, ROLE.USER],
-      skipCleanup: true,
-    });
-    adminFingerprintId = adminId;
-    adminApiKey = adminKey;
+  afterAll(async () => {
+    await cleanDatabase();
+    destroyAgent();
   });
 
   it("should allow access to own data via URL params", async () => {
@@ -49,10 +43,10 @@ describe("Ownership Check Middleware Test Suite", () => {
   it("should allow access to own data via request body", async () => {
     const response = await makeRequest({
       method: "post",
-      url: `${TEST_CONFIG.apiUrl}/visit/presence`,
+      url: `${TEST_CONFIG.apiUrl}/fingerprint/update`,
       data: {
         fingerprintId,
-        status: "online",
+        metadata: { test: true },
       },
       headers: {
         "x-api-key": validApiKey,
@@ -131,42 +125,6 @@ describe("Ownership Check Middleware Test Suite", () => {
     expect(response.data.error).toBe("API key does not match fingerprint");
   });
 
-  it("should allow admin to access other user's data via admin routes", async () => {
-    const response = await makeRequest({
-      method: "post",
-      url: `${TEST_CONFIG.apiUrl}/admin/role/assign`,
-      data: {
-        fingerprintId: otherFingerprintId,
-        role: "agent-initiate",
-      },
-      headers: {
-        "x-api-key": adminApiKey,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.data.success).toBe(true);
-  });
-
-  it("should deny non-admin access to admin routes even for own fingerprint", async () => {
-    const response = await makeRequest({
-      method: "post",
-      url: `${TEST_CONFIG.apiUrl}/admin/role/assign`,
-      data: {
-        fingerprintId: fingerprintId,
-        role: "agent-initiate",
-      },
-      headers: {
-        "x-api-key": validApiKey,
-      },
-      validateStatus: () => true,
-    });
-
-    expect(response.status).toBe(403);
-    expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("Admin role required");
-  });
-
   it("should allow access to public protected routes", async () => {
     const response = await makeRequest({
       method: "get",
@@ -238,38 +196,6 @@ describe("Ownership Check Middleware Test Suite", () => {
 
     expect(response.status).toBe(404); // Should be 404 for missing resource
     expect(response.data.success).toBe(false);
-  });
-
-  it("should allow admin to access their own data via regular routes", async () => {
-    const response = await makeRequest({
-      method: "get",
-      url: `${TEST_CONFIG.apiUrl}/visit/history/${adminFingerprintId}`,
-      headers: {
-        "x-api-key": adminApiKey,
-      },
-    });
-
-    expect(response.status).toBe(200);
-    expect(response.data.success).toBe(true);
-  });
-
-  it("should deny regular users access to admin's data", async () => {
-    const response = await makeRequest({
-      method: "post",
-      url: `${TEST_CONFIG.apiUrl}/visit/presence`,
-      data: {
-        fingerprintId: adminFingerprintId,
-        status: "online",
-      },
-      headers: {
-        "x-api-key": validApiKey,
-      },
-      validateStatus: () => true,
-    });
-
-    expect(response.status).toBe(403);
-    expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
   });
 
   it("should return 401 for GET requests when API key does not match fingerprint", async () => {

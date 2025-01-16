@@ -172,8 +172,8 @@ export interface VisitHistoryResponse {
 
 export interface VisitPresence {
   fingerprintId: string;
-  status: "online" | "offline";
-  lastUpdated: number; // Unix timestamp
+  status: "online" | "offline" | "away";
+  lastUpdated: number; // Unix timestamp for tracking last activity/status update
 }
 
 /**

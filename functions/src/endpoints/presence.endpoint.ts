@@ -1,56 +1,89 @@
 import { Router } from "express";
-import { z } from "zod";
 import { validateRequest } from "../middleware/validation.middleware";
 import { sendError, sendSuccess } from "../utils/response";
-import { updatePresence, getPresence, PresenceStatus } from "../services/presenceService";
+import { updatePresence, getPresence, updateActivity } from "../services/presenceService";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
+import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
+import { schemas } from "../types/schemas";
+import { getFirestore } from "firebase-admin/firestore";
+import { COLLECTIONS } from "../constants/collections";
 
 const router = Router();
 
-const updatePresenceSchema = z.object({
-  params: z.object({
-    fingerprintId: z.string(),
-  }),
-  body: z.object({
-    status: z.enum(["online", "offline"] as const),
-  }),
-});
+// Update presence status
+router.put(
+  "/:fingerprintId",
+  validateRequest(schemas.presenceUpdate),
+  async (req, res, next) => {
+    try {
+      const { fingerprintId } = req.params;
+      // Check if fingerprint exists first
+      const db = getFirestore();
+      const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
+      if (!doc.exists) {
+        return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+      }
+      return next();
+    } catch (error) {
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
+    }
+  },
+  verifyOwnership,
+  async (req, res) => {
+    try {
+      const { fingerprintId } = req.params;
+      const { status } = req.body;
 
-const getPresenceSchema = z.object({
-  params: z.object({
-    fingerprintId: z.string(),
-  }),
-});
+      const presence = await updatePresence(fingerprintId, status);
+      return sendSuccess(res, presence, "Presence status updated");
+    } catch (error) {
+      return sendError(
+        res,
+        error instanceof Error
+          ? error
+          : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS),
+      );
+    }
+  },
+);
 
-router.put("/:fingerprintId", validateRequest(updatePresenceSchema), async (req, res) => {
-  try {
-    const { fingerprintId } = req.params;
-    const { status } = req.body;
+// Get current presence status
+router.get(
+  "/:fingerprintId",
+  validateRequest(schemas.presenceGet),
+  verifyOwnership,
+  async (req, res) => {
+    try {
+      const { fingerprintId } = req.params;
+      const presence = await getPresence(fingerprintId);
+      return sendSuccess(res, presence, "Presence status retrieved");
+    } catch (error) {
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_PRESENCE),
+      );
+    }
+  },
+);
 
-    const presence = await updatePresence(fingerprintId, status as PresenceStatus);
-    return sendSuccess(res, presence);
-  } catch (error) {
-    return sendError(
-      res,
-      error instanceof Error
-        ? error
-        : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS),
-    );
-  }
-});
-
-router.get("/:fingerprintId", validateRequest(getPresenceSchema), async (req, res) => {
-  try {
-    const { fingerprintId } = req.params;
-    const presence = await getPresence(fingerprintId);
-    return sendSuccess(res, presence);
-  } catch (error) {
-    return sendError(
-      res,
-      error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_PRESENCE),
-    );
-  }
-});
+// Update activity timestamp
+router.post(
+  "/:fingerprintId/activity",
+  validateRequest(schemas.presenceActivity),
+  verifyOwnership,
+  async (req, res) => {
+    try {
+      const { fingerprintId } = req.params;
+      const presence = await updateActivity(fingerprintId);
+      return sendSuccess(res, presence, "Activity timestamp updated");
+    } catch (error) {
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_ACTIVITY),
+      );
+    }
+  },
+);
 
 export default router;

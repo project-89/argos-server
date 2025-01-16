@@ -1,4 +1,4 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import {
   logVisit,

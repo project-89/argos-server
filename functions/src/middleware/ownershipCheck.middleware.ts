@@ -3,11 +3,43 @@ import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendError } from "../utils/response";
+import { COLLECTIONS } from "../constants/collections";
 
 const LOG_PREFIX = "[Ownership Check]";
 
 // Endpoints that admins can access without ownership verification
 const ADMIN_BYPASS_ENDPOINTS = ["/role/assign", "/role/remove", "/tag/update", "/tag/rules"];
+
+/**
+ * Middleware to verify fingerprint exists
+ * Should be run before ownership check
+ */
+export const verifyFingerprintExists = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Skip OPTIONS requests
+    if (req.method === "OPTIONS") {
+      return next();
+    }
+
+    const targetFingerprintId = req.params.fingerprintId || req.params.id || req.body.fingerprintId;
+
+    // If no target fingerprint is specified in body or params, allow the request
+    if (!targetFingerprintId) {
+      return next();
+    }
+
+    const db = getFirestore();
+    const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
+
+    if (!doc.exists) {
+      return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+};
 
 /**
  * Middleware to ensure a caller can only access/modify their own data
@@ -28,8 +60,13 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
     console.log(`${LOG_PREFIX} Checking ownership:`, {
       method: req.method,
       path: req.path,
+      url: req.url,
       callerFingerprintId,
       targetFingerprintId,
+      params: req.params,
+      body: req.body,
+      baseUrl: req.baseUrl,
+      originalUrl: req.originalUrl,
     });
 
     // If no target fingerprint is specified in body or params, allow the request
@@ -39,11 +76,21 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
       return next();
     }
 
+    // Check if target fingerprint exists first
+    const db = getFirestore();
+    const targetDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
+    if (!targetDoc.exists) {
+      console.log(`${LOG_PREFIX} Target fingerprint does not exist`);
+      return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+    }
+
     // Check if this is an admin-bypass endpoint
     if (ADMIN_BYPASS_ENDPOINTS.some((endpoint) => req.path.includes(endpoint))) {
       // Check if caller has admin role
-      const db = getFirestore();
-      const callerDoc = await db.collection("fingerprints").doc(callerFingerprintId!).get();
+      const callerDoc = await db
+        .collection(COLLECTIONS.FINGERPRINTS)
+        .doc(callerFingerprintId!)
+        .get();
       const callerData = callerDoc.data();
 
       if (callerData?.roles?.includes("admin")) {

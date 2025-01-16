@@ -4,11 +4,12 @@ import { COLLECTIONS } from "../../constants/collections";
 import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";
 
-// Create a custom agent with a small keepAlive timeout
+// Create a custom agent with appropriate settings for testing
 const agent = new HttpAgent({
-  keepAlive: false,
-  maxSockets: 1,
-  timeout: 1000,
+  keepAlive: true,
+  maxSockets: Infinity, // No limit for tests
+  timeout: 500, // Faster timeout for tests
+  keepAliveMsecs: 100, // Shorter keepalive
 });
 
 /**
@@ -53,13 +54,13 @@ export const makeRequest = async (config: {
       agent, // Use our custom agent
     };
 
-    // console.log(`📤 Request config:`, {
-    //   method: config.method,
-    //   url: urlWithParams,
-    //   headers: requestConfig.headers,
-    //   data: config.data,
-    //   params: config.params,
-    // });
+    console.log(`📤 Request config:`, {
+      method: config.method,
+      url: urlWithParams,
+      headers: requestConfig.headers,
+      data: config.data,
+      params: config.params,
+    });
 
     const response = await fetch(urlWithParams, requestConfig);
     let data;
@@ -86,7 +87,7 @@ export const makeRequest = async (config: {
       headers,
     };
 
-    // console.log(`📥 Response:`, result);
+    console.log(`📥 Response:`, result);
 
     return result;
   } catch (error) {
@@ -107,12 +108,12 @@ export const createTestData = async (options: TestDataOptions = {}) => {
   }
 
   // Register fingerprint
-  const fingerprint = `test-fingerprint-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  const fingerprintStr = `test-fingerprint-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   const fingerprintResponse = await makeRequest({
     method: "post",
     url: `${TEST_CONFIG.apiUrl}/fingerprint/register`,
     data: {
-      fingerprint,
+      fingerprint: fingerprintStr,
       metadata: options.metadata || {
         testData: true,
         name: "Test Fingerprint",
@@ -144,7 +145,7 @@ export const createTestData = async (options: TestDataOptions = {}) => {
       .set(
         {
           roles: options.roles,
-          fingerprint,
+          fingerprint: fingerprintStr,
           metadata: options.metadata || {
             testData: true,
             name: "Test Fingerprint",
@@ -153,55 +154,9 @@ export const createTestData = async (options: TestDataOptions = {}) => {
         { merge: true },
       );
 
-    // Check immediately after setting
+    // Verify the update
     const afterDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-    console.log("Document state immediately after setting roles:", afterDoc.data());
-
-    // Verify roles were set
-    let retries = 0;
-    const maxRetries = 3;
-    let rolesVerified = false;
-
-    while (retries < maxRetries && !rolesVerified) {
-      const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-      const data = doc.data();
-      console.log(`Verification attempt ${retries + 1}:`, { fingerprintId, data });
-
-      if (data?.roles && Array.isArray(data.roles) && data.roles.length === options.roles.length) {
-        const hasAllRoles = options.roles.every((role) => data.roles.includes(role));
-        if (hasAllRoles) {
-          rolesVerified = true;
-          console.log("Roles verified successfully:", data.roles);
-          break;
-        }
-      }
-
-      retries++;
-      if (!rolesVerified && retries < maxRetries) {
-        console.log(`Retry ${retries}: Roles not verified yet, waiting...`);
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-      }
-    }
-
-    if (!rolesVerified) {
-      console.error(
-        "Role verification failed. Final document state:",
-        await db
-          .collection(COLLECTIONS.FINGERPRINTS)
-          .doc(fingerprintId)
-          .get()
-          .then((d) => d.data()),
-      );
-      throw new Error(`Failed to verify roles after ${maxRetries} attempts`);
-    }
-
-    // Double check the roles one final time
-    const finalCheck = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-    const finalData = finalCheck.data();
-    console.log("Final role verification:", { fingerprintId, roles: finalData?.roles });
-    if (!finalData?.roles || !options.roles.every((role) => finalData.roles.includes(role))) {
-      throw new Error("Final role verification failed");
-    }
+    console.log("Document state after setting roles:", afterDoc.data());
   }
 
   // Register API key - no authentication needed for first key

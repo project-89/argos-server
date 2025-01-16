@@ -9,99 +9,144 @@ const tagsSchema = z.record(z.number());
 export const schemas = {
   // Fingerprint schemas
   fingerprintRegister: z.object({
-    fingerprint: z.string({
-      required_error: "Fingerprint is required",
-      invalid_type_error: "Fingerprint must be a string",
-    }),
-    metadata: z.record(z.any()).optional(),
-  }),
-
-  fingerprintUpdate: z
-    .object({
-      fingerprintId: z.string({
-        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
-        invalid_type_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+    body: z.object({
+      fingerprint: z.string({
+        required_error: "Fingerprint is required",
+        invalid_type_error: "Fingerprint must be a string",
       }),
       metadata: z.record(z.any()).optional(),
-    })
-    .superRefine((data, ctx) => {
-      if (data.fingerprintId && !data.metadata) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.invalid_type,
-          expected: "object",
-          received: "undefined",
-          path: ["metadata"],
-          message: "Metadata is required",
-        });
-      }
     }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  }),
+
+  fingerprintUpdate: z.object({
+    body: z
+      .object({
+        fingerprintId: z.string({
+          required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+          invalid_type_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        }),
+        metadata: z.record(z.any()).optional(),
+      })
+      .superRefine((data, ctx) => {
+        if (data.fingerprintId && !data.metadata) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.invalid_type,
+            expected: "object",
+            received: "undefined",
+            path: ["metadata"],
+            message: "Metadata is required",
+          });
+        }
+      }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  }),
 
   // Visit schemas
   visitLog: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint is required",
-      invalid_type_error: "Fingerprint must be a string",
+    body: z.object({
+      fingerprintId: z.string({
+        required_error: "Fingerprint is required",
+        invalid_type_error: "Fingerprint must be a string",
+      }),
+      url: z.string().url(),
+      title: z.string().optional(),
     }),
-    url: z.string().url(),
-    title: z.string().optional(),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   updatePresence: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint is required",
-      invalid_type_error: "Fingerprint must be a string",
+    body: z.object({
+      status: z.string(),
     }),
-    status: z.string(),
+    query: z.object({}).optional(),
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: "Fingerprint is required",
+        invalid_type_error: "Fingerprint must be a string",
+      }),
+    }),
   }),
 
   removeSite: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint is required",
-      invalid_type_error: "Fingerprint must be a string",
+    body: z.object({
+      fingerprintId: z.string({
+        required_error: "Fingerprint is required",
+        invalid_type_error: "Fingerprint must be a string",
+      }),
+      siteId: z.string(),
     }),
-    siteId: z.string(),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   // ROLE schemas
   roleAssign: z.object({
-    fingerprintId: z.string(),
-    role: z.enum(Object.values(ROLE) as [string, ...string[]]),
+    body: z.object({
+      fingerprintId: z.string(),
+      role: z.enum(Object.values(ROLE) as [string, ...string[]]),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   roleRemove: z.object({
-    fingerprintId: z.string(),
-    role: z.enum(Object.values(ROLE) as [string, ...string[]]),
+    body: z.object({
+      fingerprintId: z.string(),
+      role: z.enum(Object.values(ROLE) as [string, ...string[]]),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   // Tag schemas
   addOrUpdateTags: z.object({
-    fingerprintId: z.string(),
-    tags: tagsSchema,
+    body: z.object({
+      fingerprintId: z.string(),
+      tags: tagsSchema,
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   updateRolesBasedOnTags: z.object({
-    fingerprintId: z.string(),
-    tagRules: z.record(
-      z.object({
-        min: z.number(),
-        role: z.enum(Object.values(ROLE) as [string, ...string[]]),
-      }),
-    ),
+    body: z.object({
+      fingerprintId: z.string(),
+      tagRules: z.record(
+        z.object({
+          min: z.number(),
+          role: z.enum(Object.values(ROLE) as [string, ...string[]]),
+        }),
+      ),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   // API Key schemas
   apiKeyRegister: z.object({
-    fingerprintId: z.string({
-      required_error: "Fingerprint is required",
-      invalid_type_error: "Fingerprint must be a string",
+    body: z.object({
+      fingerprintId: z.string({
+        required_error: "Fingerprint is required",
+        invalid_type_error: "Fingerprint must be a string",
+      }),
     }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   apiKeyValidate: z.object({
-    key: z.string({
-      required_error: "API key is required",
-      invalid_type_error: "API key must be a string",
+    body: z.object({
+      key: z.string({
+        required_error: "API key is required",
+        invalid_type_error: "API key must be a string",
+      }),
     }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   apiKeyRevoke: z.object({
@@ -159,5 +204,35 @@ export const schemas = {
     startTime: z.string().datetime().optional(),
     endTime: z.string().datetime().optional(),
     sessionId: z.string().optional(),
+  }),
+
+  // Presence schemas
+  presenceUpdate: z.object({
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      }),
+    }),
+    body: z
+      .object({
+        status: z.enum(["online", "offline", "away"]),
+      })
+      .strict(),
+  }),
+
+  presenceGet: z.object({
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      }),
+    }),
+  }),
+
+  presenceActivity: z.object({
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      }),
+    }),
   }),
 } as const;

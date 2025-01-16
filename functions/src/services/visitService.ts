@@ -2,8 +2,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presenceService";
-import type { PresenceStatus } from "./presenceService";
-import { Visit, Site, VisitHistoryResponse, SiteModel } from "../types/api.types";
+import { Visit, Site, VisitHistoryResponse, SiteModel, VisitPresence } from "../types/api.types";
 import { ERROR_MESSAGES } from "../constants/api";
 
 /**
@@ -136,9 +135,9 @@ export const logVisit = async (
  */
 export const updatePresenceStatus = async (
   fingerprintId: string,
-  status: string,
+  status: VisitPresence["status"],
 ): Promise<{ fingerprintId: string; status: string; lastUpdated: number }> => {
-  const result = await updatePresence(fingerprintId, status as PresenceStatus);
+  const result = await updatePresence(fingerprintId, status);
   return result;
 };
 
@@ -155,12 +154,12 @@ export const removeSiteAndVisits = async (
   const siteDoc = await siteRef.get();
 
   if (!siteDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
+    throw new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND);
   }
 
   const siteData = siteDoc.data() as Site;
   if (siteData.fingerprintId !== fingerprintId) {
-    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+    throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
   }
 
   // Delete all visits for this site

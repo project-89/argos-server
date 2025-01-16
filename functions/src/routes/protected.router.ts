@@ -4,6 +4,7 @@ import * as visit from "../endpoints/visit.endpoint";
 import * as apiKey from "../endpoints/apiKey.endpoint";
 import * as role from "../endpoints/role.endpoint";
 import * as impression from "../endpoints/impression.endpoint";
+import presence from "../endpoints/presence.endpoint";
 import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
 
 const protectedRouter = Router();
@@ -28,5 +29,8 @@ protectedRouter.get("/role/available", role.getAvailableRoles);
 protectedRouter.post("/impressions", verifyOwnership, ...impression.create);
 protectedRouter.get("/impressions/:fingerprintId", verifyOwnership, ...impression.get);
 protectedRouter.delete("/impressions/:fingerprintId", verifyOwnership, ...impression.remove);
+
+// Presence tracking - require ownership
+protectedRouter.use("/presence", presence);
 
 export default protectedRouter;

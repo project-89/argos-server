@@ -6,34 +6,27 @@ import { ERROR_MESSAGES } from "../constants/api";
 export const validateRequest = (schema: z.ZodType) => {
   return (req: Request, res: Response, next: NextFunction): void | Response => {
     try {
-      schema.parse(req.body);
+      schema.parse({
+        body: req.body,
+        query: req.query,
+        params: req.params,
+      });
       next();
       return;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const firstError = error.errors[0];
-        const details = error.errors.map((err) => {
-          const detail: {
-            code: string;
-            path: (string | number)[];
-            message: string;
-            expected?: string;
-            received?: string;
-          } = {
-            code: err.code,
-            path: err.path,
-            message: err.message,
-          };
+        const details = error.errors.map((err) => ({
+          code: err.code,
+          path: err.path,
+          message: err.message,
+          ...(err.code === "invalid_type" && {
+            expected: String(err.expected),
+            received: String(err.received),
+          }),
+        }));
 
-          if (err.code === "invalid_type") {
-            detail.expected = err.expected as string;
-            detail.received = err.received as string;
-          }
-
-          return detail;
-        });
-
-        return sendError(res, firstError.message, 400, { details });
+        const errorMessage = details[0].message;
+        return sendError(res, errorMessage, 400, { details });
       }
       return sendError(res, ERROR_MESSAGES.INVALID_REQUEST, 400);
     }

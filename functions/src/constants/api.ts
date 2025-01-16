@@ -53,6 +53,7 @@ export const ERROR_MESSAGES = {
   FAILED_GET_VISIT_HISTORY: "Failed to get visit history",
   FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
   FAILED_GET_TOKEN_PRICE: "Failed to get token price data",
+  FAILED_UPDATE_ACTIVITY: "Failed to update activity timestamp",
 
   // Validation errors
   INVALID_REQUEST: "Invalid request data",
@@ -65,7 +66,7 @@ export const ERROR_MESSAGES = {
   INVALID_URL: "Invalid URL format",
   MISSING_TITLE: "Title is required",
   MISSING_STATUS: "Status is required",
-  INVALID_STATUS: "Status must be either 'online' or 'offline'",
+  INVALID_STATUS: "Status must be either 'online', 'offline', or 'away'",
 
   // System errors
   RATE_LIMIT_EXCEEDED: "Rate limit exceeded",
