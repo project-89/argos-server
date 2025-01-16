@@ -3,6 +3,10 @@ import { resolve } from "path";
 import { Timestamp } from "firebase-admin/firestore";
 import { MOCK_PRICES } from "./testConfig";
 import { COLLECTIONS } from "../../constants/collections";
+import { jest } from "@jest/globals";
+import * as admin from "firebase-admin";
+import { getFirestore } from "firebase-admin/firestore";
+import { TEST_CONFIG } from "./testConfig";
 
 // Load test environment variables
 config({ path: resolve(__dirname, "../.env.test") });
@@ -50,10 +54,46 @@ jest.mock("firebase-admin", () => ({
       doc: jest.fn((docId) => ({
         get: jest.fn(async () => ({
           exists: collectionName === COLLECTIONS.PRICE_CACHE && docId === "Project89",
-          data: () => mockCacheData[docId],
+          data: () => mockCacheData[docId as keyof typeof mockCacheData],
         })),
         set: jest.fn((data, options) => Promise.resolve()),
       })),
     })),
   })),
 }));
+
+// Mock fetch for CoinGecko API
+const mockFetch = jest.fn((input: RequestInfo | URL, init?: RequestInit) => {
+  console.log("[Mock] Fetching URL:", input.toString());
+
+  if (input.toString().includes("api.coingecko.com")) {
+    // Default mock response for Project89
+    return Promise.resolve({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          project89: {
+            usd: 1.0,
+            usd_24h_change: -5,
+          },
+        }),
+    } as Response);
+  }
+
+  // Pass through other requests
+  return (jest.requireActual("node-fetch") as typeof fetch)(input, init);
+});
+
+global.fetch = mockFetch;
+
+// Set up test environment
+process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080";
+
+// Initialize Firebase Admin
+admin.initializeApp({
+  projectId: TEST_CONFIG.projectId,
+});
+
+// Export Firestore instance
+export const db = getFirestore();
