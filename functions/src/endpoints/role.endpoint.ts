@@ -1,6 +1,5 @@
 import { Request, Response, NextFunction } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { z } from "zod";
 import { ROLE } from "../constants/roles";
 import {
   assignRole as assignRoleService,
@@ -10,24 +9,13 @@ import {
 import { sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-
-const roleSchema = z.object({
-  fingerprintId: z
-    .string({
-      required_error: "Fingerprint ID is required",
-    })
-    .min(1, "Fingerprint ID cannot be empty"),
-  role: z.enum(Object.values(ROLE) as [string, ...string[]], {
-    required_error: "Role is required",
-    invalid_type_error: "Invalid role",
-  }),
-});
+import { schemas } from "../types/schemas";
 
 export const assignRole = [
-  validateRequest(roleSchema),
+  validateRequest(schemas.roleAssign),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { fingerprintId, role } = roleSchema.parse(req.body);
+      const { fingerprintId, role } = req.body;
       const callerFingerprintId = req.fingerprintId as string;
 
       const result = await assignRoleService(fingerprintId, callerFingerprintId, role as ROLE);
@@ -40,10 +28,10 @@ export const assignRole = [
 ];
 
 export const removeRole = [
-  validateRequest(roleSchema),
+  validateRequest(schemas.roleRemove),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const { fingerprintId, role } = roleSchema.parse(req.body);
+      const { fingerprintId, role } = req.body;
       const callerFingerprintId = req.fingerprintId as string;
 
       const result = await removeRoleService(fingerprintId, callerFingerprintId, role as ROLE);
