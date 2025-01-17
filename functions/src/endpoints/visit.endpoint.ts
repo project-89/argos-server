@@ -1,67 +1,35 @@
 import { Request, Response, NextFunction } from "express";
-import { z } from "zod";
 import { validateRequest } from "../middleware/validation.middleware";
 import { getClientIp } from "../services/fingerprintService";
-import { sendSuccess, sendError } from "../utils/response";
+import { sendSuccess } from "../utils/response";
 import {
   logVisit,
   updatePresenceStatus,
   removeSiteAndVisits,
   getVisitHistory,
-  verifyFingerprint,
 } from "../services/visitService";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
+import { schemas } from "../types/schemas";
 
-// Validation schemas
-const visitSchema = z.object({
-  fingerprintId: z.string(),
-  url: z.string().url(),
-  title: z.string().optional(),
-});
-
-const presenceSchema = z.object({
-  fingerprintId: z.string(),
-  status: z.enum(["online", "offline"] as const, {
-    invalid_type_error: "Status must be either 'online' or 'offline'",
-    required_error: "Status is required",
-  }),
-});
-
-const removeSiteSchema = z.object({
-  fingerprintId: z.string(),
-  siteId: z.string(),
-});
-
-const historySchema = z.object({
-  fingerprintId: z.string(),
-});
-
-// Extend Request type to include fingerprint
-interface AuthenticatedRequest extends Request {
-  fingerprintId?: string;
-}
+const LOG_PREFIX = "[Visit Endpoint]";
 
 /**
  * Log a visit
  */
 export const log = [
-  validateRequest(visitSchema),
-  async (req: AuthenticatedRequest, res: Response) => {
+  validateRequest(schemas.visitLog),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log(`${LOG_PREFIX} Processing visit log request`);
       const { fingerprintId, url, title } = req.body;
       const clientIp = getClientIp(req);
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
       const result = await logVisit(fingerprintId, url, title, clientIp);
-      return sendSuccess(res, result, "Visit logged successfully");
+      sendSuccess(res, result, "Visit logged successfully");
     } catch (error) {
-      console.error("Error in log visit:", error);
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_LOG_VISIT),
-      );
+      console.error(`${LOG_PREFIX} Error in log visit:`, error);
+      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_LOG_VISIT));
     }
   },
 ];
@@ -70,19 +38,17 @@ export const log = [
  * Update presence status
  */
 export const updatePresence = [
-  validateRequest(presenceSchema),
-  async (req: AuthenticatedRequest, res: Response) => {
+  validateRequest(schemas.visitPresence),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log(`${LOG_PREFIX} Processing presence update request`);
       const { fingerprintId, status } = req.body;
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
       const result = await updatePresenceStatus(fingerprintId, status);
-      return sendSuccess(res, result, "Presence status updated");
+      sendSuccess(res, result, "Presence status updated");
     } catch (error) {
-      console.error("Error in update presence:", error);
-      return sendError(
-        res,
+      console.error(`${LOG_PREFIX} Error in update presence:`, error);
+      next(
         error instanceof Error
           ? error
           : new ApiError(500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS),
@@ -95,21 +61,17 @@ export const updatePresence = [
  * Remove a site and its visits
  */
 export const removeSite = [
-  validateRequest(removeSiteSchema),
-  async (req: AuthenticatedRequest, res: Response) => {
+  validateRequest(schemas.visitRemoveSite),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
+      console.log(`${LOG_PREFIX} Processing site removal request`);
       const { fingerprintId, siteId } = req.body;
 
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
-
       const result = await removeSiteAndVisits(fingerprintId, siteId);
-      return sendSuccess(res, result, "Site and visits removed");
+      sendSuccess(res, result, "Site and visits removed");
     } catch (error) {
-      console.error("Error in remove site:", error);
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_SITE),
-      );
+      console.error(`${LOG_PREFIX} Error in remove site:`, error);
+      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_SITE));
     }
   },
 ];
@@ -118,30 +80,17 @@ export const removeSite = [
  * Get visit history
  */
 export const getHistory = [
-  // Only validate body if no fingerprintId in params
-  async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-    if (!req.params.fingerprintId) {
-      return validateRequest(historySchema)(req, res, next);
-    }
-    next();
-  },
-  async (req: AuthenticatedRequest, res: Response) => {
+  validateRequest(schemas.visitHistory),
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      // Try to get fingerprintId from params first, then body
-      const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;
-
-      if (!fingerprintId) {
-        throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
-      }
-
-      await verifyFingerprint(fingerprintId, req.fingerprintId);
+      console.log(`${LOG_PREFIX} Processing visit history request`);
+      const fingerprintId = req.params.fingerprintId;
 
       const visits = await getVisitHistory(fingerprintId);
-      return sendSuccess(res, { visits }, "Visit history retrieved");
+      sendSuccess(res, { visits }, "Visit history retrieved");
     } catch (error) {
-      console.error("Error in get visit history:", error);
-      return sendError(
-        res,
+      console.error(`${LOG_PREFIX} Error in get visit history:`, error);
+      next(
         error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_GET_VISIT_HISTORY),
       );
     }

@@ -15,9 +15,9 @@ protectedRouter.get("/fingerprint/:id", verifyOwnership, fingerprint.get);
 protectedRouter.post("/fingerprint/update", verifyOwnership, ...fingerprint.update);
 
 // Visit tracking - require ownership
-protectedRouter.post("/visit/log", verifyOwnership, ...visit.log);
+protectedRouter.post("/visit", verifyOwnership, ...visit.log);
 protectedRouter.post("/visit/presence", verifyOwnership, ...visit.updatePresence);
-protectedRouter.post("/visit/site/remove", verifyOwnership, ...visit.removeSite);
+protectedRouter.post("/visit/remove-site", verifyOwnership, ...visit.removeSite);
 protectedRouter.get("/visit/history/:fingerprintId", verifyOwnership, ...visit.getHistory);
 
 // API key management - require ownership
