@@ -43,6 +43,8 @@ export const ERROR_MESSAGES = {
   // Tag game errors
   CANNOT_TAG_SELF: "Cannot tag yourself as 'it'",
   ALREADY_TAGGED: "User is already tagged as 'it'",
+  NOT_IT: "You must be 'it' to tag someone else",
+  NO_TAGS_REMAINING: "No daily tags remaining. Try again after 24 hours.",
 
   // Operation errors
   FAILED_CREATE_IMPRESSION: "Failed to create impression",

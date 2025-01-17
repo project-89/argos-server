@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-import { validateApiKey, getApiKeyByKey } from "../services/apiKeyService";
+import { validateApiKey, getApiKeyByKey } from "../services/apiKey.service";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 

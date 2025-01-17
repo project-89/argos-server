@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { getCurrentPrices, getPriceHistory } from "../services/priceService";
+import { getCurrentPrices, getPriceHistory } from "../services/price.service";
 import { validateQuery, validateParams } from "../middleware/validation.middleware";
 import { z } from "zod";
 import { sendSuccess, sendError } from "../utils/response";

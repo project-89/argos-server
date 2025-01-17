@@ -1,13 +1,13 @@
 import { Request, Response, NextFunction } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { getClientIp } from "../services/fingerprintService";
+import { getClientIp } from "../services/fingerprint.service";
 import { sendSuccess } from "../utils/response";
 import {
   logVisit,
   updatePresenceStatus,
   removeSiteAndVisits,
   getVisitHistory,
-} from "../services/visitService";
+} from "../services/visit.service";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 import { schemas } from "../types/schemas";

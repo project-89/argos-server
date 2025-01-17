@@ -258,6 +258,12 @@ export interface TagData {
   taggedAt: Timestamp;
 }
 
+export interface TagLimitData {
+  firstTaggedAt: Timestamp;
+  remainingDailyTags: number;
+  lastTagResetAt: Timestamp;
+}
+
 export interface TagUserRequest {
   targetFingerprintId: string;
 }
@@ -273,6 +279,10 @@ export interface TagHistoryResponse {
 
 export interface IsUserItResponse {
   isIt: boolean;
+}
+
+export interface GetRemainingTagsResponse {
+  remainingTags: number;
 }
 
 /**

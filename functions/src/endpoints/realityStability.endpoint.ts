@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { sendSuccess, sendError } from "../utils/response";
-import { calculateStabilityIndex } from "../services/realityStabilityService";
+import { calculateStabilityIndex } from "../services/realityStability.service";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 

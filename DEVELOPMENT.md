@@ -7,11 +7,16 @@ argos-server/           # Repository root
 ├── functions/          # Firebase Functions directory
 │   ├── src/           # Source code directory
 │   │   ├── constants/ # Global constants and configurations
+│   │   ├── endpoints/ # API endpoint handlers
 │   │   ├── middleware/# Express middleware (auth, validation, etc.)
-│   │   ├── routes/    # API route handlers
+│   │   ├── routes/    # Route definitions (public, protected, admin)
+│   │   ├── schemas/   # Request/response Zod schemas
 │   │   ├── services/  # Business logic and data operations
 │   │   ├── types/     # TypeScript type definitions
 │   │   ├── utils/     # Helper functions and utilities
+│   │   ├── public/    # Public assets and static files
+│   │   ├── scheduled/ # Scheduled and cron jobs
+│   │   ├── scripts/   # Utility scripts
 │   │   └── test/      # Test files mirroring src structure
 │   │       ├── endpoints/  # API endpoint tests
 │   │       ├── setup/     # Test configuration and setup
@@ -31,12 +36,17 @@ argos-server/           # Repository root
    npm install
    ```
 
-2. Start Firebase emulators:
+2. Configure environment:
+   - Copy `.env.development` for local development
+   - Copy `.env.test` for testing
+   - Copy `.env.production` for production
+
+3. Start Firebase emulators:
    ```bash
    npm run serve
    ```
 
-3. Run tests:
+4. Run tests:
    ```bash
    npm test
    ```
@@ -52,14 +62,45 @@ argos-server/           # Repository root
 
 2. **Middleware**
    - `auth.middleware.ts` - API key validation
-   - `rateLimit.middleware.ts` - Request rate limiting
-   - Add new middleware as needed
+   - `ipRateLimit.middleware.ts` - IP-based rate limiting
+   - `fingerprintRateLimit.middleware.ts` - Fingerprint-based rate limiting
+   - `ownershipCheck.middleware.ts` - Resource ownership verification
+   - `roleCheck.middleware.ts` - Role-based access control
+   - `validation.middleware.ts` - Request validation
+   - `error.middleware.ts` - Error handling
+   - `metrics.ts` - Performance and usage metrics
 
-3. **Constants**
+3. **Services**
+   - `fingerprintService.ts` - Fingerprint management
+   - `apiKeyService.ts` - API key operations
+   - `visitService.ts` - Visit tracking
+   - `presenceService.ts` - Presence management
+   - `impressionService.ts` - Analytics
+   - `priceService.ts` - Price data handling
+   - `roleService.ts` - Role management
+   - `realityStabilityService.ts` - Stability tracking
+   - `cleanup.service.ts` - Data maintenance
+   - `cacheService.ts` - Caching operations
+
+4. **Constants**
    - `roles.ts` - ROLE definitions and hierarchy
    - `collections.ts` - Firestore collection names
    - `config.ts` - Environment configuration
    - `api.ts` - API-related constants
+
+5. **Scheduled Tasks**
+   - Automated cleanup jobs
+   - Cache invalidation tasks
+   - Data maintenance operations
+   - Metrics collection
+   - System health checks
+
+6. **Schema Validation**
+   - Zod schemas for request validation
+   - Response type definitions
+   - Runtime type checking
+   - Automatic type inference
+   - Reusable schema components
 
 ### 3. Testing
 
@@ -68,20 +109,43 @@ argos-server/           # Repository root
    - One test file per endpoint file
    - Shared test utilities
    - Clean database between tests
+   - Mock data for consistent testing
+   - Service-specific test suites
 
-2. **Test Requirements**
+2. **Test Components**
+   - `endpoints/` - API endpoint tests
+   - `services/` - Service layer tests
+   - `middleware/` - Middleware function tests
+   - `utils/` - Utility function tests
+   - `__mocks__/` - Mock implementations
+   - `setup/` - Test environment configuration
+   - `mockData.ts` - Shared test data
+
+3. **Test Requirements**
    - Run type checking before tests
    - Test both success and error cases
    - Test authentication and authorization
    - Use dynamic API keys
    - Clean up test data
+   - Use mock implementations where appropriate
+   - Verify rate limiting behavior
+   - Test scheduled operations
+   - Validate schema enforcement
 
-3. **Running Tests**
+4. **Running Tests**
    ```bash
    npm run build        # Run type checking
    npm test            # Run all tests
    npm test <pattern>  # Run specific tests
    ```
+
+5. **Test Data Management**
+   - Use mock data for consistent testing
+   - Dynamic data generation where needed
+   - Cleanup after each test
+   - Isolated test environments
+   - Firebase emulator usage
+   - Mock external services
 
 ### 4. Best Practices
 
@@ -136,6 +200,8 @@ argos-server/           # Repository root
    - Proper indexing
    - Data validation
    - Clean up old data
+   - Regular backups
+   - Performance monitoring
 
 ### 6. Security
 
@@ -163,18 +229,45 @@ argos-server/           # Repository root
    Never commit production keys to version control. Store them securely in your production environment variables or secret management system.
 
 2. **Rate Limiting**
-   - Per-key limits
-   - Per-IP limits
-   - Configurable windows
-   - Rate limit logging
+   - IP-based limits with sliding windows
+   - Fingerprint-based limits for authenticated requests
+   - Configurable thresholds
+   - Automatic cleanup of expired data
+   - Rate limit logging and monitoring
 
 3. **Data Access**
-   - ROLE-based access
-   - Input validation
-   - Output sanitization
+   - ROLE-based access control
+   - Resource ownership verification
+   - Input validation and sanitization
+   - Output encoding
    - Error masking
+   - SQL injection prevention
+   - XSS prevention
 
-### 7. Deployment
+### 7. Performance
+
+1. **Caching Strategy**
+   - In-memory caching for price data
+   - 5-minute cache duration
+   - Automatic invalidation
+   - Cache size limits
+   - Hit rate monitoring
+
+2. **Request Processing**
+   - Async operations
+   - Parallel processing
+   - Response streaming
+   - Memory management
+   - Connection pooling
+
+3. **Scheduled Operations**
+   - Automated cleanup runs daily
+   - Cache invalidation every 5 minutes
+   - Rate limit data cleanup
+   - Visit history pruning
+   - System metrics collection
+
+### 8. Deployment
 
 1. **Build Process**
    ```bash
@@ -191,19 +284,22 @@ argos-server/           # Repository root
    firebase deploy --only functions
    ```
 
-### 8. Monitoring
+### 9. Monitoring
 
 1. **Logging**
    - Request logging
    - Error logging
    - Rate limit tracking
    - Performance monitoring
+   - Cache effectiveness
 
 2. **Metrics**
    - Response times
    - Error rates
    - API key usage
    - Resource utilization
+   - Cache hit rates
+   - Database performance
 
 ## Contributing
 
@@ -217,18 +313,36 @@ argos-server/           # Repository root
 ## Troubleshooting
 
 1. **Common Issues**
-   - API key validation
-   - Rate limiting
-   - Type errors
-   - Test failures
+   - API key validation failures
+   - Rate limit exceeded
+   - Cache invalidation
+   - Database timeouts
+   - Authentication errors
 
 2. **Solutions**
    - Check logs
-   - Verify types
-   - Test isolation
+   - Verify configuration
+   - Test locally
+   - Review metrics
    - Clean test data
 
 ## Development Progress
+
+### Current Features
+- [x] Fingerprint management
+- [x] Visit tracking
+- [x] Presence monitoring
+- [x] Impression analytics
+- [x] Price data handling
+- [x] Role management
+- [x] Reality stability tracking
+- [x] Rate limiting implementation
+- [x] Caching system
+- [x] Automated cleanup
+- [x] Scheduled maintenance tasks
+- [x] Schema validation system
+- [x] Public asset serving
+- [x] System health monitoring
 
 ### Request Validation Implementation
 
@@ -248,275 +362,14 @@ argos-server/           # Repository root
 - [x] Updated role endpoints
 - [x] Updated tag endpoints
 - [x] Updated price endpoints
-- [x] Updated reality stability endpoint
-- [x] Added impression endpoints with validation and tests
+- [x] Updated presence endpoints
+- [x] Updated impression endpoints
+- [x] Updated reality stability endpoints
 
-#### Testing and Documentation
-- [x] Updated test suites for validation
-- [x] Fixed failing tests
-- [x] Updated documentation
-- [x] Added validation patterns to guidelines
-- [x] Verified all tests passing
-
-### Recent Updates
-
-#### Security Improvements
-- [x] Enhanced Firestore security rules
-- [x] Implemented suspicious IP detection
-- [x] Added detailed logging for security events
-- [x] Updated environment detection logic
-
-#### Router Organization
-- [x] Moved admin endpoints to dedicated router
-- [x] Improved role-based access control
-- [x] Consolidated tag and role endpoints under admin routes
-- [x] Removed API key requirement from scheduled cleanup
-- [x] Updated tests to reflect new routing structure
-- [x] Fixed fingerprint tag initialization
-- [x] Standardized error handling across endpoints
-
-#### Test Improvements
-- [x] Added comprehensive admin endpoint tests
-- [x] Updated role validation tests
-- [x] Fixed encryption configuration in tests
-- [x] Improved test data cleanup
-- [x] Added test coverage for new admin routes
-- [x] Fixed tag validation in tests
-
-### CORS Configuration and Security
-
-#### Environment-Specific CORS Behavior
-
-1. **Production Environment**
-   - Strict CORS checks against explicitly allowed origins
-   - Origins configured through:
-     - `productionOrigins` list in config
-     - `ALLOWED_ORIGINS` environment variable
-   - No wildcard origins allowed
-   - All requests must have valid origin headers
-
-2. **Development/Test Environment**
-   - More permissive but controlled CORS configuration
-   - Allows development servers:
-     - Vite dev server (http://localhost:5173)
-     - React dev server (http://localhost:3000)
-     - Firebase emulator (http://localhost:5000)
-   - Test origins for integration testing
-   - Still enforces origin validation
-
-#### Security Measures
-
-1. **CORS Headers**
-   ```typescript
-   {
-     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     allowedHeaders: ["Content-Type", "Authorization", "x-api-key"],
-     credentials: true,
-     maxAge: 86400, // 24 hours
-   }
-   ```
-
-2. **Origin Validation**
-   - Production: Strict checking against allowlist
-   - Development: Controlled permissiveness
-   - No wildcard origins in production
-   - Environment-specific configuration
-
-3. **Environment Variables**
-   - `ALLOWED_ORIGINS`: Comma-separated list of allowed origins
-   - `NODE_ENV`: Controls environment-specific behavior
-   - `FUNCTIONS_EMULATOR`: Identifies local development
-
-#### Testing CORS
-
-1. **Running CORS Tests**
-   ```bash
-   cd functions
-   npm test src/test/middleware/cors.test.ts
-   ```
-
-2. **Test Coverage**
-   - Default development origins
-   - Configured test origins
-   - Unauthorized origins
-   - Preflight requests
-   - Requests with no origin
-   - Environment variable overrides
-
-#### Deployment Checklist
-
-1. **Environment Setup**
-   - Set `ALLOWED_ORIGINS` with production domains
-   - Ensure `NODE_ENV=production`
-   - Verify `FUNCTIONS_EMULATOR` is not set
-
-2. **Security Verification**
-   - Confirm CORS headers in responses
-   - Test unauthorized origin blocking
-   - Verify credentials handling
-   - Check preflight request handling
-
-3. **Monitoring**
-   - Log unauthorized access attempts
-   - Monitor for missing CORS configurations
-   - Track CORS-related errors
-
-### Development Guidelines
-
-1. **Adding New Origins**
-   - Add to appropriate configuration section
-   - Document purpose and ownership
-   - Test CORS behavior
-   - Update relevant tests
-
-2. **Security Considerations**
-   - Never use wildcard origins in production
-   - Always validate origin headers
-   - Use environment variables for dynamic configuration
-   - Maintain strict CORS in production
-
-3. **Testing Requirements**
-   - Test all CORS scenarios
-   - Verify environment-specific behavior
-   - Check error handling
-   - Validate security measures
-
-### Rate Limiting
-
-The server implements rate limiting to protect against abuse:
-
-- Rate limits are enforced per API key or IP address
-- Default limit: 100 requests per hour
-- Rate limiting is automatically bypassed in test environment (`NODE_ENV === "test"`)
-- Rate limit data is stored in Firestore
-- Automatic cleanup of old rate limit data
-- Rate limit stats are logged for monitoring
-
-Rate limit responses include:
-- 429 status code
-- Error message
-- Retry-After header
-- Time remaining until reset
-
-Rate limiting cannot be bypassed in production, ensuring robust protection against abuse.
-
-### Service Layer Implementation
-
-#### Service Architecture
-- [x] Implemented service layer pattern
-- [x] Separated business logic from controllers
-- [x] Created base service class with common operations
-- [x] Standardized error handling in services
-- [x] Added service-level validation
-- [x] Implemented transaction handling
-- [x] Added service-level logging
-
-#### Service Layer Benefits
-1. **Code Organization**
-   - Clear separation of concerns
-   - Business logic isolation
-   - Reusable service methods
-   - Consistent error handling
-   - Standardized logging
-
-2. **Transaction Management**
-   - Atomic operations
-   - Consistent database state
-   - Error rollback
-   - Deadlock prevention
-   - Connection pooling
-
-3. **Error Handling**
-   - Service-specific errors
-   - Detailed error messages
-   - Error categorization
-   - Error logging
-   - Error recovery
-
-4. **Testing**
-   - Isolated service testing
-   - Mock database operations
-   - Transaction testing
-   - Error scenario testing
-   - Service integration testing
-
-### Response Standardization
-
-#### Response Format
-All API responses follow a standard format:
-
-```typescript
-interface SuccessResponse<T> {
-  success: true;
-  data: T;
-}
-
-interface ErrorResponse {
-  success: false;
-  error: string;
-  code?: string;
-}
-```
-
-#### Implementation Details
-1. **Success Responses**
-   - Always include `success: true`
-   - Data in typed `data` field
-   - Consistent structure
-   - Optional metadata
-   - Type safety
-
-2. **Error Responses**
-   - Always include `success: false`
-   - Clear error messages
-   - Error codes for categorization
-   - Stack traces in development
-   - Sanitized messages in production
-
-3. **Status Codes**
-   - 200: Successful operation
-   - 201: Resource created
-   - 400: Bad request / validation error
-   - 401: Authentication error
-   - 403: Authorization error
-   - 404: Resource not found
-   - 429: Rate limit exceeded
-   - 500: Server error
-
-4. **Response Utilities**
-   ```typescript
-   // Success response
-   sendSuccess<T>(res: Response, data: T): void
-
-   // Error response
-   sendError(res: Response, error: ApiError): void
-
-   // Warning response
-   sendWarning(res: Response, message: string): void
-   ```
-
-#### Response Examples
-```typescript
-// Success Response
-{
-  "success": true,
-  "data": {
-    "id": "123",
-    "name": "Example"
-  }
-}
-
-// Error Response
-{
-  "success": false,
-  "error": "Resource not found",
-  "code": "NOT_FOUND"
-}
-```
-
-#### Response Headers
-- `Content-Type: application/json`
-- `Cache-Control` appropriate for endpoint
-- `X-Request-ID` for tracking
-- Rate limit headers where applicable
-- CORS headers as configured
+### Future Improvements
+- [ ] Enhanced analytics capabilities
+- [ ] Improved caching mechanisms
+- [ ] More granular permissions system
+- [ ] Extended monitoring capabilities
+- [ ] Performance optimizations
+- [ ] Documentation updates

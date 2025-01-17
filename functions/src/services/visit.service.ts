@@ -1,7 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
-import { updatePresence } from "./presenceService";
+import { updatePresence } from "./presence.service";
 import { Visit, Site, VisitHistoryResponse, SiteModel, VisitPresence } from "../types/api.types";
 import { ERROR_MESSAGES } from "../constants/api";
 

@@ -5,7 +5,7 @@ import {
   assignRole as assignRoleService,
   removeRole as removeRoleService,
   getAvailableRoles as getAvailableRolesService,
-} from "../services/roleService";
+} from "../services/role.service";
 import { sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";

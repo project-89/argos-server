@@ -9,7 +9,7 @@ import {
   getFingerprintAndUpdateIp,
   updateFingerprintMetadata,
   getClientIp,
-} from "../services/fingerprintService";
+} from "../services/fingerprint.service";
 
 const LOG_PREFIX = "[Fingerprint Endpoint]";
 

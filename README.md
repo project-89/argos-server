@@ -1,272 +1,117 @@
 # Argos Server
 
-Argos Server is a Firebase Functions-based API server that handles fingerprinting, visit tracking, and pricing operations. The server is designed to be secure, scalable, and maintainable with a strong emphasis on authentication and data integrity.
+A Firebase Functions-based API server for fingerprinting, visit tracking, and pricing operations.
 
-## Architecture
+## Overview
 
-### Service Layer
-The server implements a robust service layer pattern:
-- Clear separation of business logic from controllers
-- Standardized error handling and logging
-- Transaction management for data consistency
-- Service-level validation and security
-- Reusable service methods
+Argos Server provides a secure and scalable API for:
+- Browser fingerprinting and tracking
+- Visit and presence monitoring
+- Price data aggregation
+- Role-based access control
+- Reality stability tracking
+- Analytics and impressions
 
-### Response Standardization
-All API responses follow a consistent format:
-- Success responses include typed data
-- Error responses include clear messages and codes
-- Consistent HTTP status codes
-- Appropriate response headers
-- Type-safe response utilities
+## System Architecture
 
-## API Structure
+### Core Components
+- Firebase Functions (Node.js 18)
+- Firestore Database
+- Cloud Scheduler
+- Cloud Pub/Sub
+- In-memory Caching
 
-### Public Endpoints
-These endpoints do not require API key authentication:
-- `POST /fingerprint/register` - Register a new fingerprint
-  - Response: `{ success: true, data: { fingerprintId: string } }`
-- `POST /api-key/register` - Register a new API key for a fingerprint
-  - Response: `{ success: true, data: { apiKey: string } }`
-- `POST /api-key/validate` - Validate an API key
-  - Response: `{ success: true, data: { valid: boolean, needsRefresh: boolean } }`
-- `GET /role/available` - Get available roles
-  - Response: `{ success: true, data: string[] }`
-- `GET /price/current` - Get current token prices
-  - Response: `{ success: true, data: { [tokenId: string]: { usd: number, usd_24h_change: number } } }`
-- `GET /price/history/:tokenId` - Get historical price data
-  - Response: `{ success: true, data: { timestamp: number, price: number }[] }`
-- `GET /reality-stability` - Get reality stability index
-  - Response: `{ success: true, data: { index: number, timestamp: number } }`
+### Request Flow
+1. All requests go through CORS and basic Express middleware
+2. Requests are routed to one of three routers:
+   - Public Router: No auth required, rate-limited
+   - Protected Router: Requires API key, ownership verification
+   - Admin Router: Requires API key and admin role
 
-### Protected Endpoints
-These endpoints require a valid API key in the `x-api-key` header:
-- `POST /api-key/revoke` - Revoke an API key
-  - Response: `{ success: true }`
-- `GET /fingerprint/:id` - Get fingerprint details
-  - Response: `{ success: true, data: { id: string, ... } }`
-- `POST /visit/log` - Log a visit
-  - Response: `{ success: true, data: { visitId: string } }`
-- `POST /visit/presence` - Update presence status
-  - Response: `{ success: true }`
-- `POST /visit/site/remove` - Remove a site
-  - Response: `{ success: true }`
-- `GET /visit/history/:fingerprintId` - Get visit history
-  - Response: `{ success: true, data: Visit[] }`
-- `POST /impressions` - Create a new impression
-  - Body: `{ fingerprintId: string, type: string, data: Record<string, any>, source?: string, sessionId?: string }`
-  - Response: `{ success: true, data: { id: string, fingerprintId: string, type: string, data: Record<string, any>, createdAt: string } }`
-- `GET /impressions/:fingerprintId` - Get impressions for a fingerprint
-  - Query: `{ type?: string, startTime?: string, endTime?: string, limit?: number, sessionId?: string }`
-  - Response: `{ success: true, data: Array<{ id: string, fingerprintId: string, type: string, data: Record<string, any>, createdAt: string }> }`
-- `DELETE /impressions/:fingerprintId` - Delete impressions for a fingerprint
-  - Query: `{ type?: string, startTime?: string, endTime?: string, sessionId?: string }`
-  - Response: `{ success: true, data: { deletedCount: number } }`
-
-### Admin Endpoints
-These endpoints require a valid API key with admin role:
-- `POST /admin/role/assign` - Assign a role
-  - Response: `{ success: true }`
-- `POST /admin/role/remove` - Remove a role
-  - Response: `{ success: true }`
-- `POST /admin/tag/update` - Add or update tags
-  - Response: `{ success: true }`
-- `POST /admin/tag/roles/update` - Update roles based on tags
-  - Response: `{ success: true }`
-
-### Error Responses
-All endpoints return standardized error responses:
-```json
-{
-  "success": false,
-  "error": "Error message",
-  "code": "ERROR_CODE"
-}
-```
-
-Common status codes:
-- 400: Bad Request (validation errors)
-- 401: Unauthorized (missing/invalid API key)
-- 403: Forbidden (insufficient permissions)
-- 429: Too Many Requests (rate limit exceeded)
-- 500: Internal Server Error
-
-### Rate Limiting
-The server implements two levels of rate limiting:
-
-1. **IP-based Rate Limiting**
-   - 300 requests per hour per IP
-   - Applies to all endpoints
-   - Helps prevent abuse from single IPs
-
-2. **Fingerprint-based Rate Limiting**
-   - 1000 requests per hour per fingerprint
-   - Applies to protected endpoints
-   - Ensures fair resource usage
-
-Rate limit responses include headers:
-- `X-RateLimit-Limit`: Maximum requests allowed
-- `X-RateLimit-Remaining`: Remaining requests
-- `X-RateLimit-Reset`: Time until limit resets (Unix timestamp)
-
-### Automated Services
-- **Price Cache**: Caches price data for 5 minutes to respect CoinGecko API rate limits
-- **Scheduled Cleanup**: Daily cleanup job that removes:
-  - Price cache entries (older than 24 hours)
-  - Rate limit stats (older than 30 days)
-  - Rate limit requests (older than 30 days)
-  - Visit records (older than 30 days)
-  - Presence records (older than 30 days)
-
-## Development
-
-### Prerequisites
-- Node.js 18+
-- Firebase CLI
-- Google Cloud SDK
-- Terraform
-
-### Setup
-1. Clone the repository
-```bash
-git clone https://github.com/Oneirocom/argos-server.git
-cd argos-server
-```
-
-2. Install dependencies
-```bash
-npm install
-cd functions
-npm install
-```
-
-3. Copy environment templates
-```bash
-cp .env.template .env
-cp terraform.tfvars.template terraform.tfvars
-```
-
-4. Configure environment variables
-```bash
-# .env
-FIREBASE_PROJECT_ID=your-project-id
-FIREBASE_REGION=us-central1
-COINGECKO_API_KEY=your-api-key
-ALLOWED_ORIGINS=https://yourdomain.com,http://localhost:5173
-FIREBASE_CONFIG_ENCRYPTION_API_KEY=your-base64-encoded-32-byte-key
-FIREBASE_CONFIG_ENCRYPTION_API_IV=your-base64-encoded-16-byte-iv
-```
-
-### Development Workflow
-1. Start emulators
-```bash
-firebase emulators:start
-```
-
-2. Run tests
-```bash
-cd functions
-npm test
-```
-
-3. Deploy
-```bash
-# Deploy infrastructure
-terraform init
-terraform plan
-terraform apply
-
-# Deploy functions
-firebase deploy --only functions
-```
+### Security Features
+- API key authentication
+- Role-based access control
+- Resource ownership verification
+- IP-based rate limiting
+- Request validation
+- Data encryption
 
 ## Infrastructure
 
-The server uses the following Google Cloud services:
-- Firebase Functions
-- Firestore
-- Cloud Scheduler
-- Cloud Pub/Sub
-- Cloud Storage
+### Cloud Services
+- **Firebase Functions**: API endpoints and business logic
+- **Firestore**: Document database for all data
+- **Cloud Scheduler**: Automated maintenance tasks
+- **Cloud Pub/Sub**: Event handling and async operations
+- **Firebase Auth**: (Optional) User authentication
 
-### Cleanup Service
-A scheduled cleanup service runs daily to maintain database performance and stay within quotas:
-```hcl
-# Cloud Function: Scheduled Cleanup
-resource "google_cloudfunctions_function" "scheduledCleanup" {
-  name        = "argos-scheduled-cleanup"
-  description = "Performs scheduled cleanup of old data"
-  runtime     = "nodejs18"
-  entry_point = "scheduledCleanup"
-  # ... configuration ...
-}
-```
+### System Requirements
+- Node.js 18+
+- Firebase CLI
+- Google Cloud SDK
+- Terraform (optional, for infrastructure management)
 
-## Security
+## Getting Started
 
-### API Key Authentication
-- All protected endpoints require a valid API key
-- API keys are tied to fingerprints
-- Keys can be revoked and are automatically disabled on re-registration
-- API keys are encrypted at rest using AES-256-CBC
-- Each API key is uniquely encrypted with a secure initialization vector
-- Encryption keys and IVs are managed through environment variables
+### Local Development Setup
+1. Clone the repository
+   ```bash
+   git clone <repository-url>
+   cd argos-server
+   ```
 
-### ROLE-Based Access Control
-- Admin endpoints require admin role
-- ROLE management restricted to admin users
-- Tag management restricted to admin users
-- Default user role assigned on registration
-- ROLE validation middleware for protected routes
+2. Install dependencies
+   ```bash
+   npm install
+   cd functions
+   npm install
+   ```
 
-### Request Validation
-- Zod-based schema validation for all endpoints
-- Type-safe request validation
-- Consistent error messages
-- Automatic type inference from schemas
-- Validation middleware for all routes
+3. Set up environment variables
+   ```bash
+   cp .env.template .env
+   cp functions/.env.development .env.development
+   ```
 
-### CORS Protection
-- Environment-specific origin validation
-- No wildcard origins in production
-- Proper preflight handling
-- Configurable headers and methods
+4. Start development server
+   ```bash
+   firebase emulators:start
+   ```
 
-### Rate Limiting
-- IP-based rate limiting (300/hour)
-- Fingerprint-based rate limiting (1000/hour)
-- Firestore-backed persistence
-- Automatic cleanup of old rate limit data
-- Graceful handling of database errors
-- Concurrent request handling
+### Environment Configuration
+Required environment variables:
+- `FIREBASE_PROJECT_ID`: Your Firebase project ID
+- `FIREBASE_REGION`: Deployment region (default: us-central1)
+- `COINGECKO_API_KEY`: API key for price data
+- `ALLOWED_ORIGINS`: Comma-separated list of allowed CORS origins
+- `RATE_LIMIT_DISABLED`: Disable rate limiting (development only)
+- `IP_RATE_LIMIT_DISABLED`: Disable IP-based rate limiting (development only)
 
-### Error Handling
-- Standardized error responses
-- Proper status codes
-- Detailed error messages in development
-- Sanitized error messages in production
-- Error logging and monitoring
-- Transaction error handling
+### Deployment
+1. Build the project
+   ```bash
+   cd functions
+   npm run build
+   ```
 
-### Middleware Architecture
-- Composable middleware pattern
-- Conditional middleware application
-- Context passing between middleware
-- Middleware configuration management
-- Performance monitoring
-- Error propagation
-
-## Test Coverage
-- 137 tests across 18 test suites
-- End-to-end API testing
-- Middleware unit testing
-- Service layer testing
-- Error handling testing
-- Rate limiting testing
-- Concurrent request testing
+2. Deploy to Firebase
+   ```bash
+   firebase deploy --only functions
+   ```
 
 ## Documentation
-- [Development Guide](DEVELOPMENT.md)
-- [Functions README](functions/README.md)
-- [Contributing Guide](CONTRIBUTING.md)
-- [License](LICENSE)
+
+- [API Documentation](functions/README.md): Detailed API endpoints and usage
+- [Development Guidelines](DEVELOPMENT.md): Development rules and best practices
+- [Contributing Guidelines](CONTRIBUTING.md): How to contribute to the project
+
+## Contributing
+
+1. Follow existing patterns
+2. Write tests for new features
+3. Update documentation
+4. Run full test suite before submitting
+
+## License
+
+Proprietary - All rights reserved
