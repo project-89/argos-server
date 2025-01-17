@@ -1,19 +1,16 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
+import { getFirestore, Timestamp, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
-import { TagData, TagUserResponse } from "../types/api.types";
-
-export interface TagLimitData {
-  firstTaggedAt: Timestamp;
-  remainingDailyTags: number;
-  lastTagResetAt: Timestamp;
-}
-
-export interface FingerprintData {
-  tags?: TagData[];
-  tagLimits?: TagLimitData;
-}
+import { ERROR_MESSAGES, ALLOWED_TAG_TYPES, TagType } from "../constants/api";
+import {
+  TagData,
+  TagUserResponse,
+  FingerprintData,
+  TagStatsDocument,
+  TagLeaderboardEntry,
+  TagLeaderboardResponse,
+  GetUserTagsResponse,
+} from "../types/api.types";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = 10;
@@ -66,16 +63,22 @@ const checkAndUpdateTagLimits = async (
 };
 
 /**
- * Tag another user as "it"
+ * Tag another user
  */
 export const tagUser = async (
   taggerFingerprintId: string,
   targetFingerprintId: string,
+  tagType: string,
 ): Promise<TagUserResponse> => {
   try {
     console.log(
-      `${LOG_PREFIX} Attempting to tag user ${targetFingerprintId} as "it" by ${taggerFingerprintId}`,
+      `${LOG_PREFIX} Attempting to tag user ${targetFingerprintId} with ${tagType} by ${taggerFingerprintId}`,
     );
+
+    // Validate tag type
+    if (!Object.values(ALLOWED_TAG_TYPES).includes(tagType as TagType)) {
+      throw new ApiError(400, ERROR_MESSAGES.INVALID_TAG_TYPE);
+    }
 
     // Validate inputs
     if (taggerFingerprintId === targetFingerprintId) {
@@ -84,7 +87,7 @@ export const tagUser = async (
 
     const db = getFirestore();
 
-    // Get tagger fingerprint to verify they exist and check if they're "it"
+    // Get tagger fingerprint to verify they exist and check if they can tag
     const taggerRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(taggerFingerprintId);
     const taggerDoc = await taggerRef.get();
 
@@ -92,12 +95,9 @@ export const tagUser = async (
       throw new ApiError(404, ERROR_MESSAGES.TAGGER_NOT_FOUND);
     }
 
-    // Check if tagger is "it"
+    // Check if tagger has the tag they're trying to pass
     const taggerData = taggerDoc.data() as FingerprintData;
-    const taggerTags = taggerData?.tags || [];
-    const taggerIsIt = taggerTags.some((tag) => tag.tag === "it");
-
-    if (!taggerIsIt) {
+    if (!taggerData.tags?.[tagType]) {
       throw new ApiError(403, ERROR_MESSAGES.NOT_IT);
     }
 
@@ -110,35 +110,36 @@ export const tagUser = async (
     }
 
     const targetData = targetDoc.data() as FingerprintData;
-    const currentTags = targetData?.tags || [];
 
-    // Check if target is already "it"
-    const targetIsIt = currentTags.some((tag) => tag.tag === "it");
-    if (targetIsIt) {
+    // Check if target already has this tag type
+    if (targetData.tags?.[tagType]) {
       // Check and update tag limits before returning error
-      await checkAndUpdateTagLimits(taggerRef, taggerData, targetIsIt);
+      await checkAndUpdateTagLimits(taggerRef, taggerData, true);
       throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
     }
 
     // Check and update tag limits
-    await checkAndUpdateTagLimits(taggerRef, taggerData, targetIsIt);
+    await checkAndUpdateTagLimits(taggerRef, taggerData, false);
 
     // Create new tag
     const newTag: TagData = {
-      tag: "it",
+      type: tagType,
       taggedBy: taggerFingerprintId,
       taggedAt: Timestamp.now(),
     };
 
-    // Update target's tags - tagger keeps their "it" status
+    // Update target's tags - tagger keeps their tag
     await targetRef.update({
-      tags: [...currentTags, newTag],
+      [`tags.${tagType}`]: newTag,
     });
 
-    console.log(`${LOG_PREFIX} Successfully tagged user ${targetFingerprintId} as "it"`);
+    // Update tag stats with target info
+    await updateTagStats(taggerFingerprintId, db, targetFingerprintId, tagType);
+
+    console.log(`${LOG_PREFIX} Successfully tagged user ${targetFingerprintId} with ${tagType}`);
     return {
       success: true,
-      message: "Successfully tagged user as 'it'",
+      message: `Successfully tagged user with ${tagType}`,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in tagUser:`, error);
@@ -190,11 +191,11 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
 };
 
 /**
- * Check if a user is currently "it"
+ * Check if a user has a specific tag
  */
-export const isUserIt = async (fingerprintId: string): Promise<boolean> => {
+export const hasTag = async (fingerprintId: string, tagType: string): Promise<boolean> => {
   try {
-    console.log(`${LOG_PREFIX} Checking if user ${fingerprintId} is "it"`);
+    console.log(`${LOG_PREFIX} Checking if user ${fingerprintId} has tag: ${tagType}`);
 
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -205,11 +206,9 @@ export const isUserIt = async (fingerprintId: string): Promise<boolean> => {
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
-    const currentTags = data?.tags || [];
-
-    return currentTags.some((tag) => tag.tag === "it");
+    return !!data.tags?.[tagType];
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in isUserIt:`, error);
+    console.error(`${LOG_PREFIX} Error in hasTag:`, error);
     if (error instanceof ApiError) {
       throw error;
     }
@@ -225,6 +224,32 @@ export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> =
     console.log(`${LOG_PREFIX} Getting tag history for user ${fingerprintId}`);
 
     const db = getFirestore();
+    const statsRef = db.collection(COLLECTIONS.TAG_STATS).doc(fingerprintId);
+    const statsDoc = await statsRef.get();
+
+    if (!statsDoc.exists) {
+      return [];
+    }
+
+    const stats = statsDoc.data() as TagStatsDocument;
+    return stats.tagHistory || [];
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+};
+
+/**
+ * Check if a user has specific tags
+ */
+export const getUserTags = async (fingerprintId: string): Promise<GetUserTagsResponse> => {
+  try {
+    console.log(`${LOG_PREFIX} Checking tags for user ${fingerprintId}`);
+
+    const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
     const fingerprintDoc = await fingerprintRef.get();
 
@@ -233,9 +258,167 @@ export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> =
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
-    return data?.tags || [];
+    const activeTags = data.tags ? Object.keys(data.tags) : [];
+
+    return {
+      hasTags: activeTags.length > 0,
+      activeTags,
+    };
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
+    console.error(`${LOG_PREFIX} Error in getUserTags:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+};
+
+/**
+ * Update tag stats for a user
+ */
+const updateTagStats = async (
+  fingerprintId: string,
+  db: FirebaseFirestore.Firestore,
+  targetFingerprintId: string,
+  tagType: string,
+): Promise<void> => {
+  const now = Timestamp.now();
+  const statsRef = db.collection(COLLECTIONS.TAG_STATS).doc(fingerprintId);
+  const statsDoc = await statsRef.get();
+
+  // Create new tag history entry
+  const newTag: TagData = {
+    type: tagType,
+    taggedBy: fingerprintId,
+    taggedAt: now,
+  };
+
+  if (!statsDoc.exists) {
+    // Create new stats document
+    await statsRef.set({
+      id: fingerprintId,
+      fingerprintId,
+      totalTagsMade: 1,
+      lastTagAt: now,
+      dailyTags: 1,
+      weeklyTags: 1,
+      monthlyTags: 1,
+      streak: 1,
+      tagTypes: { [tagType]: 1 },
+      createdAt: now,
+      updatedAt: now,
+      tagHistory: [newTag],
+    });
+    return;
+  }
+
+  const stats = statsDoc.data() as TagStatsDocument;
+  const lastTagDate = stats.lastTagAt.toDate();
+  const nowDate = now.toDate();
+
+  // Check if this is a new day
+  const isNewDay =
+    lastTagDate.getDate() !== nowDate.getDate() ||
+    lastTagDate.getMonth() !== nowDate.getMonth() ||
+    lastTagDate.getFullYear() !== nowDate.getFullYear();
+
+  // Check if streak continues
+  const streakContinues =
+    isNewDay && nowDate.getTime() - lastTagDate.getTime() <= MILLISECONDS_IN_DAY;
+
+  // Update tag type counts
+  const tagTypes = { ...stats.tagTypes };
+  tagTypes[tagType] = (tagTypes[tagType] || 0) + 1;
+
+  // Update stats
+  await statsRef.update({
+    totalTagsMade: stats.totalTagsMade + 1,
+    lastTagAt: now,
+    dailyTags: isNewDay ? 1 : stats.dailyTags + 1,
+    weeklyTags: isNewDay && nowDate.getDay() < lastTagDate.getDay() ? 1 : stats.weeklyTags + 1,
+    monthlyTags:
+      isNewDay && nowDate.getMonth() !== lastTagDate.getMonth() ? 1 : stats.monthlyTags + 1,
+    streak: streakContinues ? stats.streak + 1 : 1,
+    tagTypes,
+    updatedAt: now,
+    tagHistory: [...(stats.tagHistory || []), newTag],
+  });
+};
+
+/**
+ * Get tag leaderboard
+ */
+export const getTagLeaderboard = async (
+  timeframe: "daily" | "weekly" | "monthly" | "allTime",
+  limit: number = 10,
+  offset: number = 0,
+  currentUserId?: string,
+): Promise<TagLeaderboardResponse> => {
+  try {
+    console.log(`${LOG_PREFIX} Getting tag leaderboard for timeframe: ${timeframe}`);
+    const db = getFirestore();
+    const statsRef = db.collection(COLLECTIONS.TAG_STATS);
+
+    // Determine which field to sort by based on timeframe
+    const sortField =
+      timeframe === "daily"
+        ? "dailyTags"
+        : timeframe === "weekly"
+          ? "weeklyTags"
+          : timeframe === "monthly"
+            ? "monthlyTags"
+            : "totalTagsMade";
+
+    // Get leaderboard entries
+    const query = statsRef
+      .orderBy(sortField, "desc")
+      .orderBy("lastTagAt", "desc")
+      .limit(limit)
+      .offset(offset);
+
+    const snapshot = await query.get();
+    const entries: TagLeaderboardEntry[] = [];
+    let userRank: number | undefined;
+
+    // If we need to find user's rank and they're not in the current page
+    if (currentUserId && !snapshot.docs.some((doc) => doc.id === currentUserId)) {
+      const userQuery = statsRef.orderBy(sortField, "desc").orderBy("lastTagAt", "desc");
+
+      const allDocs = await userQuery.get();
+      userRank = allDocs.docs.findIndex((doc) => doc.id === currentUserId) + 1;
+      if (userRank === 0) userRank = undefined;
+    }
+
+    snapshot.forEach((doc: QueryDocumentSnapshot) => {
+      const data = doc.data() as TagStatsDocument;
+      entries.push({
+        fingerprintId: data.fingerprintId,
+        totalTags:
+          timeframe === "daily"
+            ? data.dailyTags
+            : timeframe === "weekly"
+              ? data.weeklyTags
+              : timeframe === "monthly"
+                ? data.monthlyTags
+                : data.totalTagsMade,
+        lastTagAt: data.lastTagAt,
+        streak: data.streak,
+        tagTypes: data.tagTypes || {},
+      });
+
+      // If this is the current user, set their rank
+      if (doc.id === currentUserId) {
+        userRank = offset + entries.length;
+      }
+    });
+
+    return {
+      timeframe,
+      entries,
+      userRank,
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in getTagLeaderboard:`, error);
     if (error instanceof ApiError) {
       throw error;
     }

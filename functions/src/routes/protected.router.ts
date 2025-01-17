@@ -35,8 +35,9 @@ protectedRouter.delete("/impressions/:fingerprintId", verifyOwnership, ...impres
 protectedRouter.use("/presence", presence);
 
 // Tag game endpoints
-protectedRouter.post("/tag", verifyOwnership, ...tag.tagUser); // Verify tagger's API key ownership
-protectedRouter.get("/tag/is-it/:fingerprintId", verifyOwnership, ...tag.isUserIt); // Check own status only
-protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, ...tag.getTagHistory); // View own history only
+protectedRouter.post("/tag", verifyOwnership, tag.tagUser);
+protectedRouter.get("/tag/user/:fingerprintId", verifyOwnership, tag.getUserTags);
+protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, tag.getTagHistory);
+protectedRouter.get("/tag/check/:fingerprintId/:tagType", verifyOwnership, tag.checkTag);
 
 export default protectedRouter;

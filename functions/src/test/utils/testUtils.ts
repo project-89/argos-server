@@ -21,10 +21,11 @@ export const destroyAgent = () => {
   }
 };
 
-interface TestDataOptions {
+export interface TestDataOptions {
   metadata?: Record<string, any>;
   roles?: string[];
   skipCleanup?: boolean;
+  initialTags?: Record<string, any>;
 }
 
 export const makeRequest = async (config: {
@@ -129,34 +130,44 @@ export const createTestData = async (options: TestDataOptions = {}) => {
   const fingerprintId = fingerprintResponse.data.data.id;
   console.log("Created fingerprint:", { fingerprintId });
 
-  // If roles are provided, set them directly in Firestore
-  if (options.roles) {
+  // If roles or tags need to be set, do it directly in Firestore
+  if (options.roles || options.initialTags) {
     const db = getFirestore();
-    console.log("Setting roles for fingerprint:", { fingerprintId, roles: options.roles });
+    console.log("Setting roles/tags for fingerprint:", {
+      fingerprintId,
+      roles: options.roles,
+      initialTags: options.initialTags,
+    });
 
     // First check the current state
     const beforeDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-    console.log("Document state before setting roles:", beforeDoc.data());
+    console.log("Document state before setting roles/tags:", beforeDoc.data());
 
-    // Set initial roles
-    await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .doc(fingerprintId)
-      .set(
-        {
-          roles: options.roles,
-          fingerprint: fingerprintStr,
-          metadata: options.metadata || {
-            testData: true,
-            name: "Test Fingerprint",
-          },
-        },
-        { merge: true },
-      );
+    // Build document data with only defined fields
+    const docData: Record<string, any> = {
+      fingerprint: fingerprintStr,
+      metadata: options.metadata || {
+        testData: true,
+        name: "Test Fingerprint",
+      },
+    };
+
+    // Only add roles if defined
+    if (options.roles) {
+      docData.roles = options.roles;
+    }
+
+    // Only add tags if defined
+    if (options.initialTags) {
+      docData.tags = options.initialTags;
+    }
+
+    // Set initial roles and tags
+    await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).set(docData, { merge: true });
 
     // Verify the update
     const afterDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-    console.log("Document state after setting roles:", afterDoc.data());
+    console.log("Document state after setting roles/tags:", afterDoc.data());
   }
 
   // Register API key - no authentication needed for first key

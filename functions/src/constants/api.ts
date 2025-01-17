@@ -41,8 +41,8 @@ export const ERROR_MESSAGES = {
   TAGGER_NOT_FOUND: "Tagger fingerprint not found",
 
   // Tag game errors
-  CANNOT_TAG_SELF: "Cannot tag yourself as 'it'",
-  ALREADY_TAGGED: "User is already tagged as 'it'",
+  CANNOT_TAG_SELF: "Cannot tag yourself",
+  ALREADY_TAGGED: "User already has this tag",
   NOT_IT: "You must be 'it' to tag someone else",
   NO_TAGS_REMAINING: "No daily tags remaining. Try again after 24 hours.",
 
@@ -81,7 +81,7 @@ export const ERROR_MESSAGES = {
   UNKNOWN_ERROR: "Unknown error occurred",
 
   MISSING_TAGS: "At least one tag must be provided",
-  INVALID_TAG_TYPE: "Expected string, received number",
+  INVALID_TAG_TYPE: "Invalid tag type. Must be one of the allowed types.",
 
   PRICE_DATA_NOT_FOUND: "No price data found for invalid-token",
   TOKEN_NOT_FOUND: "Token not found",
@@ -110,3 +110,9 @@ export const PUBLIC_ENDPOINTS: readonly string[] = [
   "/price/history/:tokenId",
   "/reality-stability",
 ];
+
+export const ALLOWED_TAG_TYPES = {
+  IT: "it",
+} as const;
+
+export type TagType = (typeof ALLOWED_TAG_TYPES)[keyof typeof ALLOWED_TAG_TYPES];

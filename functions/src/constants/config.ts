@@ -85,15 +85,6 @@ export const CORS_CONFIG = {
   },
 } as const;
 
-export const COLLECTION_NAMES = {
-  FINGERPRINTS: "fingerprints",
-  API_KEYS: "api-keys",
-  VISITS: "visits",
-  PRESENCE: "presence",
-  PRICE_HISTORY: "price-history",
-  STABILITY_METRICS: "stability-metrics",
-} as const;
-
 export const ROLE_REQUIREMENTS = {
   premium: {
     visits: 5,

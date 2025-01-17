@@ -300,4 +300,18 @@ export const schemas = {
     query: z.object({}).optional(),
     params: z.object({}).optional(),
   }),
+
+  // Tag leaderboard schemas
+  getTagLeaderboard: z.object({
+    params: z.object({}).optional(),
+    body: z.object({}).optional(),
+    query: z.object({
+      timeframe: z.enum(["daily", "weekly", "monthly", "allTime"], {
+        required_error: "Timeframe is required",
+        invalid_type_error: "Invalid timeframe",
+      }),
+      limit: z.number().int().min(1).max(100).optional().default(10),
+      offset: z.number().int().min(0).optional().default(0),
+    }),
+  }),
 } as const;

@@ -253,7 +253,7 @@ export interface VisitAnalysis {
  * Tag Game Types
  */
 export interface TagData {
-  tag: "it";
+  type: string;
   taggedBy: string;
   taggedAt: Timestamp;
 }
@@ -266,6 +266,7 @@ export interface TagLimitData {
 
 export interface TagUserRequest {
   targetFingerprintId: string;
+  tagType: string;
 }
 
 export interface TagUserResponse {
@@ -277,12 +278,54 @@ export interface TagHistoryResponse {
   tags: TagData[];
 }
 
-export interface IsUserItResponse {
-  isIt: boolean;
+export interface GetUserTagsResponse {
+  hasTags: boolean;
+  activeTags: string[];
 }
 
 export interface GetRemainingTagsResponse {
   remainingTags: number;
+}
+
+/**
+ * Tag Game Leaderboard Types
+ */
+export interface TagLeaderboardEntry {
+  fingerprintId: string;
+  totalTags: number;
+  lastTagAt: Timestamp;
+  streak: number;
+  tagTypes: Record<string, number>;
+}
+
+export interface TagLeaderboardResponse {
+  timeframe: "daily" | "weekly" | "monthly" | "allTime";
+  entries: TagLeaderboardEntry[];
+  userRank?: number;
+}
+
+export interface TagStatsDocument {
+  id: string;
+  fingerprintId: string;
+  totalTagsMade: number;
+  lastTagAt: Timestamp;
+  dailyTags: number;
+  weeklyTags: number;
+  monthlyTags: number;
+  streak: number;
+  tagTypes: Record<string, number>;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+  tagHistory?: TagData[];
+}
+
+/**
+ * Fingerprint Types
+ */
+export interface FingerprintData {
+  tags?: Record<string, TagData>;
+  tagLimits?: TagLimitData;
+  // Add other fingerprint fields as needed
 }
 
 /**

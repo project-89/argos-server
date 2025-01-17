@@ -6,6 +6,7 @@ export const COLLECTIONS = {
   RATE_LIMITS: "rate-limits",
   RATE_LIMIT_STATS: "rate-limit-stats",
   TAG_RULES: "tag-rules",
+  TAG_STATS: "tag-stats",
   PRICE_CACHE: "priceCache",
   SITES: "sites",
   IMPRESSIONS: "impressions",

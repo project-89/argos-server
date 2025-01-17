@@ -1,98 +1,73 @@
 import { Request, Response, NextFunction } from "express";
 import {
   tagUser as tagUserService,
-  isUserIt as isUserItService,
+  hasTag as hasTagService,
   getTagHistory as getTagHistoryService,
-  getRemainingTags as getRemainingTagsService,
+  getUserTags as getUserTagsService,
 } from "../services/tag.service";
 import { sendSuccess } from "../utils/response";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES, ALLOWED_TAG_TYPES } from "../constants/api";
 import { ApiError } from "../utils/error";
-import { validateRequest } from "../middleware/validation.middleware";
-import { schemas } from "../types/schemas";
-import {
-  TagUserRequest,
-  TagUserResponse,
-  TagHistoryResponse,
-  IsUserItResponse,
-  GetRemainingTagsResponse,
-} from "../types/api.types";
-
-const LOG_PREFIX = "[Tag Endpoint]";
+import { TagUserResponse, GetUserTagsResponse, TagData } from "../types/api.types";
 
 /**
- * Tag another user as "it"
+ * Tag another user
  */
-export const tagUser = [
-  validateRequest(schemas.tagUser),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      console.log(`${LOG_PREFIX} Processing tag request`);
-      const { targetFingerprintId } = req.body as TagUserRequest;
-      const taggerFingerprintId = req.fingerprintId as string;
+export const tagUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { targetFingerprintId } = req.body;
+    const taggerFingerprintId = req.fingerprintId;
 
-      const result = await tagUserService(taggerFingerprintId, targetFingerprintId);
-      sendSuccess<TagUserResponse>(res, result);
-    } catch (error) {
-      console.error(`${LOG_PREFIX} Error in tagUser:`, error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
+    if (!taggerFingerprintId) {
+      throw new ApiError(401, ERROR_MESSAGES.AUTHENTICATION_REQUIRED);
     }
-  },
-];
+
+    const result = await tagUserService(
+      taggerFingerprintId,
+      targetFingerprintId,
+      ALLOWED_TAG_TYPES.IT,
+    );
+    return sendSuccess<TagUserResponse>(res, result);
+  } catch (error) {
+    return next(error);
+  }
+};
 
 /**
- * Check if a user is currently "it"
+ * Get user's active tags
  */
-export const isUserIt = [
-  validateRequest(schemas.presenceGet), // Reuse existing schema since we just need fingerprintId param
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      console.log(`${LOG_PREFIX} Checking if user is "it"`);
-      const fingerprintId = req.params.fingerprintId;
-
-      const isIt = await isUserItService(fingerprintId);
-      sendSuccess<IsUserItResponse>(res, { isIt });
-    } catch (error) {
-      console.error(`${LOG_PREFIX} Error in isUserIt:`, error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
-    }
-  },
-];
+export const getUserTags = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fingerprintId } = req.params;
+    const result = await getUserTagsService(fingerprintId);
+    return sendSuccess<GetUserTagsResponse>(res, result);
+  } catch (error) {
+    return next(error);
+  }
+};
 
 /**
  * Get tag history for a user
  */
-export const getTagHistory = [
-  validateRequest(schemas.presenceGet), // Reuse existing schema since we just need fingerprintId param
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      console.log(`${LOG_PREFIX} Getting tag history`);
-      const fingerprintId = req.params.fingerprintId;
-
-      const tags = await getTagHistoryService(fingerprintId);
-      sendSuccess<TagHistoryResponse>(res, { tags });
-    } catch (error) {
-      console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
-    }
-  },
-];
+export const getTagHistory = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fingerprintId } = req.params;
+    const history = await getTagHistoryService(fingerprintId);
+    return sendSuccess<{ tags: TagData[] }>(res, { tags: history });
+  } catch (error) {
+    return next(error);
+  }
+};
 
 /**
- * Get remaining daily tags for a user
+ * Check if user has a specific tag
  */
-export const getRemainingTags = [
-  validateRequest(schemas.presenceGet), // Reuse existing schema since we just need fingerprintId param
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      console.log(`${LOG_PREFIX} Getting remaining tags`);
-      const fingerprintId = req.params.fingerprintId;
-
-      const remainingTags = await getRemainingTagsService(fingerprintId);
-      sendSuccess<GetRemainingTagsResponse>(res, { remainingTags });
-    } catch (error) {
-      console.error(`${LOG_PREFIX} Error in getRemainingTags:`, error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR));
-    }
-  },
-];
+export const checkTag = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fingerprintId, tagType } = req.params;
+    const hasTag = await hasTagService(fingerprintId, tagType);
+    return sendSuccess<{ hasTag: boolean }>(res, { hasTag });
+  } catch (error) {
+    return next(error);
+  }
+};
