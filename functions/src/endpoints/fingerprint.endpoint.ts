@@ -10,7 +10,6 @@ import {
   updateFingerprintMetadata,
   getClientIp,
 } from "../services/fingerprintService";
-import { getFirestore } from "firebase-admin/firestore";
 
 const LOG_PREFIX = "[Fingerprint Endpoint]";
 
@@ -38,15 +37,6 @@ export const get = async (req: Request, res: Response): Promise<Response> => {
   try {
     console.log(`${LOG_PREFIX} Starting fingerprint retrieval`);
     const fingerprintId = req.params.id;
-
-    // Check if fingerprint exists before ownership check
-    const db = getFirestore();
-    const doc = await db.collection("fingerprints").doc(fingerprintId).get();
-    if (!doc.exists) {
-      console.log(`${LOG_PREFIX} Fingerprint not found:`, fingerprintId);
-      return sendError(res, new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT));
-    }
-
     const result = await getFingerprintAndUpdateIp(fingerprintId, getClientIp(req));
     console.log(`${LOG_PREFIX} Successfully retrieved fingerprint`);
     return sendSuccess(res, result.data);

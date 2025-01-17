@@ -60,9 +60,9 @@ describe("Fingerprint Endpoint", () => {
         {
           code: "invalid_type",
           expected: "string",
+          message: "Fingerprint is required",
+          path: ["body", "fingerprint"],
           received: "undefined",
-          path: ["fingerprint"],
-          message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
       ]);
     });
@@ -132,11 +132,12 @@ describe("Fingerprint Endpoint", () => {
         method: "get",
         url: `${API_URL}/fingerprint/non-existent-id`,
         headers: { "x-api-key": validApiKey },
+        validateStatus: () => true,
       });
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(404);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+      expect(response.data.error).toBe(ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
       expect(response.data.requestId).toBeTruthy();
       expect(response.data.timestamp).toBeTruthy();
     });
@@ -370,9 +371,9 @@ describe("Fingerprint Endpoint", () => {
         {
           code: "invalid_type",
           expected: "string",
+          message: "Fingerprint is required",
+          path: ["body", "fingerprintId"],
           received: "undefined",
-          path: ["fingerprintId"],
-          message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
       ]);
     });
@@ -395,9 +396,9 @@ describe("Fingerprint Endpoint", () => {
         {
           code: "invalid_type",
           expected: "object",
-          received: "undefined",
-          path: ["metadata"],
           message: "Metadata is required",
+          path: ["body", "metadata"],
+          received: "undefined",
         },
       ]);
     });
@@ -420,9 +421,9 @@ describe("Fingerprint Endpoint", () => {
         {
           code: "invalid_type",
           expected: "object",
-          received: "string",
-          path: ["metadata"],
           message: "Expected object, received string",
+          path: ["body", "metadata"],
+          received: "string",
         },
       ]);
     });
