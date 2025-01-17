@@ -16,9 +16,7 @@ export const create = [
   validateRequest(schemas.impressionCreate),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
-      const { fingerprintId, type, data, source, sessionId } = schemas.impressionCreate.parse(
-        req.body,
-      );
+      const { fingerprintId, type, data, source, sessionId } = req.body;
 
       const impression = await createImpression(fingerprintId, type, data, {
         source,

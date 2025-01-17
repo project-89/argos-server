@@ -175,8 +175,8 @@ export const schemas = {
   apiKeyRegister: z.object({
     body: z.object({
       fingerprintId: z.string({
-        required_error: "Fingerprint is required",
-        invalid_type_error: "Fingerprint must be a string",
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
       }),
     }),
     query: z.object({}).optional(),
@@ -186,7 +186,7 @@ export const schemas = {
   apiKeyValidate: z.object({
     body: z.object({
       key: z.string({
-        required_error: "API key is required",
+        required_error: ERROR_MESSAGES.MISSING_API_KEY,
         invalid_type_error: "API key must be a string",
       }),
     }),
@@ -195,10 +195,14 @@ export const schemas = {
   }),
 
   apiKeyRevoke: z.object({
-    key: z.string({
-      required_error: "API key is required",
-      invalid_type_error: "API key must be a string",
+    body: z.object({
+      key: z.string({
+        required_error: ERROR_MESSAGES.MISSING_API_KEY,
+        invalid_type_error: "API key must be a string",
+      }),
     }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   // Impression schemas
@@ -228,17 +232,21 @@ export const schemas = {
   }),
 
   impressionCreate: z.object({
-    fingerprintId: z.string({
-      required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+    body: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      }),
+      type: z.string({
+        required_error: ERROR_MESSAGES.REQUIRED_FIELD,
+      }),
+      data: z.record(z.any(), {
+        required_error: ERROR_MESSAGES.MISSING_METADATA,
+      }),
+      source: z.string().optional(),
+      sessionId: z.string().optional(),
     }),
-    type: z.string({
-      required_error: ERROR_MESSAGES.REQUIRED_FIELD,
-    }),
-    data: z.record(z.any(), {
-      required_error: ERROR_MESSAGES.MISSING_METADATA,
-    }),
-    source: z.string().optional(),
-    sessionId: z.string().optional(),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
   }),
 
   impressionDelete: z.object({

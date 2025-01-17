@@ -103,7 +103,7 @@ describe("API Key Endpoint", () => {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
-          path: ["fingerprintId"],
+          path: ["body", "fingerprintId"],
           message: ERROR_MESSAGES.MISSING_FINGERPRINT,
         },
       ]);
@@ -290,8 +290,8 @@ describe("API Key Endpoint", () => {
           code: "invalid_type",
           expected: "string",
           received: "undefined",
-          path: ["key"],
-          message: "API key is required",
+          path: ["body", "key"],
+          message: ERROR_MESSAGES.MISSING_API_KEY,
         },
       ]);
     });

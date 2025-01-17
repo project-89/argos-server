@@ -37,6 +37,9 @@ describe("Impression Endpoint", () => {
       expect(response.status).toBe(201);
       expect(response.data.success).toBe(true);
       expect(response.data.data).toHaveProperty("id");
+
+      // Wait for the impression to be saved
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     });
 
     it("should require API key", async () => {
@@ -91,7 +94,7 @@ describe("Impression Endpoint", () => {
         },
       };
 
-      await makeRequest({
+      const createResponse = await makeRequest({
         method: "post",
         url: `${TEST_CONFIG.apiUrl}/impressions`,
         data: impressionData,
@@ -99,6 +102,11 @@ describe("Impression Endpoint", () => {
           "x-api-key": validApiKey,
         },
       });
+
+      expect(createResponse.status).toBe(201);
+
+      // Wait for the impression to be saved
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
       const response = await makeRequest({
         method: "get",
@@ -173,8 +181,9 @@ describe("Impression Endpoint", () => {
     });
 
     it("should validate fingerprint ownership", async () => {
-      // Create another test fingerprint and API key
-      const { apiKey: otherApiKey } = await createTestData({ skipCleanup: true });
+      // Create another test fingerprint and API key with a different fingerprint
+      const otherTestData = await createTestData({ skipCleanup: true });
+      const { apiKey: otherApiKey } = otherTestData;
 
       // Test with invalid API key - should return 401
       const invalidResponse = await makeRequest({
@@ -190,7 +199,7 @@ describe("Impression Endpoint", () => {
       expect(invalidResponse.data.success).toBe(false);
       expect(invalidResponse.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
 
-      // Test with mismatched but valid API key - should return 401 for GET requests
+      // Test with API key from a different fingerprint - should return 401 for GET requests
       const mismatchResponse = await makeRequest({
         method: "get",
         url: `${TEST_CONFIG.apiUrl}/impressions/${fingerprintId}`,
