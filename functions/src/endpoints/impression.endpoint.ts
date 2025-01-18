@@ -37,6 +37,7 @@ export const create = [
 ];
 
 export const get = [
+  validateRequest(schemas.impressionGet),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
       const fingerprintId = req.params.fingerprintId;

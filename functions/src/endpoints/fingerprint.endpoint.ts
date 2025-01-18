@@ -33,21 +33,24 @@ export const register = [
   },
 ];
 
-export const get = async (req: Request, res: Response): Promise<Response> => {
-  try {
-    console.log(`${LOG_PREFIX} Starting fingerprint retrieval`);
-    const fingerprintId = req.params.id;
-    const result = await getFingerprintAndUpdateIp(fingerprintId, getClientIp(req));
-    console.log(`${LOG_PREFIX} Successfully retrieved fingerprint`);
-    return sendSuccess(res, result.data);
-  } catch (error) {
-    console.error(`${LOG_PREFIX} Error retrieving fingerprint:`, error);
-    if (error instanceof ApiError) {
-      return sendError(res, error, error.statusCode);
+export const get = [
+  validateRequest(schemas.fingerprintParams),
+  async (req: Request, res: Response): Promise<Response> => {
+    try {
+      console.log(`${LOG_PREFIX} Starting fingerprint retrieval`);
+      const fingerprintId = req.params.id;
+      const result = await getFingerprintAndUpdateIp(fingerprintId, getClientIp(req));
+      console.log(`${LOG_PREFIX} Successfully retrieved fingerprint`);
+      return sendSuccess(res, result.data);
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error retrieving fingerprint:`, error);
+      if (error instanceof ApiError) {
+        return sendError(res, error, error.statusCode);
+      }
+      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
     }
-    return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
-  }
-};
+  },
+];
 
 export const update = [
   validateRequest(schemas.fingerprintUpdate),

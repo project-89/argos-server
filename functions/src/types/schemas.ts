@@ -259,6 +259,21 @@ export const schemas = {
     sessionId: z.string().optional(),
   }),
 
+  impressionGet: z.object({
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
+      }),
+    }),
+    query: z
+      .object({
+        type: z.string().optional(),
+      })
+      .optional(),
+    body: z.object({}).optional(),
+  }),
+
   // Presence schemas
   presenceUpdate: z.object({
     params: z.object({
@@ -313,5 +328,31 @@ export const schemas = {
       limit: z.number().int().min(1).max(100).optional().default(10),
       offset: z.number().int().min(0).optional().default(0),
     }),
+  }),
+
+  fingerprintParams: z.object({
+    params: z.object({
+      id: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
+      }),
+    }),
+    body: z.object({}).optional(),
+    query: z.object({}).optional(),
+  }),
+
+  checkTag: z.object({
+    params: z.object({
+      fingerprintId: z.string({
+        required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+        invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
+      }),
+      tagType: z.string({
+        required_error: "Tag type is required",
+        invalid_type_error: "Tag type must be a string",
+      }),
+    }),
+    body: z.object({}).optional(),
+    query: z.object({}).optional(),
   }),
 } as const;

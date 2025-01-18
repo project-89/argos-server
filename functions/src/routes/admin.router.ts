@@ -6,7 +6,7 @@ import * as role from "../endpoints/role.endpoint";
 const adminRouter = Router();
 
 // ROLE management routes - apply auth and admin check per route
-adminRouter.post("/role/assign", validateApiKeyMiddleware, requireAdmin, role.assignRole);
-adminRouter.post("/role/remove", validateApiKeyMiddleware, requireAdmin, role.removeRole);
+adminRouter.post("/role/assign", validateApiKeyMiddleware, requireAdmin, ...role.assignRole);
+adminRouter.post("/role/remove", validateApiKeyMiddleware, requireAdmin, ...role.removeRole);
 
 export default adminRouter;

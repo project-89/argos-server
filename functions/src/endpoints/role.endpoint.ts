@@ -43,6 +43,8 @@ export const removeRole = [
   },
 ];
 
-export const getAvailableRoles = async (_req: Request, res: Response): Promise<Response> => {
-  return sendSuccess(res, getAvailableRolesService());
-};
+export const getAvailableRoles = [
+  async (_req: Request, res: Response): Promise<Response> => {
+    return sendSuccess(res, getAvailableRolesService());
+  },
+];

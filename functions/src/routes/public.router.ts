@@ -21,7 +21,7 @@ router.get("/health", (_, res) => {
 router.post("/fingerprint/register", ...fingerprint.register);
 router.post("/api-key/register", ...apiKey.register);
 router.post("/api-key/validate", ...apiKey.validate);
-router.get("/role/available", role.getAvailableRoles);
+router.get("/role/available", ...role.getAvailableRoles);
 router.get("/price/current", ...price.getCurrent);
 router.get("/price/history/:tokenId", ...price.getHistory);
 router.get("/reality-stability", ...realityStability.getRealityStabilityIndex);

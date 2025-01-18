@@ -2,7 +2,6 @@ import { Router } from "express";
 import * as fingerprint from "../endpoints/fingerprint.endpoint";
 import * as visit from "../endpoints/visit.endpoint";
 import * as apiKey from "../endpoints/apiKey.endpoint";
-import * as role from "../endpoints/role.endpoint";
 import * as impression from "../endpoints/impression.endpoint";
 import * as tag from "../endpoints/tag.endpoint";
 import presence from "../endpoints/presence.endpoint";
@@ -23,9 +22,6 @@ protectedRouter.get("/visit/history/:fingerprintId", verifyOwnership, ...visit.g
 // API key management - require ownership
 protectedRouter.post("/api-key/revoke", verifyOwnership, ...apiKey.revoke);
 
-// ROLE information - public within protected routes
-protectedRouter.get("/role/available", role.getAvailableRoles);
-
 // Impression endpoints - require ownership
 protectedRouter.post("/impressions", verifyOwnership, ...impression.create);
 protectedRouter.get("/impressions/:fingerprintId", verifyOwnership, ...impression.get);
@@ -35,9 +31,14 @@ protectedRouter.delete("/impressions/:fingerprintId", verifyOwnership, ...impres
 protectedRouter.use("/presence", presence);
 
 // Tag game endpoints
-protectedRouter.post("/tag", verifyOwnership, tag.tagUser);
-protectedRouter.get("/tag/user/:fingerprintId", verifyOwnership, tag.getUserTags);
-protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, tag.getTagHistory);
-protectedRouter.get("/tag/check/:fingerprintId/:tagType", verifyOwnership, tag.checkTag);
+
+// Public competitive endpoints - just need valid API key
+protectedRouter.post("/tag", ...tag.tagUser); // Tag other users
+protectedRouter.get("/tag/leaderboard", ...tag.getLeaderboard); // Public leaderboard data
+
+// Personal tag data - requires ownership verification
+protectedRouter.get("/tag/user/:fingerprintId", verifyOwnership, ...tag.getUserTags);
+protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, ...tag.getTagHistory);
+protectedRouter.get("/tag/check/:fingerprintId/:tagType", verifyOwnership, ...tag.checkTag);
 
 export default protectedRouter;

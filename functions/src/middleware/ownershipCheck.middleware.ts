@@ -7,9 +7,6 @@ import { COLLECTIONS } from "../constants/collections";
 
 const LOG_PREFIX = "[Ownership Check]";
 
-// Endpoints that admins can access without ownership verification
-const ADMIN_BYPASS_ENDPOINTS = ["/role/assign", "/role/remove", "/tag/update", "/tag/rules"];
-
 /**
  * Middleware to verify fingerprint exists
  * Should be run before ownership check
@@ -44,7 +41,7 @@ export const verifyFingerprintExists = async (req: Request, res: Response, next:
 /**
  * Middleware to ensure a caller can only access/modify their own data
  * Requires auth middleware to be run first to set req.fingerprintId
- * Admins can bypass ownership checks for role management endpoints
+ * Admins can bypass ownership checks for all endpoints
  */
 export const verifyOwnership = async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -84,22 +81,16 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
       return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     }
 
-    // Check if this is an admin-bypass endpoint
-    if (ADMIN_BYPASS_ENDPOINTS.some((endpoint) => req.path.includes(endpoint))) {
-      // Check if caller has admin role
-      const callerDoc = await db
-        .collection(COLLECTIONS.FINGERPRINTS)
-        .doc(callerFingerprintId!)
-        .get();
-      const callerData = callerDoc.data();
+    // Check if caller has admin role - admins can bypass all ownership checks
+    const callerDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(callerFingerprintId!).get();
+    const callerData = callerDoc.data();
 
-      if (callerData?.roles?.includes("admin")) {
-        console.log(`${LOG_PREFIX} Admin user bypassing ownership check`);
-        return next();
-      }
+    if (callerData?.roles?.includes("admin")) {
+      console.log(`${LOG_PREFIX} Admin user bypassing ownership check`);
+      return next();
     }
 
-    // For non-admins or non-admin endpoints, verify ownership
+    // For non-admins, verify ownership
     if (callerFingerprintId !== targetFingerprintId) {
       console.log(`${LOG_PREFIX} Insufficient permissions - fingerprint mismatch`, {
         callerFingerprintId,
