@@ -147,7 +147,11 @@ const publicMiddleware = composeMiddleware(
 
 // Protected routes rate limiting
 const protectedMiddleware = composeMiddleware(
+  // IP Rate Limit first - most broad check
+  withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.ip")), "protectedIpRateLimit"),
+  // Then API Key validation which sets fingerprintId
   withMetrics(validateApiKeyMiddleware, "auth"),
+  // Then Fingerprint rate limit which uses fingerprintId
   withMetrics(
     fingerprintRateLimit(middlewareConfig.get("rateLimit.fingerprint")),
     "fingerprintRateLimit",
