@@ -47,7 +47,7 @@ jest.mock("../../utils/timestamp", () => ({
   getCurrentUnixMillis: jest.fn(),
 }));
 
-jest.mock("../../services/presenceService", () => ({
+jest.mock("../../services/presence.service", () => ({
   updatePresence: jest.fn(),
 }));
 
@@ -476,11 +476,11 @@ describe("Visit Service", () => {
         lastUpdated: mockTimestamp,
       };
 
-      require("../../services/presenceService").updatePresence.mockResolvedValueOnce(mockResult);
+      require("../../services/presence.service").updatePresence.mockResolvedValueOnce(mockResult);
 
       const result = await updatePresenceStatus(fingerprintId, status);
 
-      expect(require("../../services/presenceService").updatePresence).toHaveBeenCalledWith(
+      expect(require("../../services/presence.service").updatePresence).toHaveBeenCalledWith(
         fingerprintId,
         status,
       );

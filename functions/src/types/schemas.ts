@@ -321,18 +321,29 @@ export const schemas = {
     params: z.object({}).optional(),
     body: z.object({}).optional(),
     query: z.object({
-      timeframe: z.enum(["daily", "weekly", "monthly", "allTime"], {
-        required_error: "Timeframe is required",
-        invalid_type_error: "Invalid timeframe",
-      }),
-      limit: z.number().int().min(1).max(100).optional().default(10),
-      offset: z.number().int().min(0).optional().default(0),
+      timeframe: z
+        .enum(["daily", "weekly", "monthly", "allTime"], {
+          invalid_type_error: "Invalid timeframe",
+        })
+        .optional()
+        .default("allTime"),
+      limit: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : undefined))
+        .pipe(z.number().int().min(1).max(100).optional()),
+      offset: z
+        .string()
+        .optional()
+        .transform((val) => (val ? parseInt(val, 10) : undefined))
+        .pipe(z.number().int().min(0).optional()),
+      fingerprintId: z.string().optional(),
     }),
   }),
 
   fingerprintParams: z.object({
     params: z.object({
-      id: z.string({
+      fingerprintId: z.string({
         required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
         invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
       }),

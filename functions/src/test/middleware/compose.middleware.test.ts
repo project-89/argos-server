@@ -1,5 +1,9 @@
 import { Request, Response, NextFunction } from "express";
-import { composeMiddleware, conditionalMiddleware, pathMiddleware } from "../../middleware/compose";
+import {
+  composeMiddleware,
+  conditionalMiddleware,
+  pathMiddleware,
+} from "../../middleware/compose.middleware";
 
 describe("Middleware Composition", () => {
   let mockReq: Partial<Request>;

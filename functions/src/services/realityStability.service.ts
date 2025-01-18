@@ -1,13 +1,7 @@
 import { getCurrentPrices } from "./price.service";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-
-export interface StabilityData {
-  stabilityIndex: number;
-  currentPrice: number;
-  priceChange: number;
-  timestamp: number;
-}
+import { RealityStabilityResponse } from "@/types/api.types";
 
 /**
  * Calculate reality stability index based on Project89 token price data.
@@ -17,7 +11,7 @@ export interface StabilityData {
  * - Minimum stability is 89% (reality can never be more unstable)
  * - Negative price movements return stability towards 100% (reality stabilizing)
  */
-export const calculateStabilityIndex = async (): Promise<StabilityData> => {
+export const calculateStabilityIndex = async (): Promise<RealityStabilityResponse> => {
   try {
     // Get current price data for Project89
     const prices = await getCurrentPrices(["project89"]);
