@@ -102,7 +102,7 @@ The Argos Server provides a comprehensive API for fingerprinting, tracking, and 
   - Body: `{ fingerprintId: string, metadata: object }`
 
 #### Visit & Presence Tracking
-- `POST /visit`
+- `POST /visit/log`
   - Log a visit
   - Body: `{ fingerprintId: string, url: string, title?: string }`
 - `POST /visit/presence`
@@ -169,6 +169,7 @@ interface ErrorResponse {
 - Sliding window implementation
 
 ### Protected Endpoints
+- Default: 300 requests per hour per IP
 - Default: 1000 requests per hour per API key
 - Configurable per endpoint
 - Separate limits for different operations

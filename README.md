@@ -111,7 +111,13 @@ Required environment variables:
 2. Write tests for new features
 3. Update documentation
 4. Run full test suite before submitting
+5. Follow file naming conventions:
+   - Services: `*.service.ts`
+   - Middleware: `*.middleware.ts`
+   - Endpoints: `*.endpoint.ts`
 
 ## License
 
-Proprietary - All rights reserved
+MIT License - see [LICENSE](LICENSE) for details.
+
+This is an open source project by Oneirocom.
