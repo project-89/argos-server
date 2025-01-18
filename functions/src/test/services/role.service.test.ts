@@ -11,7 +11,7 @@ import {
   assignRole,
   removeRole,
   getAvailableRoles,
-} from "../../services/roleService";
+} from "../../services/role.service";
 
 describe("Role Service", () => {
   const db = getFirestore();

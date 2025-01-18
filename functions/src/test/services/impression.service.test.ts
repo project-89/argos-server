@@ -5,7 +5,7 @@ import {
   createImpression,
   getImpressions,
   deleteImpressions,
-} from "../../services/impressionService";
+} from "../../services/impression.service";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase } from "../utils/testUtils";
 import { MockTimestamp } from "../utils/mockTimestamp";

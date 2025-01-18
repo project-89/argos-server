@@ -7,7 +7,7 @@ import {
   removeSiteAndVisits,
   extractDomain,
   verifyFingerprint,
-} from "../../services/visitService";
+} from "../../services/visit.service";
 import { ApiError } from "../../utils/error";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
 import { ERROR_MESSAGES } from "../../constants/api";

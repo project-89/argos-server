@@ -4,7 +4,7 @@ import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../uti
 import { ROLE } from "../../constants/roles";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
-import { validateApiKey } from "../../services/apiKeyService";
+import { validateApiKey } from "../../services/apiKey.service";
 
 describe("Role Check Middleware Test Suite", () => {
   let adminApiKey: string;

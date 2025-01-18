@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { getCachedData, setCachedData } from "../../services/cacheService";
+import { getCachedData, setCachedData } from "../../services/cache.service";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
 
 jest.mock("firebase-admin/firestore", () => ({

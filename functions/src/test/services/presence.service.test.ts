@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
-import { updatePresence, getPresence } from "../../services/presenceService";
+import { updatePresence, getPresence } from "../../services/presence.service";
 import { ApiError } from "../../utils/error";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
 import { ERROR_MESSAGES } from "../../constants/api";

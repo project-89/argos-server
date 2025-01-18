@@ -7,7 +7,7 @@ import {
   validateApiKey,
   deactivateApiKey,
   revokeApiKey,
-} from "../../services/apiKeyService";
+} from "../../services/apiKey.service";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
 import { ERROR_MESSAGES } from "../../constants/api";

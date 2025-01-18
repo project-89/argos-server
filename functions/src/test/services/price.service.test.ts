@@ -1,6 +1,6 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../../constants/collections";
-import { getCurrentPrices, getPriceHistory } from "../../services/priceService";
+import { getCurrentPrices, getPriceHistory } from "../../services/price.service";
 import { ERROR_MESSAGES } from "../../constants/api";
 
 jest.mock("node-fetch", () => {

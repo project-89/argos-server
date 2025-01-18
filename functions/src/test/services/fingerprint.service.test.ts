@@ -8,7 +8,7 @@ import {
   verifyFingerprint,
   updateFingerprintMetadata,
   getClientIp,
-} from "../../services/fingerprintService";
+} from "../../services/fingerprint.service";
 import { ApiError } from "../../utils/error";
 import { Request } from "express";
 

@@ -1,5 +1,5 @@
-import { calculateStabilityIndex } from "../../services/realityStabilityService";
-import { getCurrentPrices } from "../../services/priceService";
+import { calculateStabilityIndex } from "../../services/realityStability.service";
+import { getCurrentPrices } from "../../services/price.service";
 import { ApiError } from "../../utils/error";
 import { ERROR_MESSAGES } from "../../constants/api";
 
