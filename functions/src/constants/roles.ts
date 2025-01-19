@@ -7,7 +7,13 @@ export enum ROLE {
   ADMIN = "admin",
 }
 
-export type Permission = "admin" | "manage_roles" | "manage_tags";
+export type Permission =
+  | "admin"
+  | "manage_roles"
+  | "view_classified" // Access to sensitive data
+  | "manage_operations" // Can manage field operations
+  | "oversee_agents" // Can monitor and guide other agents
+  | "special_access"; // Special clearance for certain operations
 
 export const ROLE_HIERARCHY: Record<ROLE, number> = {
   [ROLE.USER]: 0,
@@ -21,8 +27,15 @@ export const ROLE_HIERARCHY: Record<ROLE, number> = {
 export const ROLE_PERMISSIONS: Record<ROLE, Permission[]> = {
   [ROLE.USER]: [],
   [ROLE.AGENT_INITIATE]: [],
-  [ROLE.AGENT_FIELD]: ["manage_tags"],
-  [ROLE.AGENT_SENIOR]: ["manage_tags", "manage_roles"],
-  [ROLE.AGENT_MASTER]: ["manage_tags", "manage_roles"],
-  [ROLE.ADMIN]: ["admin", "manage_roles", "manage_tags"],
+  [ROLE.AGENT_FIELD]: ["view_classified"],
+  [ROLE.AGENT_SENIOR]: ["view_classified", "manage_operations", "oversee_agents"],
+  [ROLE.AGENT_MASTER]: ["view_classified", "manage_operations", "oversee_agents", "special_access"],
+  [ROLE.ADMIN]: [
+    "admin",
+    "manage_roles",
+    "view_classified",
+    "manage_operations",
+    "oversee_agents",
+    "special_access",
+  ],
 };
