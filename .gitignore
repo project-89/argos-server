@@ -8,18 +8,16 @@ crash.log
 tfplan
 # Environment and secrets
 .env
-*.json
-!package.json
-!package-lock.json
+*-service-account*.json
+*-credentials*.json
+*-key*.json
+*-e32ad*.json
+.runtimeconfig.json
 
 # Dependencies and build artifacts
 node_modules/
 functions.zip
 temp_functions/
-
-# Service account keys
-*-e32ad60750b1.json
-*-compute@developer.gserviceaccount.com.json
 
 # Build and temporary files
 .DS_Store
@@ -65,6 +63,7 @@ build/
 *.swp
 *.swo
 .DS_Store
+cursorrules.json
 
 # Test coverage
 coverage/
