@@ -10,4 +10,8 @@ export const COLLECTIONS = {
   PRICE_CACHE: "priceCache",
   SITES: "sites",
   IMPRESSIONS: "impressions",
+  PROFILES: "profiles",
+  CAPABILITIES: "capabilities",
+  STATS: "stats",
+  STATS_HISTORY: "stats-history",
 } as const;

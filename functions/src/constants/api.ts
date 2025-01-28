@@ -20,31 +20,70 @@ export const HTTP_STATUS = {
 } as const;
 
 export const ERROR_MESSAGES = {
-  // Auth errors
+  // API Key errors
   INVALID_API_KEY: "Invalid API key",
   MISSING_API_KEY: "API key is required",
-  INSUFFICIENT_PERMISSIONS: "API key does not match fingerprint",
-  CORS_ERROR: "Request origin not allowed",
-  AUTHENTICATION_REQUIRED: "Authentication required",
-  ADMIN_REQUIRED: "Admin role required",
-  PERMISSION_REQUIRED: "Required permission not found",
+  INSUFFICIENT_PERMISSIONS: "Insufficient permissions",
 
-  // Resource errors
-  NOT_FOUND: "Resource not found",
+  // CORS errors
+  CORS_ERROR: "Request origin not allowed",
+
+  // Fingerprint errors
   FINGERPRINT_NOT_FOUND: "Fingerprint not found",
   INVALID_FINGERPRINT: "Invalid fingerprint",
+  FINGERPRINT_EXISTS: "Fingerprint already exists",
+
+  // Profile errors
+  PROFILE_NOT_FOUND: "Profile not found",
+  PROFILE_EXISTS: "Profile already exists for this wallet address",
+  WALLET_NOT_FOUND: "Wallet not found",
+  USERNAME_TAKEN: "Username is already taken",
+
+  // Stats errors
+  STATS_NOT_FOUND: "Stats not found",
+  STATS_EXIST: "Stats already exist",
+
+  // Capability errors
+  CAPABILITY_EXISTS: "Capability already exists for this profile",
+  INVALID_SKILL_LEVEL: "Skill level must be between 1 and 100",
+  CAPABILITY_ALREADY_VERIFIED: "Capability is already verified",
+  ALREADY_ENDORSED: "Already endorsed this capability",
+
+  // Visit errors
+  SITE_NOT_FOUND: "Site not found",
+  PERMISSION_REQUIRED: "Permission required",
+
+  // Tag errors
+  TAGGER_NOT_FOUND: "Tagger not found",
+  NOT_IT: "You're not it",
+  CANNOT_TAG_SELF: "Cannot tag yourself",
+  ALREADY_TAGGED: "Target is already tagged",
+  NO_TAGS_REMAINING: "No tags remaining",
+
+  // Role errors
+  FAILED_ASSIGN_ROLE: "Failed to assign role",
+
+  // Price errors
+  PRICE_DATA_NOT_FOUND: "Price data not found",
+  FAILED_GET_TOKEN_PRICE: "Failed to get token price",
+  INVALID_REQUEST: "Invalid request",
+
+  // Generic errors
+  NOT_FOUND: "Not found",
+  INTERNAL_ERROR: "Internal server error",
+  INVALID_INPUT: "Invalid input",
+
+  // Auth errors
+  AUTHENTICATION_REQUIRED: "Authentication required",
+  ADMIN_REQUIRED: "Admin role required",
   INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
   MISSING_FINGERPRINT: "Fingerprint is required",
   CANNOT_REMOVE_USER_ROLE: "Cannot remove user role",
   DATABASE_NOT_READY: "Database index not ready. Please try again in a few minutes.",
-  SITE_NOT_FOUND: "Site not found",
-  TAGGER_NOT_FOUND: "Tagger fingerprint not found",
+  TAG_NOT_FOUND: "Tag not found",
 
   // Tag game errors
-  CANNOT_TAG_SELF: "Cannot tag yourself",
-  ALREADY_TAGGED: "User already has this tag",
-  NOT_IT: "You must be 'it' to tag someone else",
-  NO_TAGS_REMAINING: "No daily tags remaining. Try again after 24 hours.",
+  NO_TAGS_REMAINING_GAME: "No tags remaining in the game",
 
   // Operation errors
   FAILED_CREATE_IMPRESSION: "Failed to create impression",
@@ -52,18 +91,15 @@ export const ERROR_MESSAGES = {
   FAILED_DELETE_IMPRESSIONS: "Failed to delete impressions",
   FAILED_UPDATE_PRESENCE: "Failed to update presence status",
   FAILED_GET_PRESENCE: "Failed to get presence status",
-  FAILED_ASSIGN_ROLE: "Failed to assign role",
   FAILED_REMOVE_ROLE: "Failed to remove role",
   FAILED_LOG_VISIT: "Failed to log visit",
   FAILED_UPDATE_PRESENCE_STATUS: "Failed to update presence status",
   FAILED_REMOVE_SITE: "Failed to remove site",
   FAILED_GET_VISIT_HISTORY: "Failed to get visit history",
   FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
-  FAILED_GET_TOKEN_PRICE: "Failed to get token price data",
   FAILED_UPDATE_ACTIVITY: "Failed to update activity timestamp",
 
   // Validation errors
-  INVALID_REQUEST: "Invalid request data",
   INVALID_QUERY: "Invalid query parameters",
   INVALID_PARAMS: "Invalid path parameters",
   MISSING_METADATA: "Metadata is required",
@@ -77,13 +113,11 @@ export const ERROR_MESSAGES = {
 
   // System errors
   RATE_LIMIT_EXCEEDED: "Rate limit exceeded",
-  INTERNAL_ERROR: "Internal server error",
   UNKNOWN_ERROR: "Unknown error occurred",
 
   MISSING_TAGS: "At least one tag must be provided",
   INVALID_TAG_TYPE: "Invalid tag type. Must be one of the allowed types.",
 
-  PRICE_DATA_NOT_FOUND: "No price data found for invalid-token",
   TOKEN_NOT_FOUND: "Token not found",
 } as const;
 

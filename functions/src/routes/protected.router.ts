@@ -6,6 +6,7 @@ import * as impression from "../endpoints/impression.endpoint";
 import * as tag from "../endpoints/tag.endpoint";
 import presence from "../endpoints/presence.endpoint";
 import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
+import * as profile from "../endpoints/profile.endpoint";
 
 const protectedRouter = Router();
 
@@ -40,5 +41,11 @@ protectedRouter.get("/tag/leaderboard", ...tag.getLeaderboard); // Public leader
 protectedRouter.get("/tag/user/:fingerprintId", verifyOwnership, ...tag.getUserTags);
 protectedRouter.get("/tag/history/:fingerprintId", verifyOwnership, ...tag.getTagHistory);
 protectedRouter.get("/tag/check/:fingerprintId/:tagType", verifyOwnership, ...tag.checkTag);
+
+// Profile routes
+protectedRouter.post("/profile", ...profile.createProfile);
+protectedRouter.get("/profile/:id", ...profile.getProfile);
+protectedRouter.get("/profile/wallet/:walletAddress", ...profile.getProfileByWallet);
+protectedRouter.patch("/profile/:id", ...profile.updateProfile);
 
 export default protectedRouter;

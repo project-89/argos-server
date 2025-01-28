@@ -5,6 +5,20 @@ import { ERROR_MESSAGES } from "../constants/api";
 // Common sub-schemas
 const tagsSchema = z.record(z.number());
 
+// Profile schemas
+const contactInfoSchema = z.object({
+  email: z.string().email().optional(),
+  discord: z.string().optional(),
+  twitter: z.string().optional(),
+  github: z.string().optional(),
+});
+
+const preferencesSchema = z.object({
+  isProfilePublic: z.boolean().optional(),
+  showContactInfo: z.boolean().optional(),
+  showStats: z.boolean().optional(),
+});
+
 // Request schemas
 export const schemas = {
   // Fingerprint schemas
@@ -364,6 +378,49 @@ export const schemas = {
       }),
     }),
     body: z.object({}).optional(),
+    query: z.object({}).optional(),
+  }),
+
+  profileCreate: z.object({
+    body: z.object({
+      walletAddress: z.string(),
+      username: z.string().min(3).max(30),
+      bio: z.string().max(500).optional(),
+      avatarUrl: z.string().url().optional(),
+      contactInfo: contactInfoSchema.optional(),
+      preferences: preferencesSchema.optional(),
+    }),
+    query: z.object({}).optional(),
+    params: z.object({}).optional(),
+  }),
+
+  profileGet: z.object({
+    params: z.object({
+      id: z.string(),
+    }),
+    query: z.object({}).optional(),
+    body: z.object({}).optional(),
+  }),
+
+  profileGetByWallet: z.object({
+    params: z.object({
+      walletAddress: z.string(),
+    }),
+    query: z.object({}).optional(),
+    body: z.object({}).optional(),
+  }),
+
+  profileUpdate: z.object({
+    params: z.object({
+      id: z.string(),
+    }),
+    body: z.object({
+      username: z.string().min(3).max(30).optional(),
+      bio: z.string().max(500).optional(),
+      avatarUrl: z.string().url().optional(),
+      contactInfo: contactInfoSchema.optional(),
+      preferences: preferencesSchema.optional(),
+    }),
     query: z.object({}).optional(),
   }),
 } as const;
