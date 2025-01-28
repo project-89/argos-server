@@ -130,6 +130,9 @@ export const ENDPOINTS = {
   TAGS: "/tags",
   PRICE: "/price",
   STABILITY: "/stability",
+  PROFILE: "/profile",
+  STATS: "/stats",
+  CAPABILITIES: "/capabilities",
 } as const;
 
 export const PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price";
