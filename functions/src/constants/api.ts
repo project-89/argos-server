@@ -45,6 +45,7 @@ export const ERROR_MESSAGES = {
 
   // Capability errors
   CAPABILITY_EXISTS: "Capability already exists for this profile",
+  SIMILAR_CAPABILITY_EXISTS: "A similar capability already exists",
   INVALID_SKILL_LEVEL: "Skill level must be between 1 and 100",
   CAPABILITY_ALREADY_VERIFIED: "Capability is already verified",
   ALREADY_ENDORSED: "Already endorsed this capability",

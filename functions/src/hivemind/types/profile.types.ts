@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase-admin/firestore";
+import { Stats } from "./stats.types";
 
 export interface ContactInfo {
   email?: string;
@@ -16,6 +17,7 @@ export interface ProfilePreferences {
 export interface ProfileModel {
   id: string;
   walletAddress: string;
+  fingerprintId: string;
   username: string;
   bio: string;
   avatarUrl: string;
@@ -36,6 +38,7 @@ export interface ProfileModel {
 export interface Profile {
   id: string;
   walletAddress: string;
+  fingerprintId: string;
   username: string;
   bio: string;
   avatarUrl: string;
@@ -52,8 +55,13 @@ export interface Profile {
   updatedAt: number; // Unix timestamp
 }
 
+export interface ProfileWithStats extends Profile {
+  stats: Stats | null;
+}
+
 export interface CreateProfileInput {
   walletAddress: string;
+  fingerprintId: string;
   username: string;
   bio?: string;
   avatarUrl?: string;

@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
-import { cleanDatabase } from "../utils/testUtils";
-import { profileService } from "../../services/profile.service";
+import { COLLECTIONS } from "../../../constants/collections";
+import { cleanDatabase } from "../../utils/testUtils";
+import { profileService } from "../../../hivemind/services/profile.service";
 
 describe("ProfileService", () => {
   const db = getFirestore();
   const testWalletAddress = "0x1234567890123456789012345678901234567890";
+  const testFingerprintId = "test-fingerprint-id";
 
   beforeEach(async () => {
     await cleanDatabase();
@@ -16,10 +17,10 @@ describe("ProfileService", () => {
     await cleanDatabase();
   });
 
-  // Helper function to compare profiles without timestamps
+  // Helper function to compare profiles without timestamps and stats
   const compareProfilesWithoutTimestamps = (profile1: any, profile2: any) => {
-    const { createdAt: _c1, updatedAt: _u1, ...rest1 } = profile1;
-    const { createdAt: _c2, updatedAt: _u2, ...rest2 } = profile2;
+    const { createdAt: _c1, updatedAt: _u1, stats: _s1, ...rest1 } = profile1;
+    const { createdAt: _c2, updatedAt: _u2, stats: _s2, ...rest2 } = profile2;
     expect(rest1).toEqual(rest2);
   };
 
@@ -27,6 +28,7 @@ describe("ProfileService", () => {
     it("should create a new profile", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
         bio: "Test bio",
         avatarUrl: "https://example.com/avatar.png",
@@ -40,6 +42,7 @@ describe("ProfileService", () => {
 
       expect(profile).toMatchObject({
         walletAddress: input.walletAddress,
+        fingerprintId: input.fingerprintId,
         username: input.username,
         bio: input.bio,
         avatarUrl: input.avatarUrl,
@@ -64,11 +67,23 @@ describe("ProfileService", () => {
       });
       expect(data?.createdAt).toBeInstanceOf(Timestamp);
       expect(data?.updatedAt).toBeInstanceOf(Timestamp);
+
+      // Verify stats were created
+      const statsDoc = await db.collection(COLLECTIONS.STATS).doc(profile.id).get();
+      expect(statsDoc.exists).toBe(true);
+      const statsData = statsDoc.data();
+      expect(statsData).toMatchObject({
+        missionsCompleted: 0,
+        successRate: 0,
+        totalRewards: 0,
+        reputation: 0,
+      });
     });
 
     it("should throw error if wallet address already has a profile", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       };
 
@@ -85,6 +100,7 @@ describe("ProfileService", () => {
     it("should throw error if username is taken", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       };
 
@@ -93,6 +109,7 @@ describe("ProfileService", () => {
       await expect(
         profileService.createProfile({
           walletAddress: "0x0987654321098765432109876543210987654321",
+          fingerprintId: "different-fingerprint",
           username: "testuser",
         }),
       ).rejects.toThrow("Username is already taken");
@@ -103,6 +120,7 @@ describe("ProfileService", () => {
     it("should get a profile by id", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       };
 
@@ -114,6 +132,13 @@ describe("ProfileService", () => {
       expect(typeof profile.updatedAt).toBe("number");
       expect(profile.createdAt).toBe(created.createdAt);
       expect(profile.updatedAt).toBe(created.updatedAt);
+      expect(profile.stats).toBeDefined();
+      expect(profile.stats).toMatchObject({
+        missionsCompleted: 0,
+        successRate: 0,
+        totalRewards: 0,
+        reputation: 0,
+      });
     });
 
     it("should throw error if profile not found", async () => {
@@ -127,6 +152,7 @@ describe("ProfileService", () => {
     it("should get a profile by wallet address", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       };
 
@@ -138,6 +164,13 @@ describe("ProfileService", () => {
       expect(typeof profile.updatedAt).toBe("number");
       expect(profile.createdAt).toBe(created.createdAt);
       expect(profile.updatedAt).toBe(created.updatedAt);
+      expect(profile.stats).toBeDefined();
+      expect(profile.stats).toMatchObject({
+        missionsCompleted: 0,
+        successRate: 0,
+        totalRewards: 0,
+        reputation: 0,
+      });
     });
 
     it("should throw error if profile not found", async () => {
@@ -151,6 +184,7 @@ describe("ProfileService", () => {
     it("should update a profile", async () => {
       const input = {
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       };
 
@@ -197,12 +231,14 @@ describe("ProfileService", () => {
       // Create first profile
       await profileService.createProfile({
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser1",
       });
 
       // Create second profile
       const profile2 = await profileService.createProfile({
         walletAddress: "0x0987654321098765432109876543210987654321",
+        fingerprintId: "different-fingerprint",
         username: "testuser2",
       });
 
@@ -215,6 +251,7 @@ describe("ProfileService", () => {
     it("should allow updating to same username", async () => {
       const created = await profileService.createProfile({
         walletAddress: testWalletAddress,
+        fingerprintId: testFingerprintId,
         username: "testuser",
       });
 

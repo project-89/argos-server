@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
-import { cleanDatabase } from "../utils/testUtils";
-import { statsService } from "../../services/stats.service";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { COLLECTIONS } from "../../../constants/collections";
+import { cleanDatabase } from "../../utils/testUtils";
+import { ERROR_MESSAGES } from "../../../constants/api";
+import { statsService } from "../../../hivemind/services/stats.service";
+import { profileService } from "../../../hivemind/services/profile.service";
 
 describe("StatsService", () => {
   const db = getFirestore();
-  const testProfileId = "test-profile-id";
+  const testWalletAddress = "0x1234567890123456789012345678901234567890";
+  const testFingerprintId = "test-fingerprint-id";
 
   beforeEach(async () => {
     await cleanDatabase();
@@ -17,12 +19,23 @@ describe("StatsService", () => {
     await cleanDatabase();
   });
 
-  describe("initializeStats", () => {
-    it("should initialize stats for a profile", async () => {
-      const stats = await statsService.initializeStats(testProfileId);
+  // Helper function to create a profile and get its stats
+  const createProfileWithStats = async () => {
+    const profile = await profileService.createProfile({
+      walletAddress: testWalletAddress,
+      fingerprintId: testFingerprintId,
+      username: "testuser",
+    });
+    const stats = await statsService.getStats(profile.id);
+    return { profile, stats };
+  };
+
+  describe("getStats", () => {
+    it("should get stats for a profile", async () => {
+      const { profile, stats } = await createProfileWithStats();
 
       expect(stats).toMatchObject({
-        id: testProfileId,
+        id: profile.id,
         missionsCompleted: 0,
         successRate: 0,
         totalRewards: 0,
@@ -32,48 +45,6 @@ describe("StatsService", () => {
       expect(typeof stats.lastActive).toBe("number");
       expect(typeof stats.createdAt).toBe("number");
       expect(typeof stats.updatedAt).toBe("number");
-
-      // Verify in database
-      const doc = await db.collection(COLLECTIONS.STATS).doc(testProfileId).get();
-      expect(doc.exists).toBe(true);
-      const data = doc.data();
-      expect(data).toMatchObject({
-        id: testProfileId,
-        missionsCompleted: 0,
-        successRate: 0,
-        totalRewards: 0,
-        reputation: 0,
-      });
-      expect(data?.joinedAt).toBeInstanceOf(Timestamp);
-      expect(data?.lastActive).toBeInstanceOf(Timestamp);
-      expect(data?.createdAt).toBeInstanceOf(Timestamp);
-      expect(data?.updatedAt).toBeInstanceOf(Timestamp);
-    });
-
-    it("should throw error if stats already exist", async () => {
-      await statsService.initializeStats(testProfileId);
-      await expect(statsService.initializeStats(testProfileId)).rejects.toThrow(
-        ERROR_MESSAGES.STATS_EXIST,
-      );
-    });
-  });
-
-  describe("getStats", () => {
-    it("should get stats for a profile", async () => {
-      const created = await statsService.initializeStats(testProfileId);
-      const stats = await statsService.getStats(testProfileId);
-
-      expect(stats).toMatchObject({
-        id: testProfileId,
-        missionsCompleted: 0,
-        successRate: 0,
-        totalRewards: 0,
-        reputation: 0,
-      });
-      expect(stats.joinedAt).toBe(created.joinedAt);
-      expect(stats.lastActive).toBe(created.lastActive);
-      expect(stats.createdAt).toBe(created.createdAt);
-      expect(stats.updatedAt).toBe(created.updatedAt);
     });
 
     it("should throw error if stats not found", async () => {
@@ -85,7 +56,7 @@ describe("StatsService", () => {
 
   describe("updateStats", () => {
     it("should update stats for a profile", async () => {
-      const created = await statsService.initializeStats(testProfileId);
+      const { profile, stats: created } = await createProfileWithStats();
       const updates = {
         missionsCompleted: 1,
         successRate: 100,
@@ -93,10 +64,10 @@ describe("StatsService", () => {
         reputation: 10,
       };
 
-      const updated = await statsService.updateStats(testProfileId, updates);
+      const updated = await statsService.updateStats(profile.id, updates);
 
       expect(updated).toMatchObject({
-        id: testProfileId,
+        id: profile.id,
         ...updates,
       });
       expect(updated.joinedAt).toBe(created.joinedAt);
@@ -105,11 +76,11 @@ describe("StatsService", () => {
       expect(updated.updatedAt).toBeGreaterThan(created.updatedAt);
 
       // Verify in database
-      const doc = await db.collection(COLLECTIONS.STATS).doc(testProfileId).get();
+      const doc = await db.collection(COLLECTIONS.STATS).doc(profile.id).get();
       expect(doc.exists).toBe(true);
       const data = doc.data();
       expect(data).toMatchObject({
-        id: testProfileId,
+        id: profile.id,
         ...updates,
       });
       expect(data?.joinedAt).toBeInstanceOf(Timestamp);
@@ -127,18 +98,18 @@ describe("StatsService", () => {
 
   describe("recordHistory", () => {
     it("should record stats history", async () => {
-      const stats = await statsService.initializeStats(testProfileId);
-      await statsService.recordHistory(testProfileId, stats);
+      const { profile, stats } = await createProfileWithStats();
+      await statsService.recordHistory(profile.id, stats);
 
       const snapshot = await db
         .collection(COLLECTIONS.STATS_HISTORY)
-        .where("stats.id", "==", testProfileId)
+        .where("stats.id", "==", profile.id)
         .get();
 
       expect(snapshot.empty).toBe(false);
       const data = snapshot.docs[0].data();
       expect(data.stats).toMatchObject({
-        id: testProfileId,
+        id: profile.id,
         missionsCompleted: 0,
         successRate: 0,
         totalRewards: 0,
@@ -154,14 +125,14 @@ describe("StatsService", () => {
 
   describe("updateLastActive", () => {
     it("should update last active timestamp", async () => {
-      const created = await statsService.initializeStats(testProfileId);
+      const { profile, stats: created } = await createProfileWithStats();
 
       // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      await statsService.updateLastActive(testProfileId);
+      await statsService.updateLastActive(profile.id);
 
-      const updated = await statsService.getStats(testProfileId);
+      const updated = await statsService.getStats(profile.id);
       expect(updated.lastActive).toBeGreaterThan(created.lastActive);
       expect(updated.updatedAt).toBeGreaterThan(created.updatedAt);
     });
@@ -175,19 +146,19 @@ describe("StatsService", () => {
 
   describe("calculateSuccessRate", () => {
     it("should return 0 if no missions completed", async () => {
-      await statsService.initializeStats(testProfileId);
-      const rate = await statsService.calculateSuccessRate(testProfileId);
+      const { profile } = await createProfileWithStats();
+      const rate = await statsService.calculateSuccessRate(profile.id);
       expect(rate).toBe(0);
     });
 
     it("should return success rate if missions completed", async () => {
-      await statsService.initializeStats(testProfileId);
-      await statsService.updateStats(testProfileId, {
+      const { profile } = await createProfileWithStats();
+      await statsService.updateStats(profile.id, {
         missionsCompleted: 10,
         successRate: 80,
       });
 
-      const rate = await statsService.calculateSuccessRate(testProfileId);
+      const rate = await statsService.calculateSuccessRate(profile.id);
       expect(rate).toBe(80);
     });
 
@@ -200,24 +171,24 @@ describe("StatsService", () => {
 
   describe("updateReputation", () => {
     it("should update reputation", async () => {
-      await statsService.initializeStats(testProfileId);
-      const updated = await statsService.updateReputation(testProfileId, 10);
+      const { profile } = await createProfileWithStats();
+      const updated = await statsService.updateReputation(profile.id, 10);
       expect(updated.reputation).toBe(10);
     });
 
     it("should not allow reputation to go below 0", async () => {
-      await statsService.initializeStats(testProfileId);
-      const updated = await statsService.updateReputation(testProfileId, -10);
+      const { profile } = await createProfileWithStats();
+      const updated = await statsService.updateReputation(profile.id, -10);
       expect(updated.reputation).toBe(0);
     });
 
     it("should handle both positive and negative changes", async () => {
-      await statsService.initializeStats(testProfileId);
+      const { profile } = await createProfileWithStats();
 
-      let updated = await statsService.updateReputation(testProfileId, 20);
+      let updated = await statsService.updateReputation(profile.id, 20);
       expect(updated.reputation).toBe(20);
 
-      updated = await statsService.updateReputation(testProfileId, -5);
+      updated = await statsService.updateReputation(profile.id, -5);
       expect(updated.reputation).toBe(15);
     });
 
