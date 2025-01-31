@@ -1,17 +1,16 @@
-export * from "./api";
+// Database models (Firestore schema)
 export * from "./models";
+
+// Service types
 export * from "./services";
 
-// Additional utility types that don't fit in other categories
-export type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-
-export type Nullable<T> = T | null;
-
-export type AsyncFunction<T = any> = (...args: any[]) => Promise<T>;
-
-export type ErrorWithMessage = {
-  message: string;
-  [key: string]: any;
-};
+// API types
+export * from "./api-core.types";
+export * from "./auth.types";
+export * from "./visit.types";
+export * from "./impression.types";
+export * from "./price.types";
+export * from "./stability.types";
+export * from "./cleanup.types";
+export * from "./tag.types";
+export * from "./fingerprint.types";

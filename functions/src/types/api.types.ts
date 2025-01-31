@@ -35,6 +35,13 @@ export interface ApiErrorResponse {
 
 export type ApiResponse<T = any> = ApiSuccessResponse<T> | ApiErrorResponse;
 
+// Simple API Response type (preserved from api.ts)
+export interface SimpleApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
 /**
  * Authentication Types
  */
@@ -43,6 +50,12 @@ export interface RegisterApiKeyRequest {
   fingerprintId: string;
   metadata?: Record<string, any>;
   agentType?: string;
+}
+
+// Preserved both naming conventions for fingerprint registration
+export interface RegisterFingerprintRequest {
+  fingerprint: string;
+  metadata?: Record<string, any>;
 }
 
 export interface FingerprintRegistrationRequest {
