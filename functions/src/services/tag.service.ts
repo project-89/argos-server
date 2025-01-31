@@ -5,12 +5,12 @@ import { ERROR_MESSAGES, ALLOWED_TAG_TYPES, TagType } from "../constants/api";
 import {
   TagData,
   TagUserResponse,
-  FingerprintData,
   TagStatsDocument,
   TagLeaderboardEntry,
   TagLeaderboardResponse,
   GetUserTagsResponse,
-} from "../types/api.types";
+} from "@/types/tag.types";
+import { FingerprintData } from "@/types";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = 10;
@@ -404,6 +404,8 @@ export const getTagLeaderboard = async (
         lastTagAt: data.lastTagAt,
         streak: data.streak,
         tagTypes: data.tagTypes || {},
+        createdAt: data.createdAt,
+        updatedAt: data.updatedAt,
       });
 
       // If this is the current user, set their rank
@@ -412,11 +414,19 @@ export const getTagLeaderboard = async (
       }
     });
 
-    return {
+    const response: TagLeaderboardResponse = {
       timeframe,
-      entries,
+      entries: entries.map((entry) => ({
+        ...entry,
+        lastTagAt: entry.lastTagAt.toMillis(),
+        createdAt: entry.createdAt.toMillis(),
+        updatedAt: entry.updatedAt.toMillis(),
+      })),
       userRank,
+      generatedAt: Timestamp.now().toMillis(),
     };
+
+    return response;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getTagLeaderboard:`, error);
     if (error instanceof ApiError) {

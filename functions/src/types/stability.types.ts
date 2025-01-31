@@ -12,7 +12,7 @@ export interface RealityStabilityResponse {
   stabilityIndex: number;
   currentPrice: number;
   priceChange: number;
-  timestamp: number; // Unix timestamp for API response
+  timestamp: number; // Unix timestamp
 }
 
 export interface StabilityDocument {

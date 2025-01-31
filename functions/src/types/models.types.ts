@@ -69,7 +69,7 @@ export interface Site {
   domain: string;
   fingerprintId: string;
   createdAt: Timestamp; // Converted to Unix timestamp for API responses
-  lastVisited: number;
+  lastVisited: Timestamp; // Converted to Unix timestamp for API responses
   title?: string;
   visits: number;
   settings: {

@@ -5,7 +5,7 @@ import { updatePresence, getPresence, updateActivity } from "../services/presenc
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
-import { schemas } from "../types/schemas";
+import { schemas } from "../schemas/schemas";
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 

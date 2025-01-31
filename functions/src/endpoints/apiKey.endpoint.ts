@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { schemas } from "../types/schemas";
+import { schemas } from "../schemas/schemas";
 import { createApiKey, validateApiKey, revokeApiKey } from "../services/apiKey.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";

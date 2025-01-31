@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
-import { Impression } from "../types/models";
+import { Impression } from "../types/models.types";
 import { ApiError } from "../utils/error";
 import { getCurrentTimestamp } from "../utils/timestamp";
 import { ERROR_MESSAGES } from "../constants/api";

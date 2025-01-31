@@ -3,6 +3,8 @@
  * Contains types for API key management and fingerprint registration
  */
 
+import { Timestamp } from "firebase-admin/firestore";
+
 /**
  * API Key Management
  */
@@ -52,10 +54,32 @@ export interface FingerprintRegistrationResponse {
 }
 
 /**
- * API Endpoints Configuration
+ * Database Documents
+ */
+export interface ApiKeyDocument {
+  id: string;
+  key: string;
+  name: string;
+  fingerprintId: string;
+  metadata?: Record<string, any>;
+  agentType?: string;
+  createdAt: Timestamp;
+  lastUsed: Timestamp;
+  active: boolean;
+}
+
+export interface FingerprintRegistrationDocument {
+  id: string;
+  fingerprint: string;
+  metadata?: Record<string, any>;
+  createdAt: Timestamp;
+  lastRegistered: Timestamp;
+}
+
+/**
+ * Auth Endpoints
  */
 export const AUTH_ENDPOINTS = {
-  // Authentication
   REGISTER_FINGERPRINT: "/fingerprint/register",
   REGISTER_API_KEY: "/api-key/register",
   VALIDATE_API_KEY: "/api-key/validate",

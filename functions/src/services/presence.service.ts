@@ -3,7 +3,7 @@ import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { getCurrentUnixMillis } from "../utils/timestamp";
 import { ERROR_MESSAGES } from "../constants/api";
-import { VisitPresence } from "../types/api.types";
+import { VisitPresence } from "@/types/visit.types";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;

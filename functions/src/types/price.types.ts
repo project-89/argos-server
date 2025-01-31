@@ -11,7 +11,6 @@ import { Timestamp } from "firebase-admin/firestore";
 export interface TokenPriceData {
   usd: number;
   usd_24h_change: number;
-  lastUpdated: number; // Unix timestamp for API response
 }
 
 export interface PriceResponse {
@@ -19,7 +18,7 @@ export interface PriceResponse {
 }
 
 export interface PriceHistoryDataPoint {
-  timestamp: number; // Unix timestamp for API response
+  timestamp: number; // Unix timestamp
   price: number;
 }
 

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
 import { statsService } from "../services/stats.service";
 import { validateRequest } from "../../middleware/validation.middleware";
-import { hivemindSchemas } from "../types/schemes";
+import { StatsGetSchema, StatsUpdateSchema } from "../schemas";
 import { sendError, sendSuccess } from "../../utils/response";
 import { ApiError } from "../../utils/error";
 
@@ -9,7 +9,7 @@ import { ApiError } from "../../utils/error";
  * Get stats for a profile
  */
 export const getStats = [
-  validateRequest(hivemindSchemas.statsGet),
+  validateRequest(StatsGetSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Get Stats] Starting with params:", req.params);
@@ -36,7 +36,7 @@ export const getStats = [
  * Update stats for a profile
  */
 export const updateStats = [
-  validateRequest(hivemindSchemas.statsUpdate),
+  validateRequest(StatsUpdateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Update Stats] Starting with:", {

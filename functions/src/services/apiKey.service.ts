@@ -1,11 +1,12 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
-import { ApiKey } from "../types/models";
+import { ApiKey } from "../types/models.types";
 import { ApiError } from "../utils/error";
 import { generateApiKey } from "../utils/api-key";
 import { toUnixMillis } from "../utils/timestamp";
-import { ApiKeyValidationResponse } from "../types/api.types";
+
 import { ERROR_MESSAGES } from "../constants/api";
+import { ApiKeyValidationResponse } from "@/types/auth.types";
 
 // Type for API response that converts Timestamp to Unix time
 type ApiKeyResponse = Omit<ApiKey, "createdAt"> & { createdAt: number };
@@ -104,26 +105,12 @@ export const getApiKeyByKey = async (key: string): Promise<ApiKeyResponse | null
   const data = doc.data();
   console.log("[getApiKeyByKey] Found key data:", { keyId: doc.id, active: data.active });
 
-  // Handle different timestamp formats
-  let timestamp: Timestamp;
-  if (data.createdAt instanceof Timestamp) {
-    timestamp = data.createdAt;
-  } else if (typeof data.createdAt === "object" && data.createdAt._seconds !== undefined) {
-    // Handle raw Firestore timestamp data
-    timestamp = new Timestamp(data.createdAt._seconds, data.createdAt._nanoseconds || 0);
-  } else if (typeof data.createdAt === "number") {
-    timestamp = Timestamp.fromMillis(data.createdAt);
-  } else {
-    console.error("[getApiKeyByKey] Invalid timestamp format:", data.createdAt);
-    timestamp = Timestamp.now(); // Fallback to current time
-  }
-
   return {
     key: data.key,
     fingerprintId: data.fingerprintId,
     active: data.active,
     id: doc.id,
-    createdAt: timestamp.toMillis(),
+    createdAt: data.createdAt.toMillis(),
   };
 };
 
@@ -140,16 +127,12 @@ export const getApiKeys = async (fingerprintId: string): Promise<ApiKeyResponse[
 
   return snapshot.docs.map((doc) => {
     const data = doc.data() as ApiKey;
-    // Ensure we have a valid Firestore Timestamp
-    const createdAt =
-      data.createdAt instanceof Timestamp ? data.createdAt : Timestamp.fromMillis(data.createdAt);
-
     return {
       key: data.key,
       fingerprintId: data.fingerprintId,
       active: data.active,
       id: doc.id,
-      createdAt: toUnixMillis(createdAt),
+      createdAt: data.createdAt.toMillis(),
     };
   });
 };

@@ -8,7 +8,7 @@ import {
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-import { schemas } from "../types/schemas";
+import { schemas } from "../schemas/schemas";
 
 // Extend Request type to include fingerprint
 interface AuthenticatedRequest extends Request {

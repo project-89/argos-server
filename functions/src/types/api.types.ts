@@ -4,7 +4,7 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
-import type { Impression as ImpressionModel } from "./models";
+import type { Impression as ImpressionModel } from "./models.types";
 
 /**
  * Standard API Response Format

@@ -2,8 +2,9 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
-import { Visit, Site, VisitHistoryResponse, SiteModel, VisitPresence } from "../types/api.types";
+import { Visit, Site, VisitHistoryResponse, SiteModel, VisitPresence, ApiVisit } from "@/types";
 import { ERROR_MESSAGES } from "../constants/api";
+import { toUnixMillis } from "@/utils/timestamp";
 
 /**
  * Extracts domain from URL
@@ -63,7 +64,7 @@ export const logVisit = async (
 
   if (sitesSnapshot.empty) {
     // Create new site
-    const newSite: Site = {
+    const newSite: Omit<Site, "id"> = {
       domain,
       fingerprintId,
       lastVisited: now,
@@ -90,7 +91,6 @@ export const logVisit = async (
     siteId = siteDoc.id;
     const siteData = siteDoc.data() as Site;
     site = {
-      id: siteId,
       ...siteData,
       lastVisited: now.toMillis(),
       createdAt: siteData.createdAt.toMillis(),
@@ -106,26 +106,26 @@ export const logVisit = async (
   }
 
   // Log the visit
-  const visitData: Visit = {
+  const visitData: Omit<ApiVisit, "id"> = {
     fingerprintId,
     url,
     title: title || undefined,
     siteId,
-    timestamp: now,
+    createdAt: now,
     ...(clientIp && { clientIp }),
   };
 
-  // Remove any undefined values
+  // Filter out undefined values
   const sanitizedVisitData = Object.fromEntries(
     Object.entries(visitData).filter(([_, value]) => value !== undefined),
-  ) as Visit;
+  );
 
   const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
 
   return {
     id: visitRef.id,
-    ...sanitizedVisitData,
-    timestamp: sanitizedVisitData.timestamp.toMillis(),
+    ...visitData,
+    createdAt: toUnixMillis(now),
     site,
   };
 };
@@ -203,15 +203,14 @@ export const getVisitHistory = async (fingerprintId: string): Promise<VisitHisto
         const response: VisitHistoryResponse = {
           ...visitData,
           id: doc.id,
-          timestamp: visitData.timestamp.toMillis(),
+          createdAt: toUnixMillis(visitData.createdAt),
         };
         if (siteDoc.exists) {
           const siteData = siteDoc.data() as Site;
           response.site = {
-            id: siteDoc.id,
             ...siteData,
-            lastVisited: siteData.lastVisited.toMillis(),
-            createdAt: siteData.createdAt.toMillis(),
+            lastVisited: toUnixMillis(siteData.lastVisited),
+            createdAt: toUnixMillis(siteData.createdAt),
           };
         }
         return response;

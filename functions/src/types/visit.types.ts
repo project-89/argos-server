@@ -4,7 +4,6 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
-import { Site as SiteModel, Visit as VisitModel } from "./models";
 
 /**
  * Visit Tracking
@@ -16,8 +15,14 @@ export interface LogVisitRequest {
   timestamp?: number; // Unix timestamp
 }
 
-export interface VisitResponse extends Omit<VisitModel, "createdAt"> {
-  createdAt: number; // Unix timestamp for API responses
+export interface ApiVisit {
+  id: string;
+  fingerprintId: string;
+  url: string;
+  title: string | undefined;
+  siteId: string;
+  clientIp?: string;
+  createdAt: Timestamp;
 }
 
 export interface VisitHistoryResponse {
@@ -27,10 +32,10 @@ export interface VisitHistoryResponse {
   url: string;
   title?: string;
   siteId: string;
-  site?: SiteResponse;
+  site?: SiteModel;
 }
 
-export interface VisitData {
+export interface ApiVisitData {
   id: string;
   fingerprintId: string;
   siteId: string;
@@ -40,7 +45,21 @@ export interface VisitData {
 /**
  * Site Management
  */
-export interface SiteResponse extends Omit<SiteModel, "createdAt" | "lastVisited"> {
+export interface ApiSite {
+  domain: string;
+  fingerprintId: string;
+  lastVisited: Timestamp;
+  title?: string;
+  visits: number;
+  settings: {
+    notifications: boolean;
+    privacy: "public" | "private";
+  };
+  createdAt: Timestamp;
+}
+
+export interface SiteModel extends Omit<ApiSite, "lastVisited" | "createdAt"> {
+  id: string;
   lastVisited: number; // Unix timestamp for API responses
   createdAt: number; // Unix timestamp for API responses
 }
@@ -62,14 +81,13 @@ export interface UpdatePresenceRequest {
 export interface VisitPresence {
   fingerprintId: string;
   status: "online" | "offline" | "away";
-  lastUpdated: Timestamp;
-  createdAt: Timestamp;
+  lastUpdated: number; // Unix timestamp for tracking last activity/status update
 }
 
 /**
  * Visit Analysis
  */
-export interface VisitPattern {
+export interface ApiVisitPattern {
   currentSite: string;
   nextSite: string;
   transitionCount: number;
@@ -83,11 +101,10 @@ export interface SiteEngagement {
   averageTimeSpent: number;
   returnRate: number;
   commonNextSites: string[];
-  lastEngagement: Timestamp;
 }
 
 export interface VisitAnalysis {
-  patterns: VisitPattern[];
+  patterns: ApiVisitPattern[];
   engagement: SiteEngagement[];
   analyzedAt: Timestamp;
 }

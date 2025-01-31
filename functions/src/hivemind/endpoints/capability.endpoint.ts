@@ -2,15 +2,21 @@ import { Request, Response } from "express";
 import { capabilityService } from "../services/capability.service";
 import { skillMatchingService } from "../services/skillMatching.service";
 import { validateRequest } from "../../middleware/validation.middleware";
-import { hivemindSchemas } from "../types/schemes";
 import { sendError, sendSuccess } from "../../utils/response";
 import { ApiError } from "../../utils/error";
+import {
+  CapabilityCreateSchema,
+  CapabilityDeleteSchema,
+  CapabilityGetSchema,
+  CapabilityUpdateSchema,
+  SkillSearchSchema,
+} from "../schemas";
 
 /**
  * Create a new capability for a profile
  */
 export const createCapability = [
-  validateRequest(hivemindSchemas.capabilityCreate),
+  validateRequest(CapabilityCreateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Create Capability] Starting with:", {
@@ -39,7 +45,7 @@ export const createCapability = [
  * Get capabilities for a profile
  */
 export const getCapabilities = [
-  validateRequest(hivemindSchemas.capabilityGet),
+  validateRequest(CapabilityGetSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Get Capabilities] Starting with params:", req.params);
@@ -67,7 +73,7 @@ export const getCapabilities = [
  * Update a capability
  */
 export const updateCapability = [
-  validateRequest(hivemindSchemas.capabilityUpdate),
+  validateRequest(CapabilityUpdateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Update Capability] Starting with:", {
@@ -100,7 +106,7 @@ export const updateCapability = [
  * Delete a capability
  */
 export const deleteCapability = [
-  validateRequest(hivemindSchemas.capabilityDelete),
+  validateRequest(CapabilityDeleteSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Delete Capability] Starting with params:", req.params);
@@ -128,7 +134,7 @@ export const deleteCapability = [
  * Find similar skills based on name and description
  */
 export const findSimilarSkills = [
-  validateRequest(hivemindSchemas.skillSearch),
+  validateRequest(SkillSearchSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Find Similar Skills] Starting with query:", req.query);

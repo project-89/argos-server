@@ -1,12 +1,13 @@
 // Database models (Firestore schema)
-export * from "./models";
+export * from "./models.types";
 
 // Service types
-export * from "./services";
+export * from "./services.types";
 
 // API types
 export * from "./api-core.types";
 export * from "./auth.types";
+export * from "./role.types";
 export * from "./visit.types";
 export * from "./impression.types";
 export * from "./price.types";

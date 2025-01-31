@@ -1,7 +1,7 @@
 import { getCurrentPrices } from "./price.service";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-import { RealityStabilityResponse } from "@/types/api.types";
+import { RealityStabilityResponse } from "@/types/stability.types";
 
 /**
  * Calculate reality stability index based on Project89 token price data.

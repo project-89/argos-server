@@ -10,7 +10,7 @@ import {
 } from "../services/visit.service";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
-import { schemas } from "../types/schemas";
+import { schemas } from "../schemas/schemas";
 
 const LOG_PREFIX = "[Visit Endpoint]";
 

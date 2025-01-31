@@ -4,9 +4,9 @@ import { COLLECTIONS } from "../constants/collections";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
-import { PriceHistory } from "../types/models";
+import { PriceHistory } from "../types/models.types";
 import { ERROR_MESSAGES } from "../constants/api";
-import { TokenPriceData, PriceResponse } from "../types/api.types";
+import { TokenPriceData, PriceResponse } from "@/types/price.types";
 
 const DEFAULT_TOKENS = ["project89"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes

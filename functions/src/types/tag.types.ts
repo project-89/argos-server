@@ -12,7 +12,6 @@ export interface TagData {
   type: string;
   taggedBy: string;
   taggedAt: Timestamp;
-  createdAt: Timestamp;
 }
 
 export interface TagLimitData {
@@ -31,7 +30,6 @@ export interface TagUserRequest {
 export interface TagUserResponse {
   success: boolean;
   message: string;
-  timestamp: number; // Unix timestamp for API response
 }
 
 export interface TagHistoryResponse {
@@ -46,12 +44,10 @@ export interface TagHistoryResponse {
 export interface GetUserTagsResponse {
   hasTags: boolean;
   activeTags: string[];
-  lastUpdated: number; // Unix timestamp for API response
 }
 
 export interface GetRemainingTagsResponse {
   remainingTags: number;
-  lastReset: number; // Unix timestamp for API response
 }
 
 /**

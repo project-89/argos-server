@@ -1,15 +1,22 @@
 import { Request, Response } from "express";
 import { profileService } from "../services/profile.service";
 import { validateRequest } from "../../middleware/validation.middleware";
-import { hivemindSchemas } from "../types/schemes";
+
 import { sendError, sendSuccess } from "../../utils/response";
 import { ApiError } from "../../utils/error";
+import {
+  ProfileCreateSchema,
+  ProfileGetByWalletSchema,
+  ProfileGetSchema,
+  ProfileSearchSchema,
+  ProfileUpdateSchema,
+} from "../schemas";
 
 /**
  * Create a new profile
  */
 export const createProfile = [
-  validateRequest(hivemindSchemas.profileCreate),
+  validateRequest(ProfileCreateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Create Profile] Starting with body:", req.body);
@@ -34,7 +41,7 @@ export const createProfile = [
  * Get a profile by ID
  */
 export const getProfile = [
-  validateRequest(hivemindSchemas.profileGet),
+  validateRequest(ProfileGetSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Get Profile] Starting with params:", req.params);
@@ -59,7 +66,7 @@ export const getProfile = [
  * Get a profile by wallet address
  */
 export const getProfileByWallet = [
-  validateRequest(hivemindSchemas.profileGetByWallet),
+  validateRequest(ProfileGetByWalletSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Get Profile By Wallet] Starting with params:", req.params);
@@ -84,7 +91,7 @@ export const getProfileByWallet = [
  * Update a profile
  */
 export const updateProfile = [
-  validateRequest(hivemindSchemas.profileUpdate),
+  validateRequest(ProfileUpdateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Update Profile] Starting with:", {
@@ -113,7 +120,7 @@ export const updateProfile = [
  * Search for profiles based on various criteria
  */
 export const searchProfiles = [
-  validateRequest(hivemindSchemas.profileSearch),
+  validateRequest(ProfileSearchSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Search Profiles] Starting with query:", req.query);

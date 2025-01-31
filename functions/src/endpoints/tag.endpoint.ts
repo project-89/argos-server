@@ -7,7 +7,7 @@ import {
   getTagLeaderboard as getTagLeaderboardService,
 } from "../services/tag.service";
 import { validateRequest } from "../middleware/validation.middleware";
-import { schemas } from "../types/schemas";
+import { schemas } from "../schemas/schemas";
 import { sendSuccess } from "../utils/response";
 import { ERROR_MESSAGES, ALLOWED_TAG_TYPES } from "../constants/api";
 import { ApiError } from "../utils/error";

@@ -18,7 +18,7 @@ import {
   SkillAnalysis,
   SkillSimilaritySchema,
   DEFAULT_SKILL_ANALYSIS,
-} from "../types/schemas";
+} from "../schemas/schemas";
 
 // Initialize Gemini model with the Google provider
 const geminiModel = google("gemini-pro");

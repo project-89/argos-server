@@ -4,7 +4,7 @@ import { COLLECTIONS } from "../constants/collections";
 import { ROLE } from "../constants/roles";
 import { ERROR_MESSAGES } from "../constants/api";
 
-import { Fingerprint } from "../types/models";
+import { Fingerprint } from "../types/models.types";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
 

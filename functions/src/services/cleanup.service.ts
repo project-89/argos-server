@@ -1,7 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-import { CleanupResult, VisitData, VisitPattern, SiteEngagement } from "../types/api.types";
+import { CleanupResult, VisitData, VisitPattern } from "@/types/cleanup.types";
+import { SiteEngagement } from "@/types/visit.types";
 
 /**
  * Cleanup service to remove old data from the database
