@@ -2,7 +2,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
-import { Visit, Site, VisitHistoryResponse, SiteModel, VisitPresence, ApiVisit } from "@/types";
+import { Visit, VisitHistoryResponse, VisitPresence, ApiVisit, Site, SiteResponse } from "@/types";
 import { ERROR_MESSAGES } from "../constants/api";
 import { toUnixMillis } from "@/utils/timestamp";
 
@@ -21,174 +21,217 @@ export const extractDomain = (url: string): string => {
 /**
  * Verifies fingerprint exists and ownership
  */
-export const verifyFingerprint = async (
-  fingerprintId: string,
-  authenticatedId?: string,
-): Promise<void> => {
-  const db = getFirestore();
-  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-  const fingerprintDoc = await fingerprintRef.get();
+export const verifyFingerprint = async ({
+  fingerprintId,
+  authenticatedId,
+}: {
+  fingerprintId: string;
+  authenticatedId?: string;
+}): Promise<void> => {
+  try {
+    const db = getFirestore();
+    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+    const fingerprintDoc = await fingerprintRef.get();
 
-  if (!fingerprintDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-  }
+    if (!fingerprintDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+    }
 
-  if (authenticatedId && fingerprintId !== authenticatedId) {
-    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+    if (authenticatedId && fingerprintId !== authenticatedId) {
+      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+    }
+  } catch (error) {
+    console.error(`[Visit Service] Error in verifyFingerprint:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
 /**
  * Logs a visit and updates site information
  */
-export const logVisit = async (
-  fingerprintId: string,
-  url: string,
-  title?: string,
-  clientIp?: string,
-): Promise<VisitHistoryResponse> => {
-  const db = getFirestore();
-  const domain = extractDomain(url);
-  const now = Timestamp.now();
+export const logVisit = async ({
+  fingerprintId,
+  url,
+  title,
+  clientIp,
+}: {
+  fingerprintId: string;
+  url: string;
+  title?: string;
+  clientIp?: string;
+}): Promise<VisitHistoryResponse> => {
+  try {
+    const db = getFirestore();
+    const domain = extractDomain(url);
+    const now = Timestamp.now();
 
-  // Find or create site
-  const sitesSnapshot = await db
-    .collection(COLLECTIONS.SITES)
-    .where("domain", "==", domain)
-    .where("fingerprintId", "==", fingerprintId)
-    .limit(1)
-    .get();
+    // Find or create site
+    const sitesSnapshot = await db
+      .collection(COLLECTIONS.SITES)
+      .where("domain", "==", domain)
+      .where("fingerprintId", "==", fingerprintId)
+      .limit(1)
+      .get();
 
-  let siteId: string;
-  let site: SiteModel;
+    let siteId: string;
+    let site: SiteResponse;
 
-  if (sitesSnapshot.empty) {
-    // Create new site
-    const newSite: Omit<Site, "id"> = {
-      domain,
+    if (sitesSnapshot.empty) {
+      // Create new site
+      const newSite: Omit<Site, "id"> = {
+        domain,
+        fingerprintId,
+        lastVisited: now,
+        title: title || domain,
+        visits: 1,
+        settings: {
+          notifications: true,
+          privacy: "private",
+        },
+        createdAt: now,
+      };
+
+      const siteRef = await db.collection(COLLECTIONS.SITES).add(newSite);
+      siteId = siteRef.id;
+      site = {
+        id: siteId,
+        ...newSite,
+        lastVisited: toUnixMillis(now),
+        createdAt: toUnixMillis(now),
+      };
+    } else {
+      // Update existing site
+      const siteDoc = sitesSnapshot.docs[0];
+      siteId = siteDoc.id;
+      const siteData = siteDoc.data() as Site;
+      site = {
+        ...siteData,
+        lastVisited: now.toMillis(),
+        createdAt: siteData.createdAt.toMillis(),
+        visits: (siteData.visits || 0) + 1,
+      };
+
+      await siteDoc.ref.update({
+        lastVisited: now,
+        visits: site.visits,
+      });
+    }
+
+    // Log the visit
+    const visitData: Omit<ApiVisit, "id"> = {
       fingerprintId,
-      lastVisited: now,
-      title: title || domain,
-      visits: 1,
-      settings: {
-        notifications: true,
-        privacy: "private",
-      },
+      url,
+      title: title || undefined,
+      siteId,
       createdAt: now,
+      ...(clientIp && { clientIp }),
     };
 
-    const siteRef = await db.collection(COLLECTIONS.SITES).add(newSite);
-    siteId = siteRef.id;
-    site = {
-      id: siteId,
-      ...newSite,
-      lastVisited: now.toMillis(),
-      createdAt: now.toMillis(),
-    };
-  } else {
-    // Update existing site
-    const siteDoc = sitesSnapshot.docs[0];
-    siteId = siteDoc.id;
-    const siteData = siteDoc.data() as Site;
-    site = {
-      ...siteData,
-      lastVisited: now.toMillis(),
-      createdAt: siteData.createdAt.toMillis(),
-      visits: (siteData.visits || 0) + 1,
-      title: title || siteData.title,
-    };
+    // Filter out undefined values
+    const sanitizedVisitData = Object.fromEntries(
+      Object.entries(visitData).filter(([_, value]) => value !== undefined),
+    );
 
-    await siteDoc.ref.update({
-      lastVisited: now,
-      visits: site.visits,
-      title: site.title,
-    });
+    const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
+
+    return {
+      id: visitRef.id,
+      ...visitData,
+      createdAt: toUnixMillis(now),
+      site,
+    };
+  } catch (error) {
+    console.error(`[Visit Service] Error in logVisit:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  // Log the visit
-  const visitData: Omit<ApiVisit, "id"> = {
-    fingerprintId,
-    url,
-    title: title || undefined,
-    siteId,
-    createdAt: now,
-    ...(clientIp && { clientIp }),
-  };
-
-  // Filter out undefined values
-  const sanitizedVisitData = Object.fromEntries(
-    Object.entries(visitData).filter(([_, value]) => value !== undefined),
-  );
-
-  const visitRef = await db.collection(COLLECTIONS.VISITS).add(sanitizedVisitData);
-
-  return {
-    id: visitRef.id,
-    ...visitData,
-    createdAt: toUnixMillis(now),
-    site,
-  };
 };
 
 /**
  * Updates presence status for a fingerprint
  */
-export const updatePresenceStatus = async (
-  fingerprintId: string,
-  status: VisitPresence["status"],
-): Promise<{ fingerprintId: string; status: string; lastUpdated: number }> => {
-  const result = await updatePresence(fingerprintId, status);
-  return result;
+export const updatePresenceStatus = async ({
+  fingerprintId,
+  status,
+}: {
+  fingerprintId: string;
+  status: VisitPresence["status"];
+}): Promise<{ fingerprintId: string; status: string; lastUpdated: number }> => {
+  try {
+    const result = await updatePresence({ fingerprintId, status });
+    return result;
+  } catch (error) {
+    console.error(`[Visit Service] Error in updatePresenceStatus:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
 };
 
 /**
  * Removes a site and all its visits
  */
-export const removeSiteAndVisits = async (
-  fingerprintId: string,
-  siteId: string,
-): Promise<{ fingerprintId: string; siteId: string; timestamp: number }> => {
-  const db = getFirestore();
+export const removeSiteAndVisits = async ({
+  fingerprintId,
+  siteId,
+}: {
+  fingerprintId: string;
+  siteId: string;
+}): Promise<{ fingerprintId: string; siteId: string; timestamp: number }> => {
+  try {
+    const db = getFirestore();
 
-  const siteRef = db.collection(COLLECTIONS.SITES).doc(siteId);
-  const siteDoc = await siteRef.get();
+    const siteRef = db.collection(COLLECTIONS.SITES).doc(siteId);
+    const siteDoc = await siteRef.get();
 
-  if (!siteDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND);
+    if (!siteDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND);
+    }
+
+    const siteData = siteDoc.data() as Site;
+    if (siteData.fingerprintId !== fingerprintId) {
+      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
+    }
+
+    // Delete all visits for this site
+    const visitsSnapshot = await db
+      .collection(COLLECTIONS.VISITS)
+      .where("siteId", "==", siteId)
+      .get();
+
+    const batch = db.batch();
+    visitsSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+    batch.delete(siteRef);
+    await batch.commit();
+
+    return {
+      fingerprintId,
+      siteId,
+      timestamp: toUnixMillis(siteData.lastVisited),
+    };
+  } catch (error) {
+    console.error(`[Visit Service] Error in removeSiteAndVisits:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  const siteData = siteDoc.data() as Site;
-  if (siteData.fingerprintId !== fingerprintId) {
-    throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-  }
-
-  // Delete all visits for this site
-  const visitsSnapshot = await db
-    .collection(COLLECTIONS.VISITS)
-    .where("siteId", "==", siteId)
-    .get();
-
-  const batch = db.batch();
-  visitsSnapshot.docs.forEach((doc) => {
-    batch.delete(doc.ref);
-  });
-  batch.delete(siteRef);
-  await batch.commit();
-
-  return {
-    fingerprintId,
-    siteId,
-    timestamp: siteData.lastVisited.toMillis(),
-  };
 };
 
 /**
  * Gets visit history for a fingerprint
  */
 export const getVisitHistory = async (fingerprintId: string): Promise<VisitHistoryResponse[]> => {
-  const db = getFirestore();
-
   try {
+    const db = getFirestore();
     const snapshot = await db
       .collection(COLLECTIONS.VISITS)
       .where("fingerprintId", "==", fingerprintId)
@@ -219,12 +262,10 @@ export const getVisitHistory = async (fingerprintId: string): Promise<VisitHisto
 
     return visits;
   } catch (error: any) {
-    if (error.code === 9 && error.message.includes("requires an index")) {
-      console.error("Index required for this query. Please create the following index:");
-      console.error(`Collection: ${COLLECTIONS.VISITS}`);
-      console.error("Fields: fingerprintId (ASC), timestamp (DESC)");
-      throw new ApiError(500, "Database index not ready. Please try again in a few minutes.");
+    console.error(`[Visit Service] Error in getVisitHistory:`, error);
+    if (error instanceof ApiError) {
+      throw error;
     }
-    throw error;
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

@@ -4,7 +4,7 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
-import type { Impression as ImpressionModel } from "./models.types";
+import type { Impression as ImpressionModel } from "./models";
 
 /**
  * Standard API Response Format
@@ -340,82 +340,3 @@ export interface FingerprintData {
   tagLimits?: TagLimitData;
   // Add other fingerprint fields as needed
 }
-
-/**
- * API Endpoints Configuration
- */
-export const API_ENDPOINTS = {
-  // Authentication
-  REGISTER_FINGERPRINT: "/fingerprint/register",
-  REGISTER_API_KEY: "/api-key/register",
-  VALIDATE_API_KEY: "/api-key/validate",
-  REVOKE_API_KEY: "/api-key/revoke",
-
-  // Impressions
-  CREATE_IMPRESSION: "/impressions",
-  GET_IMPRESSIONS: "/impressions/:fingerprintId",
-  DELETE_IMPRESSIONS: "/impressions/:fingerprintId",
-
-  // Visit Tracking
-  LOG_VISIT: "/visit/log",
-  UPDATE_PRESENCE: "/visit/presence",
-  GET_VISIT_HISTORY: "/visit/history/:fingerprintId",
-  REMOVE_SITE: "/visit/site/remove",
-
-  // Fingerprint Management
-  GET_FINGERPRINT: "/fingerprint/:id",
-  UPDATE_FINGERPRINT: "/fingerprint/update",
-
-  // Price Data
-  GET_CURRENT_PRICES: "/price/current",
-  GET_PRICE_HISTORY: "/price/history/:tokenId",
-  GET_REALITY_STABILITY: "/reality-stability",
-} as const;
-
-/**
- * Rate Limiting Configuration
- */
-export const RATE_LIMITS = {
-  PUBLIC_ENDPOINTS: {
-    REQUESTS_PER_HOUR: 100,
-    SCOPE: "IP",
-  },
-  PROTECTED_ENDPOINTS: {
-    REQUESTS_PER_HOUR: 1000,
-    SCOPE: "API_KEY",
-  },
-  HEALTH_ENDPOINTS: {
-    REQUESTS_PER_MINUTE: 60,
-    SCOPE: "IP",
-  },
-} as const;
-
-/**
- * Error Codes and Messages
- */
-export const API_ERRORS = {
-  BAD_REQUEST: {
-    code: 400,
-    message: "Invalid parameters provided",
-  },
-  UNAUTHORIZED: {
-    code: 401,
-    message: "Missing or invalid API key",
-  },
-  FORBIDDEN: {
-    code: 403,
-    message: "API key does not match fingerprint",
-  },
-  NOT_FOUND: {
-    code: 404,
-    message: "Resource not found",
-  },
-  RATE_LIMIT_EXCEEDED: {
-    code: 429,
-    message: "Rate limit exceeded",
-  },
-  INTERNAL_ERROR: {
-    code: 500,
-    message: "Internal server error",
-  },
-} as const;

@@ -4,19 +4,13 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
+import { Site } from "./models";
 
 /**
  * Visit Tracking
  */
-export interface LogVisitRequest {
-  fingerprintId: string;
-  url: string;
-  title?: string;
-  timestamp?: number; // Unix timestamp
-}
 
 export interface ApiVisit {
-  id: string;
   fingerprintId: string;
   url: string;
   title: string | undefined;
@@ -29,46 +23,17 @@ export interface VisitHistoryResponse {
   id: string;
   fingerprintId: string;
   createdAt: number; // Unix timestamp
+  lastUpdated?: number; // Unix timestamp
   url: string;
   title?: string;
   siteId: string;
-  site?: SiteModel;
+  site?: SiteResponse;
 }
 
-export interface ApiVisitData {
-  id: string;
-  fingerprintId: string;
-  siteId: string;
-  createdAt: Timestamp;
+export interface SiteResponse extends Omit<Site, "lastVisited" | "createdAt"> {
+  lastVisited: number; // Unix timestamp
+  createdAt: number; // Unix timestamp
 }
-
-/**
- * Site Management
- */
-export interface ApiSite {
-  domain: string;
-  fingerprintId: string;
-  lastVisited: Timestamp;
-  title?: string;
-  visits: number;
-  settings: {
-    notifications: boolean;
-    privacy: "public" | "private";
-  };
-  createdAt: Timestamp;
-}
-
-export interface SiteModel extends Omit<ApiSite, "lastVisited" | "createdAt"> {
-  id: string;
-  lastVisited: number; // Unix timestamp for API responses
-  createdAt: number; // Unix timestamp for API responses
-}
-
-export interface RemoveSiteRequest {
-  fingerprintId: string;
-  siteId: string;
-}
-
 /**
  * Presence Tracking
  */
@@ -82,6 +47,7 @@ export interface VisitPresence {
   fingerprintId: string;
   status: "online" | "offline" | "away";
   lastUpdated: number; // Unix timestamp for tracking last activity/status update
+  createdAt: number; // Unix timestamp for tracking last activity/status update
 }
 
 /**

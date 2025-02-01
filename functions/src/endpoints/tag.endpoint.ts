@@ -16,7 +16,7 @@ import {
   GetUserTagsResponse,
   TagData,
   TagLeaderboardResponse,
-} from "../types/api.types";
+} from "../types/old-api.types";
 
 type TimeframeType = "daily" | "weekly" | "monthly" | "allTime";
 

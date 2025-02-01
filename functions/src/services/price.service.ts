@@ -4,7 +4,7 @@ import { COLLECTIONS } from "../constants/collections";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
-import { PriceHistory } from "../types/models.types";
+import { PriceHistory } from "../types/models";
 import { ERROR_MESSAGES } from "../constants/api";
 import { TokenPriceData, PriceResponse } from "@/types/price.types";
 

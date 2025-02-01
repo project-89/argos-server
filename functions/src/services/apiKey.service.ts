@@ -1,20 +1,25 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
-import { ApiKey } from "../types/models.types";
 import { ApiError } from "../utils/error";
 import { generateApiKey } from "../utils/api-key";
 import { toUnixMillis } from "../utils/timestamp";
 
 import { ERROR_MESSAGES } from "../constants/api";
-import { ApiKeyValidationResponse } from "@/types/auth.types";
-
-// Type for API response that converts Timestamp to Unix time
-type ApiKeyResponse = Omit<ApiKey, "createdAt"> & { createdAt: number };
 
 /**
  * Creates a new API key for a fingerprint
  */
-export const createApiKey = async (fingerprintId: string): Promise<ApiKeyResponse> => {
+export const createApiKey = async ({
+  fingerprintId,
+}: {
+  fingerprintId: string;
+}): Promise<{
+  key: string;
+  fingerprintId: string;
+  active: boolean;
+  id: string;
+  createdAt: number;
+}> => {
   console.log("[createApiKey] Starting with fingerprintId:", fingerprintId);
   const db = getFirestore();
 
@@ -73,6 +78,7 @@ export const createApiKey = async (fingerprintId: string): Promise<ApiKeyRespons
       id: newKeyRef.id,
       createdAt: toUnixMillis(createdAt),
     };
+
     console.log("[createApiKey] Successfully created key:", { keyId: newKeyRef.id });
     return response;
   } catch (error) {
@@ -91,7 +97,15 @@ export const createApiKey = async (fingerprintId: string): Promise<ApiKeyRespons
 /**
  * Gets an API key by its key string
  */
-export const getApiKeyByKey = async (key: string): Promise<ApiKeyResponse | null> => {
+export const getApiKeyByKey = async (
+  key: string,
+): Promise<{
+  key: string;
+  fingerprintId: string;
+  active: boolean;
+  id: string;
+  createdAt: number;
+} | null> => {
   console.log("[getApiKeyByKey] Starting lookup for key");
   const db = getFirestore();
   const snapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", key).get();
@@ -110,37 +124,19 @@ export const getApiKeyByKey = async (key: string): Promise<ApiKeyResponse | null
     fingerprintId: data.fingerprintId,
     active: data.active,
     id: doc.id,
-    createdAt: data.createdAt.toMillis(),
+    createdAt: toUnixMillis(data.createdAt),
   };
-};
-
-/**
- * Gets all API keys for a fingerprint
- */
-export const getApiKeys = async (fingerprintId: string): Promise<ApiKeyResponse[]> => {
-  const db = getFirestore();
-  const snapshot = await db
-    .collection(COLLECTIONS.API_KEYS)
-    .where("fingerprintId", "==", fingerprintId)
-    .orderBy("createdAt", "desc")
-    .get();
-
-  return snapshot.docs.map((doc) => {
-    const data = doc.data() as ApiKey;
-    return {
-      key: data.key,
-      fingerprintId: data.fingerprintId,
-      active: data.active,
-      id: doc.id,
-      createdAt: data.createdAt.toMillis(),
-    };
-  });
 };
 
 /**
  * Validates an API key
  */
-export const validateApiKey = async (key: string): Promise<ApiKeyValidationResponse> => {
+export const validateApiKey = async (
+  key: string,
+): Promise<{
+  isValid: boolean;
+  needsRefresh: boolean;
+}> => {
   console.log("[validateApiKey] Starting validation");
   try {
     const apiKey = await getApiKeyByKey(key);
@@ -170,30 +166,15 @@ export const validateApiKey = async (key: string): Promise<ApiKeyValidationRespo
 };
 
 /**
- * Deactivates an API key
- */
-export const deactivateApiKey = async (fingerprintId: string, keyId: string): Promise<void> => {
-  const db = getFirestore();
-  const keyRef = db.collection(COLLECTIONS.API_KEYS).doc(keyId);
-  const keyDoc = await keyRef.get();
-
-  if (!keyDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
-  }
-
-  if (keyDoc.data()?.fingerprintId !== fingerprintId) {
-    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
-  }
-
-  await keyRef.update({
-    active: false,
-  });
-};
-
-/**
  * Revokes an API key
  */
-export const revokeApiKey = async (key: string, fingerprintId: string): Promise<void> => {
+export const revokeApiKey = async ({
+  key,
+  fingerprintId,
+}: {
+  key: string;
+  fingerprintId: string;
+}): Promise<void> => {
   console.log("[revokeApiKey] Starting revocation:", { fingerprintId });
   try {
     const db = getFirestore();

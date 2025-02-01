@@ -3,6 +3,7 @@
  * Contains types for the tag game system and leaderboard
  */
 
+import { ALLOWED_TAG_TYPES } from "@/constants/tag.constants";
 import { Timestamp } from "firebase-admin/firestore";
 
 /**
@@ -20,34 +21,6 @@ export interface TagLimitData {
   lastTagResetAt: Timestamp;
   createdAt: Timestamp;
   updatedAt: Timestamp;
-}
-
-export interface TagUserRequest {
-  targetFingerprintId: string;
-  tagType: string;
-}
-
-export interface TagUserResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface TagHistoryResponse {
-  tags: Array<{
-    type: string;
-    taggedBy: string;
-    taggedAt: number; // Unix timestamp for API response
-    createdAt: number; // Unix timestamp for API response
-  }>;
-}
-
-export interface GetUserTagsResponse {
-  hasTags: boolean;
-  activeTags: string[];
-}
-
-export interface GetRemainingTagsResponse {
-  remainingTags: number;
 }
 
 /**
@@ -93,13 +66,4 @@ export interface TagStatsDocument {
   tagHistory?: TagData[];
 }
 
-/**
- * Tag Game Endpoints
- */
-export const TAG_ENDPOINTS = {
-  TAG_USER: "/tag/user",
-  GET_USER_TAGS: "/tag/user/:fingerprintId",
-  GET_TAG_HISTORY: "/tag/history/:fingerprintId",
-  GET_REMAINING_TAGS: "/tag/remaining/:fingerprintId",
-  GET_LEADERBOARD: "/tag/leaderboard",
-} as const;
+export type TagType = (typeof ALLOWED_TAG_TYPES)[keyof typeof ALLOWED_TAG_TYPES];

@@ -4,7 +4,7 @@ import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api";
 
-export interface RoleData {
+interface RoleData {
   roles?: ROLE[];
 }
 

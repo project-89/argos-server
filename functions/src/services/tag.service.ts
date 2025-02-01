@@ -1,16 +1,17 @@
 import { getFirestore, Timestamp, QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES, ALLOWED_TAG_TYPES, TagType } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api";
 import {
   TagData,
-  TagUserResponse,
   TagStatsDocument,
   TagLeaderboardEntry,
   TagLeaderboardResponse,
-  GetUserTagsResponse,
+  TagType,
 } from "@/types/tag.types";
 import { FingerprintData } from "@/types";
+import { ALLOWED_TAG_TYPES } from "@/constants/tag.constants";
+import { toUnixMillis } from "@/utils/timestamp";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = 10;
@@ -19,57 +20,76 @@ const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 /**
  * Check and update daily tag limits
  */
-const checkAndUpdateTagLimits = async (
-  taggerRef: FirebaseFirestore.DocumentReference,
-  taggerData: FingerprintData,
-  targetIsIt: boolean,
-): Promise<void> => {
-  const now = Timestamp.now();
-  const tagLimits = taggerData.tagLimits;
+const checkAndUpdateTagLimits = async ({
+  taggerRef,
+  taggerData,
+  targetIsIt,
+}: {
+  taggerRef: FirebaseFirestore.DocumentReference;
+  taggerData: FingerprintData;
+  targetIsIt: boolean;
+}): Promise<void> => {
+  try {
+    const now = Timestamp.now();
+    const tagLimits = taggerData.tagLimits;
 
-  // If no tag limits exist, this is their first time being "it"
-  if (!tagLimits) {
-    await taggerRef.update({
-      tagLimits: {
-        firstTaggedAt: now,
-        remainingDailyTags: MAX_DAILY_TAGS - (targetIsIt ? 1 : 0),
-        lastTagResetAt: now,
-      },
-    });
-    return;
-  }
-
-  // Check if 24 hours have passed since last reset
-  const timeSinceReset = now.toMillis() - tagLimits.lastTagResetAt.toMillis();
-  const shouldReset = timeSinceReset >= MILLISECONDS_IN_DAY;
-
-  // If target is already "it", we need to deduct a tag
-  if (targetIsIt) {
-    if (tagLimits.remainingDailyTags <= 0 && !shouldReset) {
-      throw new ApiError(429, ERROR_MESSAGES.NO_TAGS_REMAINING);
+    // If no tag limits exist, this is their first time being "it"
+    if (!tagLimits) {
+      await taggerRef.update({
+        tagLimits: {
+          firstTaggedAt: now,
+          remainingDailyTags: MAX_DAILY_TAGS - (targetIsIt ? 1 : 0),
+          lastTagResetAt: now,
+        },
+      });
+      return;
     }
+
+    // Check if 24 hours have passed since last reset
+    const timeSinceReset = now.toMillis() - tagLimits.lastTagResetAt.toMillis();
+    const shouldReset = timeSinceReset >= MILLISECONDS_IN_DAY;
+
+    // If target is already "it", we need to deduct a tag
+    if (targetIsIt) {
+      if (tagLimits.remainingDailyTags <= 0 && !shouldReset) {
+        throw new ApiError(429, ERROR_MESSAGES.NO_TAGS_REMAINING);
+      }
+    }
+
+    // Update tag limits
+    const newTagLimits = {
+      firstTaggedAt: tagLimits.firstTaggedAt,
+      remainingDailyTags: shouldReset
+        ? MAX_DAILY_TAGS - (targetIsIt ? 1 : 0)
+        : tagLimits.remainingDailyTags - (targetIsIt ? 1 : 0),
+      lastTagResetAt: shouldReset ? now : tagLimits.lastTagResetAt,
+    };
+
+    await taggerRef.update({ tagLimits: newTagLimits });
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in checkAndUpdateTagLimits:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  // Update tag limits
-  const newTagLimits = {
-    firstTaggedAt: tagLimits.firstTaggedAt,
-    remainingDailyTags: shouldReset
-      ? MAX_DAILY_TAGS - (targetIsIt ? 1 : 0)
-      : tagLimits.remainingDailyTags - (targetIsIt ? 1 : 0),
-    lastTagResetAt: shouldReset ? now : tagLimits.lastTagResetAt,
-  };
-
-  await taggerRef.update({ tagLimits: newTagLimits });
 };
 
 /**
  * Tag another user
  */
-export const tagUser = async (
-  taggerFingerprintId: string,
-  targetFingerprintId: string,
-  tagType: string,
-): Promise<TagUserResponse> => {
+export const tagUser = async ({
+  taggerFingerprintId,
+  targetFingerprintId,
+  tagType,
+}: {
+  taggerFingerprintId: string;
+  targetFingerprintId: string;
+  tagType: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+}> => {
   try {
     console.log(
       `${LOG_PREFIX} Attempting to tag user ${targetFingerprintId} with ${tagType} by ${taggerFingerprintId}`,
@@ -114,12 +134,12 @@ export const tagUser = async (
     // Check if target already has this tag type
     if (targetData.tags?.[tagType]) {
       // Check and update tag limits before returning error
-      await checkAndUpdateTagLimits(taggerRef, taggerData, true);
+      await checkAndUpdateTagLimits({ taggerRef, taggerData, targetIsIt: true });
       throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
     }
 
     // Check and update tag limits
-    await checkAndUpdateTagLimits(taggerRef, taggerData, false);
+    await checkAndUpdateTagLimits({ taggerRef, taggerData, targetIsIt: false });
 
     // Create new tag
     const newTag: TagData = {
@@ -134,7 +154,7 @@ export const tagUser = async (
     });
 
     // Update tag stats with target info
-    await updateTagStats(taggerFingerprintId, db, targetFingerprintId, tagType);
+    await updateTagStats({ fingerprintId: taggerFingerprintId, db, tagType });
 
     console.log(`${LOG_PREFIX} Successfully tagged user ${targetFingerprintId} with ${tagType}`);
     return {
@@ -174,7 +194,7 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
 
     // Check if 24 hours have passed since last reset
     const now = Timestamp.now();
-    const timeSinceReset = now.toMillis() - tagLimits.lastTagResetAt.toMillis();
+    const timeSinceReset = toUnixMillis(now) - toUnixMillis(tagLimits.lastTagResetAt);
 
     if (timeSinceReset >= MILLISECONDS_IN_DAY) {
       return MAX_DAILY_TAGS;
@@ -193,7 +213,13 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
 /**
  * Check if a user has a specific tag
  */
-export const hasTag = async (fingerprintId: string, tagType: string): Promise<boolean> => {
+export const hasTag = async ({
+  fingerprintId,
+  tagType,
+}: {
+  fingerprintId: string;
+  tagType: string;
+}): Promise<boolean> => {
   try {
     console.log(`${LOG_PREFIX} Checking if user ${fingerprintId} has tag: ${tagType}`);
 
@@ -245,7 +271,12 @@ export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> =
 /**
  * Check if a user has specific tags
  */
-export const getUserTags = async (fingerprintId: string): Promise<GetUserTagsResponse> => {
+export const getUserTags = async (
+  fingerprintId: string,
+): Promise<{
+  hasTags: boolean;
+  activeTags: string[];
+}> => {
   try {
     console.log(`${LOG_PREFIX} Checking tags for user ${fingerprintId}`);
 
@@ -276,84 +307,112 @@ export const getUserTags = async (fingerprintId: string): Promise<GetUserTagsRes
 /**
  * Update tag stats for a user
  */
-const updateTagStats = async (
-  fingerprintId: string,
-  db: FirebaseFirestore.Firestore,
-  targetFingerprintId: string,
-  tagType: string,
-): Promise<void> => {
-  const now = Timestamp.now();
-  const statsRef = db.collection(COLLECTIONS.TAG_STATS).doc(fingerprintId);
-  const statsDoc = await statsRef.get();
+const updateTagStats = async ({
+  fingerprintId,
+  db,
+  tagType,
+}: {
+  fingerprintId: string;
+  db: FirebaseFirestore.Firestore;
+  tagType: string;
+}): Promise<{
+  success: boolean;
+  message: string;
+}> => {
+  try {
+    const now = Timestamp.now();
+    const statsRef = db.collection(COLLECTIONS.TAG_STATS).doc(fingerprintId);
+    const statsDoc = await statsRef.get();
 
-  // Create new tag history entry
-  const newTag: TagData = {
-    type: tagType,
-    taggedBy: fingerprintId,
-    taggedAt: now,
-  };
+    // Create new tag history entry
+    const newTag: TagData = {
+      type: tagType,
+      taggedBy: fingerprintId,
+      taggedAt: now,
+    };
 
-  if (!statsDoc.exists) {
-    // Create new stats document
-    await statsRef.set({
-      id: fingerprintId,
-      fingerprintId,
-      totalTagsMade: 1,
+    if (!statsDoc.exists) {
+      // Create new stats document
+      await statsRef.set({
+        id: fingerprintId,
+        fingerprintId,
+        totalTagsMade: 1,
+        lastTagAt: now,
+        dailyTags: 1,
+        weeklyTags: 1,
+        monthlyTags: 1,
+        streak: 1,
+        tagTypes: { [tagType]: 1 },
+        createdAt: now,
+        updatedAt: now,
+        tagHistory: [newTag],
+      });
+      return {
+        success: true,
+        message: "Tag stats created",
+      };
+    }
+
+    const stats = statsDoc.data() as TagStatsDocument;
+    const lastTagDate = stats.lastTagAt.toDate();
+    const nowDate = now.toDate();
+
+    // Check if this is a new day
+    const isNewDay =
+      lastTagDate.getDate() !== nowDate.getDate() ||
+      lastTagDate.getMonth() !== nowDate.getMonth() ||
+      lastTagDate.getFullYear() !== nowDate.getFullYear();
+
+    // Check if streak continues
+    const streakContinues =
+      isNewDay && nowDate.getTime() - lastTagDate.getTime() <= MILLISECONDS_IN_DAY;
+
+    // Update tag type counts
+    const tagTypes = { ...stats.tagTypes };
+    tagTypes[tagType] = (tagTypes[tagType] || 0) + 1;
+
+    // Update stats
+    await statsRef.update({
+      totalTagsMade: stats.totalTagsMade + 1,
       lastTagAt: now,
-      dailyTags: 1,
-      weeklyTags: 1,
-      monthlyTags: 1,
-      streak: 1,
-      tagTypes: { [tagType]: 1 },
-      createdAt: now,
+      dailyTags: isNewDay ? 1 : stats.dailyTags + 1,
+      weeklyTags: isNewDay && nowDate.getDay() < lastTagDate.getDay() ? 1 : stats.weeklyTags + 1,
+      monthlyTags:
+        isNewDay && nowDate.getMonth() !== lastTagDate.getMonth() ? 1 : stats.monthlyTags + 1,
+      streak: streakContinues ? stats.streak + 1 : 1,
+      tagTypes,
       updatedAt: now,
-      tagHistory: [newTag],
+      tagHistory: [...(stats.tagHistory || []), newTag],
     });
-    return;
+
+    console.log(`${LOG_PREFIX} Successfully updated tag stats for user ${fingerprintId}`);
+    return {
+      success: true,
+      message: "Tag stats updated",
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in updateTagStats:`, error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  const stats = statsDoc.data() as TagStatsDocument;
-  const lastTagDate = stats.lastTagAt.toDate();
-  const nowDate = now.toDate();
-
-  // Check if this is a new day
-  const isNewDay =
-    lastTagDate.getDate() !== nowDate.getDate() ||
-    lastTagDate.getMonth() !== nowDate.getMonth() ||
-    lastTagDate.getFullYear() !== nowDate.getFullYear();
-
-  // Check if streak continues
-  const streakContinues =
-    isNewDay && nowDate.getTime() - lastTagDate.getTime() <= MILLISECONDS_IN_DAY;
-
-  // Update tag type counts
-  const tagTypes = { ...stats.tagTypes };
-  tagTypes[tagType] = (tagTypes[tagType] || 0) + 1;
-
-  // Update stats
-  await statsRef.update({
-    totalTagsMade: stats.totalTagsMade + 1,
-    lastTagAt: now,
-    dailyTags: isNewDay ? 1 : stats.dailyTags + 1,
-    weeklyTags: isNewDay && nowDate.getDay() < lastTagDate.getDay() ? 1 : stats.weeklyTags + 1,
-    monthlyTags:
-      isNewDay && nowDate.getMonth() !== lastTagDate.getMonth() ? 1 : stats.monthlyTags + 1,
-    streak: streakContinues ? stats.streak + 1 : 1,
-    tagTypes,
-    updatedAt: now,
-    tagHistory: [...(stats.tagHistory || []), newTag],
-  });
 };
 
 /**
  * Get tag leaderboard
  */
-export const getTagLeaderboard = async (
-  timeframe: "daily" | "weekly" | "monthly" | "allTime",
-  limit: number = 10,
-  offset: number = 0,
-  currentUserId?: string,
-): Promise<TagLeaderboardResponse> => {
+export const getTagLeaderboard = async ({
+  timeframe,
+  limit,
+  offset,
+  currentUserId,
+}: {
+  timeframe: "daily" | "weekly" | "monthly" | "allTime";
+  limit: number;
+  offset: number;
+  currentUserId?: string;
+}): Promise<TagLeaderboardResponse> => {
   try {
     console.log(`${LOG_PREFIX} Getting tag leaderboard for timeframe: ${timeframe}`);
     const db = getFirestore();
@@ -418,12 +477,12 @@ export const getTagLeaderboard = async (
       timeframe,
       entries: entries.map((entry) => ({
         ...entry,
-        lastTagAt: entry.lastTagAt.toMillis(),
-        createdAt: entry.createdAt.toMillis(),
-        updatedAt: entry.updatedAt.toMillis(),
+        lastTagAt: toUnixMillis(entry.lastTagAt),
+        createdAt: toUnixMillis(entry.createdAt),
+        updatedAt: toUnixMillis(entry.updatedAt),
       })),
       userRank,
-      generatedAt: Timestamp.now().toMillis(),
+      generatedAt: toUnixMillis(Timestamp.now()),
     };
 
     return response;

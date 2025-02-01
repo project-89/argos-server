@@ -3,7 +3,7 @@
  * Contains types for tracking and managing user impressions
  */
 
-import type { Impression as ImpressionModel } from "./models.types";
+import type { Impression as ImpressionModel } from "./models";
 
 /**
  * Impression Management

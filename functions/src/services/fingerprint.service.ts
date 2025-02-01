@@ -4,19 +4,9 @@ import { COLLECTIONS } from "../constants/collections";
 import { ROLE } from "../constants/roles";
 import { ERROR_MESSAGES } from "../constants/api";
 
-import { Fingerprint } from "../types/models.types";
+import { Fingerprint } from "../types/models";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
-
-export interface FingerprintDocData extends Omit<Fingerprint, "createdAt" | "ipMetadata"> {
-  id: string;
-  createdAt: Timestamp;
-  ipMetadata: {
-    primaryIp?: string;
-    ipFrequency: Record<string, number>;
-    lastSeenAt: Record<string, Timestamp>;
-  };
-}
 
 /**
  * Extracts client IP from request
@@ -32,13 +22,17 @@ export const getClientIp = (req: Request): string => {
 /**
  * Creates a new fingerprint record
  */
-export const createFingerprint = async (
-  fingerprint: string,
-  ip: string,
-  metadata?: Record<string, any>,
-): Promise<FingerprintDocData> => {
+export const createFingerprint = async ({
+  fingerprint,
+  ip,
+  metadata,
+}: {
+  fingerprint: string;
+  ip: string;
+  metadata?: Record<string, any>;
+}): Promise<Fingerprint> => {
   const now = Timestamp.now();
-  const docData: Omit<FingerprintDocData, "id"> = {
+  const docData: Omit<Fingerprint, "id"> = {
     fingerprint,
     roles: [ROLE.USER], // Always use default user role
     createdAt: now,
@@ -50,6 +44,7 @@ export const createFingerprint = async (
       primaryIp: ip,
       ipFrequency: { [ip]: 1 },
       lastSeenAt: { [ip]: now },
+      suspiciousIps: [],
     },
   };
 
@@ -65,10 +60,13 @@ export const createFingerprint = async (
 /**
  * Gets a fingerprint record and updates its IP metadata
  */
-export const getFingerprintAndUpdateIp = async (
-  id: string,
-  ip: string,
-): Promise<{ data: FingerprintDocData }> => {
+export const getFingerprintAndUpdateIp = async ({
+  id,
+  ip,
+}: {
+  id: string;
+  ip: string;
+}): Promise<{ data: Fingerprint }> => {
   const db = getFirestore();
   const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(id);
 
@@ -80,18 +78,14 @@ export const getFingerprintAndUpdateIp = async (
         throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
       }
 
-      const data = fingerprintDoc.data() as FingerprintDocData;
+      const data = fingerprintDoc.data() as Fingerprint;
+
       const ipAddresses = data.ipAddresses || [];
       const ipMetadata = data.ipMetadata || {
         ipFrequency: {},
         lastSeenAt: {},
         primaryIp: undefined,
       };
-
-      // Ensure tags property exists
-      if (!data.tags) {
-        data.tags = [];
-      }
 
       // Update IP frequency and last seen
       const newFrequency = (ipMetadata.ipFrequency[ip] || 0) + 1;
@@ -140,10 +134,13 @@ export const getFingerprintAndUpdateIp = async (
 /**
  * Verifies fingerprint exists and ownership
  */
-export const verifyFingerprint = async (
-  fingerprintId: string,
-  authenticatedId?: string,
-): Promise<void> => {
+export const verifyFingerprint = async ({
+  fingerprintId,
+  authenticatedId,
+}: {
+  fingerprintId: string;
+  authenticatedId?: string;
+}): Promise<void> => {
   const db = getFirestore();
   const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
   const fingerprintDoc = await fingerprintRef.get();
@@ -160,10 +157,13 @@ export const verifyFingerprint = async (
 /**
  * Updates fingerprint metadata
  */
-export const updateFingerprintMetadata = async (
-  fingerprintId: string,
-  metadata: Record<string, any>,
-): Promise<FingerprintDocData> => {
+export const updateFingerprintMetadata = async ({
+  fingerprintId,
+  metadata,
+}: {
+  fingerprintId: string;
+  metadata: Record<string, any>;
+}): Promise<Fingerprint> => {
   const db = getFirestore();
   const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
 
@@ -174,7 +174,7 @@ export const updateFingerprintMetadata = async (
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data() as FingerprintDocData;
+    const data = fingerprintDoc.data() as Fingerprint;
     const updatedMetadata = deepMerge(data.metadata || {}, metadata);
 
     await fingerprintRef.update({

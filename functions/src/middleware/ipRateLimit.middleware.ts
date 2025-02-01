@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { sendWarning } from "../utils/response";
-import { Fingerprint } from "../types/models.types";
+import { Fingerprint } from "../types/models";
 
 interface RateLimitConfig {
   windowMs: number;

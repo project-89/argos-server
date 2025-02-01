@@ -121,36 +121,3 @@ export const ERROR_MESSAGES = {
 
   TOKEN_NOT_FOUND: "Token not found",
 } as const;
-
-export const ENDPOINTS = {
-  API_KEY: "/api-key",
-  FINGERPRINT: "/fingerprint",
-  VISIT: "/visit",
-  PRESENCE: "/presence",
-  ROLE: "/role",
-  TAGS: "/tags",
-  PRICE: "/price",
-  STABILITY: "/stability",
-  PROFILE: "/profile",
-  STATS: "/stats",
-  CAPABILITIES: "/capabilities",
-} as const;
-
-export const PRICE_API_URL = "https://api.coingecko.com/api/v3/simple/price";
-
-// Public endpoints that should not require API key authentication
-export const PUBLIC_ENDPOINTS: readonly string[] = [
-  "/fingerprint/register",
-  "/api-key/register",
-  "/api-key/validate",
-  "/role/available",
-  "/price/current",
-  "/price/history/:tokenId",
-  "/reality-stability",
-];
-
-export const ALLOWED_TAG_TYPES = {
-  IT: "it",
-} as const;
-
-export type TagType = (typeof ALLOWED_TAG_TYPES)[keyof typeof ALLOWED_TAG_TYPES];

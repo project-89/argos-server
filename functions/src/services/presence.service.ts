@@ -26,10 +26,13 @@ const shouldMarkAsAway = (lastUpdated: number): boolean => {
 /**
  * Update presence status for a fingerprint
  */
-export const updatePresence = async (
-  fingerprintId: string,
-  status: PresenceStatus,
-): Promise<VisitPresence> => {
+export const updatePresence = async ({
+  fingerprintId,
+  status,
+}: {
+  fingerprintId: string;
+  status: PresenceStatus;
+}): Promise<VisitPresence> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -66,7 +69,11 @@ export const updatePresence = async (
 /**
  * Get current presence status for a fingerprint
  */
-export const getPresence = async (fingerprintId: string): Promise<VisitPresence> => {
+export const getPresence = async ({
+  fingerprintId,
+}: {
+  fingerprintId: string;
+}): Promise<VisitPresence> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -90,7 +97,7 @@ export const getPresence = async (fingerprintId: string): Promise<VisitPresence>
 
     // Check if user should be marked as away
     if (presence.status === "online" && shouldMarkAsAway(presence.lastUpdated)) {
-      const awayPresence = await updatePresence(fingerprintId, "away");
+      const awayPresence = await updatePresence({ fingerprintId, status: "away" });
       return awayPresence;
     }
 
@@ -111,7 +118,11 @@ export const getPresence = async (fingerprintId: string): Promise<VisitPresence>
 /**
  * Update activity timestamp for a fingerprint
  */
-export const updateActivity = async (fingerprintId: string): Promise<VisitPresence> => {
+export const updateActivity = async ({
+  fingerprintId,
+}: {
+  fingerprintId: string;
+}): Promise<VisitPresence> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -127,7 +138,7 @@ export const updateActivity = async (fingerprintId: string): Promise<VisitPresen
 
     // If no presence or currently offline, set as online
     if (!presence || presence.status === "offline") {
-      return updatePresence(fingerprintId, "online");
+      return updatePresence({ fingerprintId, status: "online" });
     }
 
     // Update last activity
