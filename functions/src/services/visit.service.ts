@@ -2,7 +2,7 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
-import { Visit, VisitHistoryResponse, VisitPresence, ApiVisit, Site, SiteResponse } from "@/types";
+import { Visit, VisitHistoryResponse, VisitPresence, Site, SiteResponse } from "@/types";
 import { ERROR_MESSAGES } from "../constants/api";
 import { toUnixMillis } from "@/utils/timestamp";
 
@@ -121,7 +121,7 @@ export const logVisit = async ({
     }
 
     // Log the visit
-    const visitData: Omit<ApiVisit, "id"> = {
+    const visitData: Omit<Visit, "id"> = {
       fingerprintId,
       url,
       title: title || undefined,

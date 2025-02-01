@@ -10,7 +10,7 @@ import { Site } from "./models";
  * Visit Tracking
  */
 
-export interface ApiVisit {
+export interface Visit {
   fingerprintId: string;
   url: string;
   title: string | undefined;
@@ -50,15 +50,18 @@ export interface VisitPresence {
   createdAt: number; // Unix timestamp for tracking last activity/status update
 }
 
-/**
- * Visit Analysis
- */
-export interface ApiVisitPattern {
+export interface VisitData {
+  id: string;
+  fingerprintId: string;
+  siteId: string;
+  timestamp: number;
+}
+
+export interface VisitPattern {
   currentSite: string;
   nextSite: string;
   transitionCount: number;
   averageTimeSpent: number;
-  lastTransition: Timestamp;
 }
 
 export interface SiteEngagement {
@@ -70,7 +73,7 @@ export interface SiteEngagement {
 }
 
 export interface VisitAnalysis {
-  patterns: ApiVisitPattern[];
+  patterns: VisitPattern[];
   engagement: SiteEngagement[];
   analyzedAt: Timestamp;
 }

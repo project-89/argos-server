@@ -1,9 +1,19 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-import { CleanupResult, VisitData, VisitPattern } from "@/types/cleanup.types";
-import { SiteEngagement } from "@/types/visit.types";
 
+import { SiteEngagement, VisitData, VisitPattern } from "@/types";
+
+interface CleanupResult {
+  cleanupTime: number;
+  itemsCleaned: {
+    visits: number;
+    presence: number;
+    priceCache: number;
+    rateLimitStats: number;
+    rateLimitRequests: number;
+  };
+}
 /**
  * Cleanup service to remove old data from the database
  * @returns {Promise<CleanupResult>} Result of the cleanup operation
