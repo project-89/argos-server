@@ -1,8 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-
-import { SiteEngagement, VisitData, VisitPattern } from "@/types";
+import { SiteEngagement, VisitPattern } from "@/types/visit.types";
+import { Visit } from "@/types";
 
 interface CleanupResult {
   cleanupTime: number;
@@ -129,9 +129,9 @@ export const analyzeVisitPatterns = async (
     .orderBy("timestamp", "asc")
     .get();
 
-  const visits: VisitData[] = visitsSnapshot.docs.map((doc) => ({
+  const visits: Visit[] = visitsSnapshot.docs.map((doc) => ({
     id: doc.id,
-    ...(doc.data() as Omit<VisitData, "id">),
+    ...(doc.data() as Omit<Visit, "id">),
   }));
 
   // Analyze site transitions
@@ -141,7 +141,7 @@ export const analyzeVisitPatterns = async (
   for (let i = 0; i < visits.length - 1; i++) {
     const current = visits[i];
     const next = visits[i + 1];
-    const timeSpent = next.timestamp - current.timestamp;
+    const timeSpent = next.createdAt.seconds - current.createdAt.seconds;
 
     // Track site transitions
     const key = `${current.siteId}-${next.siteId}`;

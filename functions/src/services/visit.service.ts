@@ -2,9 +2,16 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
-import { Visit, VisitHistoryResponse, VisitPresence, Site, SiteResponse } from "@/types";
+import { Visit, Site } from "@/types";
 import { ERROR_MESSAGES } from "../constants/api";
 import { toUnixMillis } from "@/utils/timestamp";
+
+import {
+  SiteResponse,
+  VisitPresence,
+  VisitResponse,
+  VisitHistoryResponse,
+} from "@/types/visit.types";
 
 /**
  * Extracts domain from URL
@@ -62,7 +69,7 @@ export const logVisit = async ({
   url: string;
   title?: string;
   clientIp?: string;
-}): Promise<VisitHistoryResponse> => {
+}): Promise<{ id: string; visit: VisitResponse; site: SiteResponse }> => {
   try {
     const db = getFirestore();
     const domain = extractDomain(url);
@@ -139,8 +146,10 @@ export const logVisit = async ({
 
     return {
       id: visitRef.id,
-      ...visitData,
-      createdAt: toUnixMillis(now),
+      visit: {
+        ...visitData,
+        createdAt: toUnixMillis(now),
+      },
       site,
     };
   } catch (error) {

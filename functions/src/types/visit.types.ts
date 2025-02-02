@@ -1,23 +1,8 @@
-/**
- * Visit and Site Tracking Types
- * Contains types for tracking user visits, site data, and presence
- */
-
-import { Timestamp } from "firebase-admin/firestore";
-import { Site } from "./models";
+import { Site, Visit } from "./models";
 
 /**
  * Visit Tracking
  */
-
-export interface Visit {
-  fingerprintId: string;
-  url: string;
-  title: string | undefined;
-  siteId: string;
-  clientIp?: string;
-  createdAt: Timestamp;
-}
 
 export interface VisitHistoryResponse {
   id: string;
@@ -37,11 +22,6 @@ export interface SiteResponse extends Omit<Site, "lastVisited" | "createdAt"> {
 /**
  * Presence Tracking
  */
-export interface UpdatePresenceRequest {
-  fingerprintId: string;
-  status: "online" | "offline";
-  currentSites?: string[];
-}
 
 export interface VisitPresence {
   fingerprintId: string;
@@ -54,7 +34,11 @@ export interface VisitData {
   id: string;
   fingerprintId: string;
   siteId: string;
-  timestamp: number;
+  createdAt: number;
+}
+
+export interface VisitResponse extends Omit<Visit, "id" | "createdAt"> {
+  createdAt: number;
 }
 
 export interface VisitPattern {
@@ -71,19 +55,3 @@ export interface SiteEngagement {
   returnRate: number;
   commonNextSites: string[];
 }
-
-export interface VisitAnalysis {
-  patterns: VisitPattern[];
-  engagement: SiteEngagement[];
-  analyzedAt: Timestamp;
-}
-
-/**
- * Visit Endpoints
- */
-export const VISIT_ENDPOINTS = {
-  LOG_VISIT: "/visit/log",
-  UPDATE_PRESENCE: "/visit/presence",
-  GET_VISIT_HISTORY: "/visit/history/:fingerprintId",
-  REMOVE_SITE: "/visit/site/remove",
-} as const;
