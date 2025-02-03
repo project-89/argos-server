@@ -1,8 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
-import { ROLE, ROLE_HIERARCHY } from "../constants/roles";
+import { COLLECTIONS } from "../constants/collections.constants";
+import { ROLE, ROLE_HIERARCHY } from "../constants/roles.constants";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 interface RoleData {
   roles?: ROLE[];

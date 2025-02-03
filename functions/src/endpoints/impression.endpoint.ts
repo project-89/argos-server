@@ -7,8 +7,8 @@ import {
 } from "../services/impression.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
-import { schemas } from "../schemas/schemas";
+import { ERROR_MESSAGES } from "../constants/api.constants";
+import { GetImpressionsSchema, DeleteImpressionsSchema, CreateImpressionSchema } from "@/schemas";
 
 // Extend Request type to include fingerprint
 interface AuthenticatedRequest extends Request {
@@ -17,14 +17,16 @@ interface AuthenticatedRequest extends Request {
 
 // Route handlers
 export const create = [
-  validateRequest(schemas.impressionCreate),
+  validateRequest(CreateImpressionSchema),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
       const { fingerprintId, type, data, source, sessionId } = req.body;
 
-      const impression = await createImpression(fingerprintId, type, data, {
-        source,
-        sessionId,
+      const impression = await createImpression({
+        fingerprintId,
+        type,
+        data,
+        options: { source, sessionId },
       });
       return sendSuccess(res, impression, "Impression created successfully", 201);
     } catch (error) {
@@ -37,7 +39,7 @@ export const create = [
 ];
 
 export const get = [
-  validateRequest(schemas.impressionGet),
+  validateRequest(GetImpressionsSchema),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
       const fingerprintId = req.params.fingerprintId;
@@ -51,7 +53,7 @@ export const get = [
         ...(type && { type: type as string }),
       };
 
-      const impressions = await getImpressions(fingerprintId, options);
+      const impressions = await getImpressions({ fingerprintId, options });
       return sendSuccess(res, impressions, "Impressions retrieved successfully");
     } catch (error) {
       return sendError(
@@ -63,7 +65,7 @@ export const get = [
 ];
 
 export const remove = [
-  validateRequest(schemas.impressionDelete),
+  validateRequest(DeleteImpressionsSchema),
   async (req: AuthenticatedRequest, res: Response): Promise<Response> => {
     try {
       const fingerprintId = req.params.fingerprintId || req.body.fingerprintId;

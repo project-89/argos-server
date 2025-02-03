@@ -1,9 +1,9 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
-import { Impression } from "../types/models";
+import { COLLECTIONS } from "../constants/collections.constants";
+import { Impression } from "@/types";
 import { ApiError } from "../utils/error";
 import { getCurrentTimestamp } from "../utils/timestamp";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 /**
  * Verifies fingerprint ownership

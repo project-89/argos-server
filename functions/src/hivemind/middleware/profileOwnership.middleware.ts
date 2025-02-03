@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants/api.constants";
 import { sendError } from "../../utils/response";
 import { Profile } from "../types/profile.types";
 import { profileService } from "../services/profile.service";

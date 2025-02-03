@@ -1,7 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS } from "../../constants/collections.constants";
 import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants/api.constants";
 import {
   AnalyzeSkillInput,
   AnalyzeSkillResponse,

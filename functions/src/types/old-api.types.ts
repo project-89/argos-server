@@ -4,7 +4,7 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
-import type { Impression as ImpressionModel } from "./models";
+import type { Impression as ImpressionModel } from "./models/models";
 
 /**
  * Standard API Response Format
@@ -312,8 +312,8 @@ export interface TagLeaderboardEntry {
 }
 
 export interface TagLeaderboardResponse {
-  timeframe: "daily" | "weekly" | "monthly" | "allTime";
-  entries: TagLeaderboardEntry[];
+  timeFrame: "daily" | "weekly" | "monthly" | "allTime";
+  entries: Omit<TagLeaderboardEntry, "lastTagAt"> | { lastTagAt: number }[];
   userRank?: number;
 }
 

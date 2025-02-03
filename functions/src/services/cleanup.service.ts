@@ -1,8 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-import { SiteEngagement, VisitPattern } from "@/types/visit.types";
-import { Visit } from "@/types";
+import { SiteEngagement, VisitPattern, Visit } from "@/types";
 
 interface CleanupResult {
   cleanupTime: number;

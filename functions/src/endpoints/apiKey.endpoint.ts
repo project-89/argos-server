@@ -1,15 +1,16 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { schemas } from "../schemas/schemas";
+
 import { createApiKey, validateApiKey, revokeApiKey } from "../services/apiKey.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
+import { ApiKeyRegisterSchema, ApiKeyRevokeSchema, ApiKeyValidateSchema } from "@/schemas";
 
 /**
  * Register a new API key
  */
 export const register = [
-  validateRequest(schemas.apiKeyRegister),
+  validateRequest(ApiKeyRegisterSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Register API Key] Starting registration with body:", req.body);
@@ -48,7 +49,7 @@ export const register = [
  * Validate an API key
  */
 export const validate = [
-  validateRequest(schemas.apiKeyValidate),
+  validateRequest(ApiKeyValidateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Validate API Key] Starting validation with body:", req.body);
@@ -78,7 +79,7 @@ export const validate = [
  * Revoke an API key
  */
 export const revoke = [
-  validateRequest(schemas.apiKeyRevoke),
+  validateRequest(ApiKeyRevokeSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Revoke API Key] Starting revocation with:", {
@@ -93,7 +94,7 @@ export const revoke = [
         return sendError(res, "Authentication required", 401);
       }
 
-      await revokeApiKey(key, fingerprintId);
+      await revokeApiKey({ key, fingerprintId });
       console.log("[Revoke API Key] Successfully revoked key:", { key, fingerprintId });
 
       return sendSuccess(res, null, "API key revoked successfully");

@@ -1,10 +1,10 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import { ApiError } from "../utils/error";
 import { generateApiKey } from "../utils/api-key";
 import { toUnixMillis } from "../utils/timestamp";
 
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 /**
  * Creates a new API key for a fingerprint

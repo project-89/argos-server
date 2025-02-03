@@ -1,10 +1,10 @@
 import { Request } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
-import { ROLE } from "../constants/roles";
-import { ERROR_MESSAGES } from "../constants/api";
+import { COLLECTIONS } from "../constants/collections.constants";
+import { ROLE } from "../constants/roles.constants";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
-import { Fingerprint } from "../types/models";
+import { Fingerprint } from "@/types";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
 
@@ -61,14 +61,14 @@ export const createFingerprint = async ({
  * Gets a fingerprint record and updates its IP metadata
  */
 export const getFingerprintAndUpdateIp = async ({
-  id,
+  fingerprintId,
   ip,
 }: {
-  id: string;
+  fingerprintId: string;
   ip: string;
 }): Promise<{ data: Fingerprint }> => {
   const db = getFirestore();
-  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(id);
+  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
 
   try {
     const updatedDoc = await db.runTransaction(async (transaction) => {
@@ -126,7 +126,7 @@ export const getFingerprintAndUpdateIp = async ({
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error(`[Fingerprint ${id}] Error updating IP:`, error);
+    console.error(`[Fingerprint ${fingerprintId}] Error updating IP:`, error);
     throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

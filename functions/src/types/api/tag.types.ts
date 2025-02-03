@@ -37,7 +37,7 @@ export interface TagLeaderboardEntry {
 }
 
 export interface TagLeaderboardResponse {
-  timeframe: "daily" | "weekly" | "monthly" | "allTime";
+  timeFrame: "daily" | "weekly" | "monthly" | "allTime";
   entries: Array<{
     fingerprintId: string;
     totalTags: number;
@@ -51,7 +51,7 @@ export interface TagLeaderboardResponse {
   generatedAt: number; // Unix timestamp for API response
 }
 
-export interface TagStatsDocument {
+export interface TagStats {
   id: string;
   fingerprintId: string;
   totalTagsMade: number;

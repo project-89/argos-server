@@ -1,9 +1,9 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import { ApiError } from "../utils/error";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-import { ERROR_MESSAGES } from "../constants/api";
-import { VisitPresence } from "@/types/visit.types";
+import { ERROR_MESSAGES } from "../constants/api.constants";
+import { VisitPresence } from "@/types";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
@@ -56,6 +56,7 @@ export const updatePresence = async ({
       fingerprintId,
       status,
       lastUpdated: now,
+      createdAt: now,
     };
   } catch (error) {
     if (error instanceof ApiError) {
@@ -92,6 +93,7 @@ export const getPresence = async ({
         fingerprintId,
         status: "offline",
         lastUpdated: now,
+        createdAt: now,
       };
     }
 
@@ -105,6 +107,7 @@ export const getPresence = async ({
       fingerprintId,
       status: presence.status,
       lastUpdated: presence.lastUpdated,
+      createdAt: now,
     };
   } catch (error) {
     if (error instanceof ApiError) {
@@ -155,6 +158,7 @@ export const updateActivity = async ({
       fingerprintId,
       status: presenceData.status,
       lastUpdated: now,
+      createdAt: now,
     };
   } catch (error) {
     if (error instanceof ApiError) {

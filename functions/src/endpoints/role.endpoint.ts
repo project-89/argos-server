@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { ROLE } from "../constants/roles";
+import { ROLE } from "../constants/roles.constants";
 import {
   assignRole as assignRoleService,
   removeRole as removeRoleService,
@@ -8,11 +8,11 @@ import {
 } from "../services/role.service";
 import { sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
-import { schemas } from "../schemas/schemas";
+import { ERROR_MESSAGES } from "../constants/api.constants";
+import { AssignRoleSchema, RemoveRoleSchema } from "@/schemas";
 
 export const assignRole = [
-  validateRequest(schemas.roleAssign),
+  validateRequest(AssignRoleSchema),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { fingerprintId, role } = req.body;
@@ -28,7 +28,7 @@ export const assignRole = [
 ];
 
 export const removeRole = [
-  validateRequest(schemas.roleRemove),
+  validateRequest(RemoveRoleSchema),
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       const { fingerprintId, role } = req.body;

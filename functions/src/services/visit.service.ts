@@ -1,9 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
-import { Visit, Site } from "@/types";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import { toUnixMillis } from "@/utils/timestamp";
 
 import {
@@ -11,7 +9,9 @@ import {
   VisitPresence,
   VisitResponse,
   VisitHistoryResponse,
-} from "@/types/visit.types";
+  Visit,
+  Site,
+} from "@/types";
 
 /**
  * Extracts domain from URL

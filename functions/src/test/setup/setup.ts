@@ -2,7 +2,7 @@ import { config } from "dotenv";
 import { resolve } from "path";
 import { Timestamp } from "firebase-admin/firestore";
 import { MOCK_PRICES } from "./testConfig";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS } from "../../constants/collections.constants";
 import { jest } from "@jest/globals";
 import * as admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";

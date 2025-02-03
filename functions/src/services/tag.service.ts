@@ -1,15 +1,16 @@
 import { getFirestore, Timestamp, QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 import {
   TagData,
-  TagStatsDocument,
   TagLeaderboardEntry,
   TagLeaderboardResponse,
   TagType,
-} from "@/types/tag.types";
-import { FingerprintData } from "@/types";
+  TagStats,
+  FingerprintData,
+} from "@/types";
+
 import { ALLOWED_TAG_TYPES } from "@/constants/tag.constants";
 import { toUnixMillis } from "@/utils/timestamp";
 
@@ -257,7 +258,7 @@ export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> =
       return [];
     }
 
-    const stats = statsDoc.data() as TagStatsDocument;
+    const stats = statsDoc.data() as TagStats;
     return stats.tagHistory || [];
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
@@ -353,7 +354,7 @@ const updateTagStats = async ({
       };
     }
 
-    const stats = statsDoc.data() as TagStatsDocument;
+    const stats = statsDoc.data() as TagStats;
     const lastTagDate = stats.lastTagAt.toDate();
     const nowDate = now.toDate();
 
@@ -403,28 +404,28 @@ const updateTagStats = async ({
  * Get tag leaderboard
  */
 export const getTagLeaderboard = async ({
-  timeframe,
+  timeFrame,
   limit,
   offset,
   currentUserId,
 }: {
-  timeframe: "daily" | "weekly" | "monthly" | "allTime";
+  timeFrame: "daily" | "weekly" | "monthly" | "allTime";
   limit: number;
   offset: number;
   currentUserId?: string;
 }): Promise<TagLeaderboardResponse> => {
   try {
-    console.log(`${LOG_PREFIX} Getting tag leaderboard for timeframe: ${timeframe}`);
+    console.log(`${LOG_PREFIX} Getting tag leaderboard for timeframe: ${timeFrame}`);
     const db = getFirestore();
     const statsRef = db.collection(COLLECTIONS.TAG_STATS);
 
     // Determine which field to sort by based on timeframe
     const sortField =
-      timeframe === "daily"
+      timeFrame === "daily"
         ? "dailyTags"
-        : timeframe === "weekly"
+        : timeFrame === "weekly"
           ? "weeklyTags"
-          : timeframe === "monthly"
+          : timeFrame === "monthly"
             ? "monthlyTags"
             : "totalTagsMade";
 
@@ -449,15 +450,15 @@ export const getTagLeaderboard = async ({
     }
 
     snapshot.forEach((doc: QueryDocumentSnapshot) => {
-      const data = doc.data() as TagStatsDocument;
+      const data = doc.data() as TagStats;
       entries.push({
         fingerprintId: data.fingerprintId,
         totalTags:
-          timeframe === "daily"
+          timeFrame === "daily"
             ? data.dailyTags
-            : timeframe === "weekly"
+            : timeFrame === "weekly"
               ? data.weeklyTags
-              : timeframe === "monthly"
+              : timeFrame === "monthly"
                 ? data.monthlyTags
                 : data.totalTagsMade,
         lastTagAt: data.lastTagAt,
@@ -474,7 +475,7 @@ export const getTagLeaderboard = async ({
     });
 
     const response: TagLeaderboardResponse = {
-      timeframe,
+      timeFrame,
       entries: entries.map((entry) => ({
         ...entry,
         lastTagAt: toUnixMillis(entry.lastTagAt),

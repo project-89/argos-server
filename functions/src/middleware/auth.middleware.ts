@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 import { validateApiKey, getApiKeyByKey } from "../services/apiKey.service";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 
 /**
  * Middleware to validate API key and set fingerprintId on request

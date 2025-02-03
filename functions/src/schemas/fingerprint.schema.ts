@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 export const FingerprintRegisterSchema = z.object({
   body: z.object({
@@ -35,4 +35,13 @@ export const FingerprintUpdateSchema = z.object({
     }),
   query: z.object({}).optional(),
   params: z.object({}).optional(),
+});
+
+export const FingerprintParamsSchema = z.object({
+  params: z.object({
+    fingerprintId: z.string({
+      required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+      invalid_type_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
+    }),
+  }),
 });

@@ -1,12 +1,12 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fetch from "node-fetch";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
-import { PriceHistory } from "../types/models";
-import { ERROR_MESSAGES } from "../constants/api";
-import { TokenPriceData, PriceResponse } from "@/types/price.types";
+import { PriceHistory } from "../types/models/models";
+import { ERROR_MESSAGES } from "../constants/api.constants";
+import { PriceResponse } from "@/types";
 
 const DEFAULT_TOKENS = ["project89"];
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -74,7 +74,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
         }
 
         const responseData = await response.json();
-        const data = responseData[symbol] as TokenPriceData;
+        const data = responseData[symbol];
         if (!data) {
           throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
         }

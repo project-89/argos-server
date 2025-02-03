@@ -1,9 +1,9 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 import { ApiError } from "../utils/error";
-import { ROLE, ROLE_PERMISSIONS, Permission } from "../constants/roles";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ROLE, ROLE_PERMISSIONS, Permission } from "../constants/roles.constants";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 /**
  * Creates middleware to check if the user has the required permission

@@ -3,18 +3,18 @@ import { validateRequest } from "../middleware/validation.middleware";
 import { sendError, sendSuccess } from "../utils/response";
 import { updatePresence, getPresence, updateActivity } from "../services/presence.service";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
-import { schemas } from "../schemas/schemas";
+import { PresenceActivitySchema, PresenceGetSchema, PresenceUpdateSchema } from "@/schemas";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections";
+import { COLLECTIONS } from "../constants/collections.constants";
 
 const router = Router();
 
 // Update presence status
 router.put(
   "/:fingerprintId",
-  validateRequest(schemas.presenceUpdate),
+  validateRequest(PresenceUpdateSchema),
   async (req, res, next) => {
     try {
       const { fingerprintId } = req.params;
@@ -35,7 +35,7 @@ router.put(
       const { fingerprintId } = req.params;
       const { status } = req.body;
 
-      const presence = await updatePresence(fingerprintId, status);
+      const presence = await updatePresence({ fingerprintId, status });
       return sendSuccess(res, presence, "Presence status updated");
     } catch (error) {
       return sendError(
@@ -51,12 +51,12 @@ router.put(
 // Get current presence status
 router.get(
   "/:fingerprintId",
-  validateRequest(schemas.presenceGet),
+  validateRequest(PresenceGetSchema),
   verifyOwnership,
   async (req, res) => {
     try {
       const { fingerprintId } = req.params;
-      const presence = await getPresence(fingerprintId);
+      const presence = await getPresence({ fingerprintId });
       return sendSuccess(res, presence, "Presence status retrieved");
     } catch (error) {
       return sendError(
@@ -70,12 +70,12 @@ router.get(
 // Update activity timestamp
 router.post(
   "/:fingerprintId/activity",
-  validateRequest(schemas.presenceActivity),
+  validateRequest(PresenceActivitySchema),
   verifyOwnership,
   async (req, res) => {
     try {
       const { fingerprintId } = req.params;
-      const presence = await updateActivity(fingerprintId);
+      const presence = await updateActivity({ fingerprintId });
       return sendSuccess(res, presence, "Activity timestamp updated");
     } catch (error) {
       return sendError(

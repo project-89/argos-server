@@ -1,9 +1,13 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { schemas } from "../schemas/schemas";
+import {
+  FingerprintParamsSchema,
+  FingerprintRegisterSchema,
+  FingerprintUpdateSchema,
+} from "@/schemas";
 import { sendError, sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 import {
   createFingerprint,
   getFingerprintAndUpdateIp,
@@ -14,13 +18,13 @@ import {
 const LOG_PREFIX = "[Fingerprint Endpoint]";
 
 export const register = [
-  validateRequest(schemas.fingerprintRegister),
+  validateRequest(FingerprintRegisterSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log(`${LOG_PREFIX} Starting fingerprint registration`);
       const { fingerprint, metadata } = req.body;
       const ip = getClientIp(req);
-      const result = await createFingerprint(fingerprint, ip, metadata);
+      const result = await createFingerprint({ fingerprint, ip, metadata });
       console.log(`${LOG_PREFIX} Successfully created fingerprint`);
       return sendSuccess(res, result, "Fingerprint registered successfully", 201);
     } catch (error) {
@@ -34,12 +38,12 @@ export const register = [
 ];
 
 export const get = [
-  validateRequest(schemas.fingerprintParams),
+  validateRequest(FingerprintParamsSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log(`${LOG_PREFIX} Starting fingerprint retrieval`);
-      const fingerprintId = req.params.id;
-      const result = await getFingerprintAndUpdateIp(fingerprintId, getClientIp(req));
+      const fingerprintId = req.params.fingerprintId;
+      const result = await getFingerprintAndUpdateIp({ fingerprintId, ip: getClientIp(req) });
       console.log(`${LOG_PREFIX} Successfully retrieved fingerprint`);
       return sendSuccess(res, result.data);
     } catch (error) {
@@ -53,12 +57,12 @@ export const get = [
 ];
 
 export const update = [
-  validateRequest(schemas.fingerprintUpdate),
+  validateRequest(FingerprintUpdateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log(`${LOG_PREFIX} Starting fingerprint update`);
       const { fingerprintId, metadata } = req.body;
-      const result = await updateFingerprintMetadata(fingerprintId, metadata);
+      const result = await updateFingerprintMetadata({ fingerprintId, metadata });
       console.log(`${LOG_PREFIX} Successfully updated fingerprint`);
       return sendSuccess(res, result, "Fingerprint updated successfully");
     } catch (error) {

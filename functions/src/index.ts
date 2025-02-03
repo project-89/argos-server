@@ -18,13 +18,13 @@ import cors from "cors";
 import { validateApiKeyMiddleware } from "./middleware/auth.middleware";
 import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
 import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
-import { CORS_CONFIG } from "./constants/config";
+import { CORS_CONFIG } from "./constants/config.constants";
 import { composeMiddleware } from "./middleware/compose.middleware";
 import { MiddlewareConfig } from "./middleware/config.middleware";
 import { withMetrics } from "./middleware/metrics.middleware";
 import { errorHandler } from "./middleware/error.middleware";
 import { ApiError } from "./utils/error";
-import { ERROR_MESSAGES } from "./constants/api";
+import { ERROR_MESSAGES } from "./constants/api.constants";
 import { sendError } from "./utils/response";
 
 // Import routers

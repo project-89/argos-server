@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ERROR_MESSAGES } from "../constants/api";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 
 export const ApiKeyRegisterSchema = z.object({
   body: z.object({
