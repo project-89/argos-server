@@ -93,8 +93,14 @@ export const updateLastActive = async (profileId: string): Promise<void> => {
 export const calculateSuccessRate = async (profileId: string): Promise<number> => {
   try {
     const db = getFirestore();
-    const stats = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
-    return stats.data()?.successRate || 0;
+    const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
+
+    if (!doc.exists) {
+      throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
+    }
+
+    const data = doc.data();
+    return data?.successRate || 0;
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }

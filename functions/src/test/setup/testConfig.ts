@@ -1,4 +1,4 @@
-import { PriceResponse } from "../../types/old-api.types";
+import { PriceResponse } from "@/types/services";
 
 export interface TestConfig {
   projectId: string;

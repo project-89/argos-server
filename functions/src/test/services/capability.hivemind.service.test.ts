@@ -6,6 +6,7 @@ import { profileService } from "../../services/profile.hivemind.service";
 import { toUnixMillis } from "../../utils/timestamp";
 import { SkillLevel, SkillModel, ProfileCapabilityModel } from "../../types/services";
 import { skillMatchingService } from "../../services/skillMatching.hivemind.service";
+import { ApiError } from "../../utils/error";
 
 describe("CapabilityService", () => {
   const db = getFirestore();
@@ -242,7 +243,7 @@ describe("CapabilityService", () => {
       };
 
       await expect(capabilityService.createCapability(testProfileId, input)).rejects.toThrow(
-        ERROR_MESSAGES.INTERNAL_ERROR,
+        ERROR_MESSAGES.SKILL_NAME_REQUIRED,
       );
     });
 
@@ -255,7 +256,7 @@ describe("CapabilityService", () => {
       };
 
       await expect(capabilityService.createCapability(testProfileId, input)).rejects.toThrow(
-        ERROR_MESSAGES.INTERNAL_ERROR,
+        ERROR_MESSAGES.SKILL_NAME_TOO_LONG,
       );
     });
 
@@ -264,11 +265,11 @@ describe("CapabilityService", () => {
         name: "Valid Name",
         level: SkillLevel.Advanced,
         type: "Development" as const,
-        description: "a".repeat(1001),
+        description: "a".repeat(501),
       };
 
       await expect(capabilityService.createCapability(testProfileId, input)).rejects.toThrow(
-        ERROR_MESSAGES.INTERNAL_ERROR,
+        ERROR_MESSAGES.SKILL_DESCRIPTION_TOO_LONG,
       );
     });
 
@@ -283,6 +284,27 @@ describe("CapabilityService", () => {
       await expect(capabilityService.createCapability(testProfileId, input)).rejects.toThrow(
         ERROR_MESSAGES.INVALID_SKILL_LEVEL,
       );
+    });
+
+    it("should handle skill matching service failure gracefully", async () => {
+      analyzeSkillSpy.mockRejectedValueOnce(new Error("Service unavailable"));
+
+      const input = {
+        name: "Test Skill",
+        level: SkillLevel.Advanced,
+        type: "Development" as const,
+      };
+
+      try {
+        await capabilityService.createCapability(testProfileId, input);
+        fail("Expected an error to be thrown");
+      } catch (error) {
+        if (!(error instanceof ApiError)) {
+          fail("Expected an ApiError to be thrown");
+        }
+        expect(error.message).toBe("Service unavailable");
+        expect(error.statusCode).toBe(500);
+      }
     });
   });
 
@@ -551,22 +573,6 @@ describe("CapabilityService", () => {
   });
 
   describe("Edge Cases and Error Handling", () => {
-    it("should handle skill matching service failure gracefully", async () => {
-      // Mock skill matching service to throw an error
-      analyzeSkillSpy.mockRejectedValueOnce(new Error("Service unavailable"));
-
-      const input = {
-        name: "New Skill",
-        level: SkillLevel.Advanced,
-        type: "Development" as const,
-        description: "Test description",
-      };
-
-      await expect(capabilityService.createCapability(testProfileId, input)).rejects.toThrow(
-        ERROR_MESSAGES.INTERNAL_ERROR,
-      );
-    });
-
     it("should handle concurrent capability creation", async () => {
       analyzeSkillSpy.mockResolvedValue({
         matches: [],

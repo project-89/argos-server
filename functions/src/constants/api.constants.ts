@@ -59,6 +59,9 @@ export const ERROR_MESSAGES = {
   INVALID_SKILL_LEVEL: "Skill level must be between 1 and 100",
   CAPABILITY_ALREADY_VERIFIED: "Capability is already verified",
   ALREADY_ENDORSED: "Already endorsed this capability",
+  SKILL_NAME_REQUIRED: "Skill name is required",
+  SKILL_NAME_TOO_LONG: "Skill name is too long",
+  SKILL_DESCRIPTION_TOO_LONG: "Skill description is too long",
 
   // Visit errors
   SITE_NOT_FOUND: "Site not found",

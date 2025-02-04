@@ -2,7 +2,7 @@ import { getCurrentUnixMillis } from "../utils/timestamp";
 import { ROLE } from "../constants/roles.constants";
 import { Fingerprint } from "../types/models/models.types";
 import { Timestamp } from "firebase-admin/firestore";
-import { PriceResponse } from "../types/old-api.types";
+import { PriceResponse } from "@/types/services";
 
 export const MOCK_PRICE_DATA: PriceResponse = {
   project89: {

@@ -22,6 +22,20 @@ export const capabilityService = {
   ): Promise<ProfileCapability> {
     try {
       console.log("[createCapability] Starting with input:", { profileId, input });
+
+      // Basic input validation
+      if (!input.name || input.name.trim().length === 0) {
+        throw ApiError.from(null, 400, ERROR_MESSAGES.SKILL_NAME_REQUIRED);
+      }
+
+      if (input.name.length > 100) {
+        throw ApiError.from(null, 400, ERROR_MESSAGES.SKILL_NAME_TOO_LONG);
+      }
+
+      if (input.description && input.description.length > 500) {
+        throw ApiError.from(null, 400, ERROR_MESSAGES.SKILL_DESCRIPTION_TOO_LONG);
+      }
+
       const db = getFirestore();
       const skillsCollection = db.collection(COLLECTIONS.SKILLS);
       const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
@@ -46,11 +60,7 @@ export const capabilityService = {
       const type = input.type || analysis.suggestedType;
       const category = input.category || analysis.suggestedCategory;
       if (!type) {
-        throw ApiError.from(
-          null,
-          400,
-          `${ERROR_MESSAGES.INVALID_INPUT}: Could not determine skill type`,
-        );
+        throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_INPUT);
       }
 
       // Check if skill already exists
