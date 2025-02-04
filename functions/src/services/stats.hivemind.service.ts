@@ -3,112 +3,113 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils/error";
 import { StatsModel, StatsResponse } from "../types/services";
 
-class StatsService {
-  private db = getFirestore();
+export const getStats = async (profileId: string): Promise<StatsResponse> => {
+  try {
+    const db = getFirestore();
+    const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
 
-  async getStats(profileId: string): Promise<StatsResponse> {
-    try {
-      const doc = await this.db.collection(COLLECTIONS.STATS).doc(profileId).get();
-
-      if (!doc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.STATS_NOT_FOUND);
-      }
-
-      const data = doc.data() as StatsModel;
-      return {
-        ...data,
-        joinedAt: data.joinedAt.toMillis(),
-        lastActive: data.lastActive.toMillis(),
-        createdAt: data.createdAt.toMillis(),
-        updatedAt: data.updatedAt.toMillis(),
-      };
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    if (!doc.exists) {
+      throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
     }
+
+    const data = doc.data() as StatsModel;
+    return {
+      ...data,
+      joinedAt: data.joinedAt.toMillis(),
+      lastActive: data.lastActive.toMillis(),
+      createdAt: data.createdAt.toMillis(),
+      updatedAt: data.updatedAt.toMillis(),
+    };
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
+};
 
-  async updateStats(profileId: string, updates: Partial<StatsModel>): Promise<StatsResponse> {
-    try {
-      const doc = await this.db.collection(COLLECTIONS.STATS).doc(profileId).get();
+export const updateStats = async (
+  profileId: string,
+  updates: Partial<StatsModel>,
+): Promise<StatsResponse> => {
+  try {
+    const db = getFirestore();
+    const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
 
-      if (!doc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.STATS_NOT_FOUND);
-      }
-
-      const now = Timestamp.now();
-      const updateData = {
-        ...updates,
-        lastActive: now,
-        updatedAt: now,
-      };
-
-      await doc.ref.update(updateData);
-      return this.getStats(profileId);
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    if (!doc.exists) {
+      throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
     }
-  }
 
-  async recordHistory(profileId: string, stats: StatsResponse): Promise<void> {
-    try {
-      const historyRef = this.db.collection(COLLECTIONS.STATS_HISTORY);
-      await historyRef.add({
-        timestamp: Timestamp.now(),
-        stats: {
-          ...stats,
-          joinedAt: Timestamp.fromMillis(stats.joinedAt),
-          lastActive: Timestamp.fromMillis(stats.lastActive),
-          createdAt: Timestamp.fromMillis(stats.createdAt),
-          updatedAt: Timestamp.fromMillis(stats.updatedAt),
-        },
-      });
-    } catch (error) {
-      console.error("[Stats Service] Error recording history:", error);
-      // Don't throw here as per test implementation
+    const now = Timestamp.now();
+    const updateData = {
+      ...updates,
+      lastActive: now,
+      updatedAt: now,
+    };
+
+    await doc.ref.update(updateData);
+    return getStats(profileId);
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+};
+
+export const recordHistory = async (profileId: string, stats: StatsResponse): Promise<void> => {
+  try {
+    const db = getFirestore();
+    const historyRef = db.collection(COLLECTIONS.STATS_HISTORY);
+    await historyRef.add({
+      timestamp: Timestamp.now(),
+      stats: {
+        ...stats,
+        joinedAt: Timestamp.fromMillis(stats.joinedAt),
+        lastActive: Timestamp.fromMillis(stats.lastActive),
+        createdAt: Timestamp.fromMillis(stats.createdAt),
+        updatedAt: Timestamp.fromMillis(stats.updatedAt),
+      },
+    });
+  } catch (error) {
+    console.error("[Stats Service] Error recording history:", error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+};
+
+export const updateLastActive = async (profileId: string): Promise<void> => {
+  try {
+    const db = getFirestore();
+    const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
+
+    if (!doc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.STATS_NOT_FOUND);
     }
+
+    const now = Timestamp.now();
+    await doc.ref.update({
+      lastActive: now,
+      updatedAt: now,
+    });
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
+};
 
-  async updateLastActive(profileId: string): Promise<void> {
-    try {
-      const doc = await this.db.collection(COLLECTIONS.STATS).doc(profileId).get();
-
-      if (!doc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.STATS_NOT_FOUND);
-      }
-
-      const now = Timestamp.now();
-      await doc.ref.update({
-        lastActive: now,
-        updatedAt: now,
-      });
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+export const calculateSuccessRate = async (profileId: string): Promise<number> => {
+  try {
+    const db = getFirestore();
+    const stats = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
+    return stats.data()?.successRate || 0;
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
+};
 
-  async calculateSuccessRate(profileId: string): Promise<number> {
-    try {
-      const stats = await this.getStats(profileId);
-      return stats.successRate;
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+export const updateReputation = async (
+  profileId: string,
+  change: number,
+): Promise<StatsResponse> => {
+  try {
+    const db = getFirestore();
+    const stats = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
+    const newReputation = Math.max(0, stats.data()?.reputation + change);
+    return updateStats(profileId, { reputation: newReputation });
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-
-  async updateReputation(profileId: string, change: number): Promise<StatsResponse> {
-    try {
-      const stats = await this.getStats(profileId);
-      const newReputation = Math.max(0, stats.reputation + change);
-      return this.updateStats(profileId, { reputation: newReputation });
-    } catch (error) {
-      if (error instanceof ApiError) throw error;
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
-  }
-}
-
-export const statsService = new StatsService();
+};

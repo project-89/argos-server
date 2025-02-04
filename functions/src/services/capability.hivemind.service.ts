@@ -20,21 +20,21 @@ export const capabilityService = {
     profileId: string,
     input: CreateCapabilityInput,
   ): Promise<ProfileCapability> {
-    console.log("[createCapability] Starting with input:", { profileId, input });
-    const db = getFirestore();
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-
     try {
+      console.log("[createCapability] Starting with input:", { profileId, input });
+      const db = getFirestore();
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+
       // Check if profile exists
       const profileDoc = await db.collection(COLLECTIONS.PROFILES).doc(profileId).get();
       if (!profileDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
       }
 
       // Validate skill level
       if (!Object.values(SkillLevel).includes(input.level)) {
-        throw new ApiError(400, ERROR_MESSAGES.INVALID_SKILL_LEVEL);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_SKILL_LEVEL);
       }
 
       // Analyze skill and find similar skills
@@ -46,7 +46,11 @@ export const capabilityService = {
       const type = input.type || analysis.suggestedType;
       const category = input.category || analysis.suggestedCategory;
       if (!type) {
-        throw new ApiError(400, `${ERROR_MESSAGES.INVALID_INPUT}: Could not determine skill type`);
+        throw ApiError.from(
+          null,
+          400,
+          `${ERROR_MESSAGES.INVALID_INPUT}: Could not determine skill type`,
+        );
       }
 
       // Check if skill already exists
@@ -95,7 +99,7 @@ export const capabilityService = {
         .get();
 
       if (!existingCapability.empty) {
-        throw new ApiError(400, ERROR_MESSAGES.CAPABILITY_EXISTS);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.CAPABILITY_EXISTS);
       }
 
       // Create profile capability
@@ -126,37 +130,28 @@ export const capabilityService = {
         profileId,
         input,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      // If skill analysis fails, return a clear error
-      if (error instanceof Error && error.message.includes("Gemini")) {
-        throw new ApiError(
-          503,
-          "Skill analysis service is temporarily unavailable. Please try again later.",
-        );
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async getCapability(capabilityId: string): Promise<ProfileCapability & Skill> {
-    console.log("[getCapability] Starting with id:", capabilityId);
-    const db = getFirestore();
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      console.log("[getCapability] Starting with id:", capabilityId);
+      const db = getFirestore();
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+
       const capabilityDoc = await profileCapabilitiesCollection.doc(capabilityId).get();
       if (!capabilityDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
       }
 
       const capability = capabilityDoc.data() as ProfileCapabilityModel;
       const skillDoc = await skillsCollection.doc(capability.skillId).get();
 
       if (!skillDoc.exists) {
-        throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+        throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
       }
 
       const skill = skillDoc.data() as SkillModel;
@@ -174,20 +169,18 @@ export const capabilityService = {
         stack: error instanceof Error ? error.stack : undefined,
         capabilityId,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async getCapabilities(profileId: string): Promise<Array<ProfileCapability & Skill>> {
-    console.log("[getCapabilities] Starting with profileId:", profileId);
-    const db = getFirestore();
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      console.log("[getCapabilities] Starting with profileId:", profileId);
+      const db = getFirestore();
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+
       const capabilitiesSnapshot = await profileCapabilitiesCollection
         .where("profileId", "==", profileId)
         .get();
@@ -200,7 +193,7 @@ export const capabilityService = {
           const skillDoc = await skillsCollection.doc(capability.skillId).get();
 
           if (!skillDoc.exists) {
-            throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+            throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
           }
 
           const skill = skillDoc.data() as SkillModel;
@@ -222,10 +215,8 @@ export const capabilityService = {
         stack: error instanceof Error ? error.stack : undefined,
         profileId,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -234,32 +225,32 @@ export const capabilityService = {
     capabilityId: string,
     input: UpdateCapabilityInput,
   ): Promise<ProfileCapability & Skill> {
-    console.log("[updateCapability] Starting with:", { profileId, capabilityId, input });
-    const db = getFirestore();
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      console.log("[updateCapability] Starting with:", { profileId, capabilityId, input });
+      const db = getFirestore();
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+
       // Validate skill level if provided
       if (input.level && !Object.values(SkillLevel).includes(input.level)) {
-        throw new ApiError(400, ERROR_MESSAGES.INVALID_SKILL_LEVEL);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_SKILL_LEVEL);
       }
 
       const capabilityRef = profileCapabilitiesCollection.doc(capabilityId);
       const capabilityDoc = await capabilityRef.get();
 
       if (!capabilityDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
       }
 
       const capability = capabilityDoc.data() as ProfileCapabilityModel;
       if (capability.profileId !== profileId) {
-        throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+        throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
       }
 
       const skillDoc = await skillsCollection.doc(capability.skillId).get();
       if (!skillDoc.exists) {
-        throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+        throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
       }
 
       const skill = skillDoc.data() as SkillModel;
@@ -328,10 +319,7 @@ export const capabilityService = {
         capabilityId,
         input,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -339,22 +327,22 @@ export const capabilityService = {
     capabilityId: string,
     verifierId: string,
   ): Promise<ProfileCapability & Skill> {
-    console.log("[verifyCapability] Starting with:", { capabilityId, verifierId });
-    const db = getFirestore();
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      console.log("[verifyCapability] Starting with:", { capabilityId, verifierId });
+      const db = getFirestore();
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+
       const capabilityRef = profileCapabilitiesCollection.doc(capabilityId);
       const capabilityDoc = await capabilityRef.get();
 
       if (!capabilityDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
       }
 
       const capability = capabilityDoc.data() as ProfileCapabilityModel;
       if (capability.isVerified) {
-        throw new ApiError(400, ERROR_MESSAGES.CAPABILITY_ALREADY_VERIFIED);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.CAPABILITY_ALREADY_VERIFIED);
       }
 
       const now = Timestamp.now();
@@ -378,7 +366,7 @@ export const capabilityService = {
 
       const skillDoc = await skillsCollection.doc(capability.skillId).get();
       if (!skillDoc.exists) {
-        throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+        throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
       }
 
       const skill = skillDoc.data() as SkillModel;
@@ -400,30 +388,27 @@ export const capabilityService = {
         capabilityId,
         verifierId,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async deleteCapability(profileId: string, capabilityId: string): Promise<void> {
-    console.log("[deleteCapability] Starting with:", { profileId, capabilityId });
-    const db = getFirestore();
-    const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
-    const skillsCollection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      console.log("[deleteCapability] Starting with:", { profileId, capabilityId });
+      const db = getFirestore();
+      const profileCapabilitiesCollection = db.collection(COLLECTIONS.PROFILE_CAPABILITIES);
+      const skillsCollection = db.collection(COLLECTIONS.SKILLS);
+
       const capabilityRef = profileCapabilitiesCollection.doc(capabilityId);
       const capabilityDoc = await capabilityRef.get();
 
       if (!capabilityDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
       }
 
       const capability = capabilityDoc.data() as ProfileCapabilityModel;
       if (capability.profileId !== profileId) {
-        throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+        throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
       }
 
       // Decrement useCount on the skill
@@ -452,10 +437,7 @@ export const capabilityService = {
         profileId,
         capabilityId,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -468,7 +450,7 @@ export const capabilityService = {
       return analysis.matches.map((match) => match.skill);
     } catch (error) {
       console.error("[findSimilarCapabilities] Error:", error);
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -483,7 +465,7 @@ export const capabilityService = {
       });
     } catch (error) {
       console.error("[searchCapabilities] Error:", error);
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 };

@@ -10,6 +10,9 @@ export const HTTP_STATUS = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  // hivemind errors
+  PROFILE_NOT_FOUND_FOR_WALLET: "Profile not found for wallet address",
+
   // API Key errors
   INVALID_API_KEY: "Invalid API key",
   MISSING_API_KEY: "API key is required",

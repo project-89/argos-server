@@ -14,11 +14,11 @@ import {
 
 export const profileService = {
   async createProfile(input: CreateProfileInput): Promise<Profile> {
-    console.log("[createProfile] Starting with input:", input);
-    const db = getFirestore();
-    const collection = db.collection(COLLECTIONS.PROFILES);
-
     try {
+      console.log("[createProfile] Starting with input:", input);
+      const db = getFirestore();
+      const collection = db.collection(COLLECTIONS.PROFILES);
+
       // Check if profile already exists with this wallet
       const existing = await collection
         .where("walletAddress", "==", input.walletAddress)
@@ -28,7 +28,7 @@ export const profileService = {
       console.log("[createProfile] Existing check result:", { exists: !existing.empty });
 
       if (!existing.empty) {
-        throw new ApiError(400, ERROR_MESSAGES.PROFILE_EXISTS);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.PROFILE_EXISTS);
       }
 
       // Check if username is taken
@@ -40,7 +40,7 @@ export const profileService = {
       console.log("[createProfile] Username check result:", { exists: !existingUsername.empty });
 
       if (!existingUsername.empty) {
-        throw new ApiError(400, ERROR_MESSAGES.USERNAME_TAKEN);
+        throw ApiError.from(null, 400, ERROR_MESSAGES.USERNAME_TAKEN);
       }
 
       const now = Timestamp.now();
@@ -98,20 +98,17 @@ export const profileService = {
         stack: error instanceof Error ? error.stack : undefined,
         input,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async getProfile(id: string): Promise<ProfileWithStats> {
-    console.log("[getProfile] Starting with id:", id);
-    const db = getFirestore();
-    const profileCollection = db.collection(COLLECTIONS.PROFILES);
-    const statsCollection = db.collection(COLLECTIONS.STATS);
-
     try {
+      console.log("[getProfile] Starting with id:", id);
+      const db = getFirestore();
+      const profileCollection = db.collection(COLLECTIONS.PROFILES);
+      const statsCollection = db.collection(COLLECTIONS.STATS);
+
       // Get both profile and stats in parallel
       const [profileDoc, statsDoc] = await Promise.all([
         profileCollection.doc(id).get(),
@@ -124,7 +121,7 @@ export const profileService = {
       });
 
       if (!profileDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
       }
 
       const profileData = profileDoc.data() as ProfileModel;
@@ -150,19 +147,16 @@ export const profileService = {
         stack: error instanceof Error ? error.stack : undefined,
         id,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async getProfileByWallet(walletAddress: string): Promise<ProfileWithStats> {
-    console.log("[getProfileByWallet] Starting with walletAddress:", walletAddress);
-    const db = getFirestore();
-    const profileCollection = db.collection(COLLECTIONS.PROFILES);
-
     try {
+      console.log("[getProfileByWallet] Starting with walletAddress:", walletAddress);
+      const db = getFirestore();
+      const profileCollection = db.collection(COLLECTIONS.PROFILES);
+
       const snapshot = await profileCollection
         .where("walletAddress", "==", walletAddress)
         .limit(1)
@@ -170,7 +164,7 @@ export const profileService = {
       console.log("[getProfileByWallet] Profile found:", { found: !snapshot.empty });
 
       if (snapshot.empty) {
-        throw new ApiError(404, "Profile not found for wallet address");
+        throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND_FOR_WALLET);
       }
 
       const profileData = snapshot.docs[0].data() as ProfileModel;
@@ -198,24 +192,21 @@ export const profileService = {
         stack: error instanceof Error ? error.stack : undefined,
         walletAddress,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   async updateProfile(id: string, input: UpdateProfileInput): Promise<Profile> {
-    console.log("[updateProfile] Starting with:", { id, input });
-    const db = getFirestore();
-    const collection = db.collection(COLLECTIONS.PROFILES);
-
     try {
+      console.log("[updateProfile] Starting with:", { id, input });
+      const db = getFirestore();
+      const collection = db.collection(COLLECTIONS.PROFILES);
+
       const doc = await collection.doc(id).get();
       console.log("[updateProfile] Document exists:", doc.exists);
 
       if (!doc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
       }
 
       // If username is being updated, check if new username is taken
@@ -231,7 +222,7 @@ export const profileService = {
         });
 
         if (!existingUsername.empty && existingUsername.docs[0].id !== id) {
-          throw new ApiError(400, ERROR_MESSAGES.USERNAME_TAKEN);
+          throw ApiError.from(null, 400, ERROR_MESSAGES.USERNAME_TAKEN);
         }
       }
 
@@ -275,10 +266,7 @@ export const profileService = {
         id,
         input,
       });
-      if (error instanceof ApiError) {
-        throw error;
-      }
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -351,7 +339,7 @@ export const profileService = {
       return { profiles, total };
     } catch (error) {
       console.error("[Profile Service] Error searching profiles:", error);
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 };

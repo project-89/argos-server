@@ -52,7 +52,7 @@ export const skillMatchingService = {
       };
     } catch (error) {
       console.error("[analyzeSkill] Error:", error);
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -80,7 +80,7 @@ Provide structured data with:
       return object;
     } catch (error) {
       console.error("[analyzeWithStructuredData] Analysis failed:", error);
-      throw error;
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -88,10 +88,10 @@ Provide structured data with:
    * Find matching capabilities based on description and structured data analysis
    */
   async findMatches(description: string, analysis: SkillAnalysis): Promise<SkillMatch[]> {
-    const db = getFirestore();
-    const collection = db.collection(COLLECTIONS.SKILLS);
-
     try {
+      const db = getFirestore();
+      const collection = db.collection(COLLECTIONS.SKILLS);
+
       // Get capabilities of the same type or parent type
       const typeMatches = collection.where("type", "==", analysis.type);
       const parentTypeMatches = analysis.parentType
@@ -158,7 +158,7 @@ Provide structured data with:
       return matches.sort((a, b) => b.confidence - a.confidence);
     } catch (error) {
       console.error("[findMatches] Database error:", error);
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
@@ -208,84 +208,109 @@ Provide a similarity score between 0 and 1, and list the reasons for your score.
    * Map SkillModel to Skill interface
    */
   mapToSkill(model: SkillModel): Skill {
-    return {
-      ...model,
-      createdAt: toUnixMillis(model.createdAt),
-      updatedAt: toUnixMillis(model.updatedAt),
-    };
+    try {
+      return {
+        ...model,
+        createdAt: toUnixMillis(model.createdAt),
+        updatedAt: toUnixMillis(model.updatedAt),
+      };
+    } catch (error) {
+      console.error("[mapToSkill] Error:", error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
   },
 
   /**
    * Check if description matches skill name (fuzzy match)
    */
   hasNameMatch(description: string, name: string): boolean {
-    return (
-      description.toLowerCase().includes(name.toLowerCase()) ||
-      name.toLowerCase().includes(description.toLowerCase())
-    );
+    try {
+      return (
+        description.toLowerCase().includes(name.toLowerCase()) ||
+        name.toLowerCase().includes(description.toLowerCase())
+      );
+    } catch (error) {
+      console.error("[hasNameMatch] Error:", error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
   },
 
   /**
    * Check if description matches any aliases
    */
   hasAliasMatch(description: string, aliases?: string[]): boolean {
-    if (!aliases) return false;
-    return aliases.some(
-      (alias) =>
-        description.toLowerCase().includes(alias.toLowerCase()) ||
-        alias.toLowerCase().includes(description.toLowerCase()),
-    );
+    try {
+      if (!aliases) return false;
+      return aliases.some(
+        (alias) =>
+          description.toLowerCase().includes(alias.toLowerCase()) ||
+          alias.toLowerCase().includes(description.toLowerCase()),
+      );
+    } catch (error) {
+      console.error("[hasAliasMatch] Error:", error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
   },
 
   /**
    * Check if description contains any matching keywords
    */
   hasKeywordMatch(description: string, keywords?: string[]): boolean {
-    if (!keywords) return false;
-    return keywords.some((keyword) => description.toLowerCase().includes(keyword.toLowerCase()));
+    try {
+      if (!keywords) return false;
+      return keywords.some((keyword) => description.toLowerCase().includes(keyword.toLowerCase()));
+    } catch (error) {
+      console.error("[hasKeywordMatch] Error:", error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
   },
 
   /**
    * Search capabilities for autocomplete
    */
   async searchCapabilities(input: SearchCapabilitiesInput): Promise<Skill[]> {
-    console.log("[searchCapabilities] Starting with input:", input);
-    const db = getFirestore();
-    const collection = db.collection(COLLECTIONS.SKILLS);
+    try {
+      console.log("[searchCapabilities] Starting with input:", input);
+      const db = getFirestore();
+      const collection = db.collection(COLLECTIONS.SKILLS);
 
-    let query = collection.orderBy("useCount", "desc");
+      let query = collection.orderBy("useCount", "desc");
 
-    if (input.type) {
-      query = query.where("type", "==", input.type);
+      if (input.type) {
+        query = query.where("type", "==", input.type);
+      }
+
+      if (input.category) {
+        query = query.where("category", "==", input.category);
+      }
+
+      if (input.parentType) {
+        query = query.where("parentType", "==", input.parentType);
+      }
+
+      const snapshot = await query.limit(input.limit || 10).get();
+
+      // Filter results client-side based on query
+      const results = snapshot.docs
+        .map((doc) => this.mapToSkill(doc.data() as SkillModel))
+        .filter((skill) => {
+          const searchTerms = input.query.toLowerCase().split(" ");
+          const searchableText = [
+            skill.name,
+            skill.description,
+            ...(skill.aliases || []),
+            ...(skill.keywords || []),
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return searchTerms.every((term) => searchableText.includes(term));
+        });
+
+      return results;
+    } catch (error) {
+      console.error("[searchCapabilities] Error:", error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
-
-    if (input.category) {
-      query = query.where("category", "==", input.category);
-    }
-
-    if (input.parentType) {
-      query = query.where("parentType", "==", input.parentType);
-    }
-
-    const snapshot = await query.limit(input.limit || 10).get();
-
-    // Filter results client-side based on query
-    const results = snapshot.docs
-      .map((doc) => this.mapToSkill(doc.data() as SkillModel))
-      .filter((skill) => {
-        const searchTerms = input.query.toLowerCase().split(" ");
-        const searchableText = [
-          skill.name,
-          skill.description,
-          ...(skill.aliases || []),
-          ...(skill.keywords || []),
-        ]
-          .join(" ")
-          .toLowerCase();
-
-        return searchTerms.every((term) => searchableText.includes(term));
-      });
-
-    return results;
   },
 };
