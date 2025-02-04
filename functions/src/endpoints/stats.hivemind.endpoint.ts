@@ -1,9 +1,12 @@
 import { Request, Response } from "express";
-import { statsService } from "../services/stats.hivemind.service";
 import { validateRequest } from "../middleware/validation.middleware";
 import { StatsGetSchema, StatsUpdateSchema } from "../schemas";
 import { sendError, sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
+import {
+  getStats as getStatsService,
+  updateStats as updateStatsService,
+} from "../services/stats.hivemind.service";
 
 /**
  * Get stats for a profile
@@ -13,7 +16,7 @@ export const getStats = [
   async (req: Request, res: Response): Promise<Response> => {
     try {
       console.log("[Get Stats] Starting with params:", req.params);
-      const stats = await statsService.getStats(req.params.profileId);
+      const stats = await getStatsService(req.params.profileId);
       console.log("[Get Stats] Successfully retrieved stats for profile:", {
         profileId: req.params.profileId,
       });
@@ -43,7 +46,7 @@ export const updateStats = [
         params: req.params,
         body: req.body,
       });
-      const stats = await statsService.updateStats(req.params.profileId, req.body);
+      const stats = await updateStatsService(req.params.profileId, req.body);
       console.log("[Update Stats] Successfully updated stats for profile:", {
         profileId: req.params.profileId,
       });

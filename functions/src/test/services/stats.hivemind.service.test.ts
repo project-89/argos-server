@@ -2,7 +2,14 @@ import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../../constants";
 import { cleanDatabase } from "../utils/testUtils";
-import { statsService } from "../../services/stats.hivemind.service";
+import {
+  calculateSuccessRate,
+  getStats,
+  recordHistory,
+  updateLastActive,
+  updateReputation,
+  updateStats,
+} from "../../services/stats.hivemind.service";
 import { profileService } from "../../services/profile.hivemind.service";
 
 describe("StatsService", () => {
@@ -25,7 +32,7 @@ describe("StatsService", () => {
       fingerprintId: testFingerprintId,
       username: "testuser",
     });
-    const stats = await statsService.getStats(profile.id);
+    const stats = await getStats(profile.id);
     return { profile, stats };
   };
 
@@ -47,9 +54,7 @@ describe("StatsService", () => {
     });
 
     it("should throw error if stats not found", async () => {
-      await expect(statsService.getStats("non-existent-id")).rejects.toThrow(
-        ERROR_MESSAGES.STATS_NOT_FOUND,
-      );
+      await expect(getStats("non-existent-id")).rejects.toThrow(ERROR_MESSAGES.STATS_NOT_FOUND);
     });
   });
 
@@ -63,7 +68,7 @@ describe("StatsService", () => {
         reputation: 10,
       };
 
-      const updated = await statsService.updateStats(profile.id, updates);
+      const updated = await updateStats(profile.id, updates);
 
       expect(updated).toMatchObject({
         id: profile.id,
@@ -89,16 +94,16 @@ describe("StatsService", () => {
     });
 
     it("should throw error if stats not found", async () => {
-      await expect(
-        statsService.updateStats("non-existent-id", { missionsCompleted: 1 }),
-      ).rejects.toThrow(ERROR_MESSAGES.STATS_NOT_FOUND);
+      await expect(updateStats("non-existent-id", { missionsCompleted: 1 })).rejects.toThrow(
+        ERROR_MESSAGES.STATS_NOT_FOUND,
+      );
     });
   });
 
   describe("recordHistory", () => {
     it("should record stats history", async () => {
       const { profile, stats } = await createProfileWithStats();
-      await statsService.recordHistory(profile.id, stats);
+      await recordHistory(profile.id, stats);
 
       const snapshot = await db
         .collection(COLLECTIONS.STATS_HISTORY)
@@ -129,15 +134,15 @@ describe("StatsService", () => {
       // Wait a bit to ensure timestamp difference
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      await statsService.updateLastActive(profile.id);
+      await updateLastActive(profile.id);
 
-      const updated = await statsService.getStats(profile.id);
+      const updated = await getStats(profile.id);
       expect(updated.lastActive).toBeGreaterThan(created.lastActive);
       expect(updated.updatedAt).toBeGreaterThan(created.updatedAt);
     });
 
     it("should throw error if stats not found", async () => {
-      await expect(statsService.updateLastActive("non-existent-id")).rejects.toThrow(
+      await expect(updateLastActive("non-existent-id")).rejects.toThrow(
         ERROR_MESSAGES.STATS_NOT_FOUND,
       );
     });
@@ -146,23 +151,23 @@ describe("StatsService", () => {
   describe("calculateSuccessRate", () => {
     it("should return 0 if no missions completed", async () => {
       const { profile } = await createProfileWithStats();
-      const rate = await statsService.calculateSuccessRate(profile.id);
+      const rate = await calculateSuccessRate(profile.id);
       expect(rate).toBe(0);
     });
 
     it("should return success rate if missions completed", async () => {
       const { profile } = await createProfileWithStats();
-      await statsService.updateStats(profile.id, {
+      await updateStats(profile.id, {
         missionsCompleted: 10,
         successRate: 80,
       });
 
-      const rate = await statsService.calculateSuccessRate(profile.id);
+      const rate = await calculateSuccessRate(profile.id);
       expect(rate).toBe(80);
     });
 
     it("should throw error if stats not found", async () => {
-      await expect(statsService.calculateSuccessRate("non-existent-id")).rejects.toThrow(
+      await expect(calculateSuccessRate("non-existent-id")).rejects.toThrow(
         ERROR_MESSAGES.STATS_NOT_FOUND,
       );
     });
@@ -171,28 +176,28 @@ describe("StatsService", () => {
   describe("updateReputation", () => {
     it("should update reputation", async () => {
       const { profile } = await createProfileWithStats();
-      const updated = await statsService.updateReputation(profile.id, 10);
+      const updated = await updateReputation(profile.id, 10);
       expect(updated.reputation).toBe(10);
     });
 
     it("should not allow reputation to go below 0", async () => {
       const { profile } = await createProfileWithStats();
-      const updated = await statsService.updateReputation(profile.id, -10);
+      const updated = await updateReputation(profile.id, -10);
       expect(updated.reputation).toBe(0);
     });
 
     it("should handle both positive and negative changes", async () => {
       const { profile } = await createProfileWithStats();
 
-      let updated = await statsService.updateReputation(profile.id, 20);
+      let updated = await updateReputation(profile.id, 20);
       expect(updated.reputation).toBe(20);
 
-      updated = await statsService.updateReputation(profile.id, -5);
+      updated = await updateReputation(profile.id, -5);
       expect(updated.reputation).toBe(15);
     });
 
     it("should throw error if stats not found", async () => {
-      await expect(statsService.updateReputation("non-existent-id", 10)).rejects.toThrow(
+      await expect(updateReputation("non-existent-id", 10)).rejects.toThrow(
         ERROR_MESSAGES.STATS_NOT_FOUND,
       );
     });
