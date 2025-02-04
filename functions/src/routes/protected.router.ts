@@ -10,7 +10,7 @@ import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
 const protectedRouter = Router();
 
 // Fingerprint operations
-protectedRouter.get("/fingerprint/:id", verifyOwnership, ...fingerprint.get);
+protectedRouter.get("/fingerprint/:fingerprintId", verifyOwnership, ...fingerprint.get);
 protectedRouter.post("/fingerprint/update", verifyOwnership, ...fingerprint.update);
 
 // Visit tracking - require ownership

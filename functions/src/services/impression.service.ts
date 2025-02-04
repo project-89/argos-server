@@ -1,8 +1,8 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections.constants";
 import { Impression } from "@/types";
 import { ApiError } from "../utils/error";
-import { getCurrentTimestamp } from "../utils/timestamp";
+
 import { ERROR_MESSAGES } from "../constants/api.constants";
 
 /**
@@ -54,7 +54,7 @@ export const createImpression = async ({
 }): Promise<Impression> => {
   try {
     const db = getFirestore();
-    const createdAt = getCurrentTimestamp();
+    const createdAt = Timestamp.now();
 
     const impression: Omit<Impression, "id"> = {
       fingerprintId,

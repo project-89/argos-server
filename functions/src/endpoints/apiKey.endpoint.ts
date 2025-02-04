@@ -1,10 +1,15 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-
-import { createApiKey, validateApiKey, deactivateApiKey } from "../services/apiKey.service";
+import {
+  createApiKey,
+  validateApiKey,
+  deactivateApiKey,
+  getApiKeyByKey,
+} from "../services/apiKey.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
 import { ApiKeyRegisterSchema, ApiKeyValidateSchema, ApiKeyDeactivateSchema } from "../schemas";
+import { ERROR_MESSAGES, SUCCESS_MESSAGES } from "../constants";
 
 /**
  * Register a new API key
@@ -29,7 +34,7 @@ export const register = [
           active: result.active,
           createdAt: result.createdAt,
         },
-        "API key registered successfully",
+        SUCCESS_MESSAGES.API_KEY_REGISTERED,
       );
     } catch (error) {
       console.error("[Register API Key] Error:", {
@@ -37,10 +42,7 @@ export const register = [
         stack: error instanceof Error ? error.stack : undefined,
         body: req.body,
       });
-      if (error instanceof ApiError) {
-        return sendError(res, error.message, error.statusCode);
-      }
-      return sendError(res, "Failed to register API key", 500);
+      return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_REGISTER_API_KEY));
     }
   },
 ];
@@ -67,10 +69,7 @@ export const validate = [
         stack: error instanceof Error ? error.stack : undefined,
         body: req.body,
       });
-      if (error instanceof ApiError) {
-        return sendError(res, error.message, error.statusCode);
-      }
-      return sendError(res, "Failed to validate API key", 500);
+      return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_VALIDATE_API_KEY));
     }
   },
 ];
@@ -83,17 +82,30 @@ export const deactivate = [
   async (req: Request, res: Response): Promise<Response> => {
     try {
       const { key } = req.body;
-      const fingerprintId = req.fingerprintId || "";
 
-      const result = await deactivateApiKey({ keyId: key, fingerprintId });
-      return sendSuccess(res, result, "API key deactivated successfully");
+      // Get the API key document first
+      const apiKey = await getApiKeyByKey(key);
+      if (!apiKey) {
+        throw ApiError.from(null, 404, ERROR_MESSAGES.API_KEY_NOT_FOUND);
+      }
+
+      // Check if the authenticated user's fingerprint matches the API key's fingerprint
+      if (apiKey.fingerprintId !== req.fingerprintId) {
+        throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      }
+
+      const result = await deactivateApiKey({
+        keyId: apiKey.id,
+        fingerprintId: apiKey.fingerprintId,
+      });
+      return sendSuccess(res, result, SUCCESS_MESSAGES.API_KEY_DEACTIVATED);
     } catch (error) {
       console.error("[Deactivate API Key] Error:", {
         error,
         stack: error instanceof Error ? error.stack : undefined,
         body: req.body,
       });
-      return sendError(res, "Failed to deactivate API key", 500);
+      return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_DEACTIVATE_API_KEY));
     }
   },
 ];

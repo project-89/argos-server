@@ -1,6 +1,6 @@
 import { describe, it, expect } from "@jest/globals";
-import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest } from "../utils/testUtils";
+import { TEST_CONFIG } from "../config/testConfig";
 
 describe("Health Endpoint", () => {
   const API_URL = TEST_CONFIG.apiUrl;

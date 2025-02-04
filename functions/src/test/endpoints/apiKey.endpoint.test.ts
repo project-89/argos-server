@@ -124,11 +124,11 @@ describe("API Key Endpoint", () => {
     });
   });
 
-  describe("POST /api-key/revoke", () => {
-    it("should revoke an existing API key", async () => {
+  describe("POST /api-key/deactivate", () => {
+    it("should deactivate an existing API key", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        url: `${TEST_CONFIG.apiUrl}/api-key/deactivate`,
         data: {
           key: validApiKey,
         },
@@ -139,7 +139,7 @@ describe("API Key Endpoint", () => {
 
       expect(response.status).toBe(200);
       expect(response.data.success).toBe(true);
-      expect(response.data.message).toBe("API key revoked successfully");
+      expect(response.data.message).toBe("API key deactivated successfully");
 
       // Verify the key is no longer valid by trying to use it
       const verifyResponse = await makeRequest({
@@ -161,7 +161,7 @@ describe("API Key Endpoint", () => {
     it("should reject request without API key", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        url: `${TEST_CONFIG.apiUrl}/api-key/deactivate`,
         data: {
           key: validApiKey,
         },
@@ -175,7 +175,7 @@ describe("API Key Endpoint", () => {
     it("should reject request with invalid API key", async () => {
       const response = await makeRequest({
         method: "post",
-        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        url: `${TEST_CONFIG.apiUrl}/api-key/deactivate`,
         data: {
           key: validApiKey,
         },
@@ -190,23 +190,26 @@ describe("API Key Endpoint", () => {
     });
 
     it("should reject request when API key does not match fingerprint", async () => {
-      // Create another fingerprint with a different API key
-      const { apiKey: otherApiKey } = await createTestData();
+      // Create first fingerprint and API key
+      const { apiKey: firstApiKey } = await createTestData({ skipCleanup: true });
+
+      // Create second fingerprint with a different API key
+      const { apiKey: secondApiKey } = await createTestData({ skipCleanup: true });
 
       const response = await makeRequest({
         method: "post",
-        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        url: `${TEST_CONFIG.apiUrl}/api-key/deactivate`,
         data: {
-          key: validApiKey,
+          key: firstApiKey,
         },
         headers: {
-          "x-api-key": otherApiKey,
+          "x-api-key": secondApiKey,
         },
       });
 
-      expect(response.status).toBe(401);
+      expect(response.status).toBe(403);
       expect(response.data.success).toBe(false);
-      expect(response.data.error).toBe(ERROR_MESSAGES.INVALID_API_KEY);
+      expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     });
   });
 
@@ -229,10 +232,10 @@ describe("API Key Endpoint", () => {
     });
 
     it("should indicate when a key needs refresh", async () => {
-      // Revoke the key first
+      // Deactivate the key
       await makeRequest({
         method: "post",
-        url: `${TEST_CONFIG.apiUrl}/api-key/revoke`,
+        url: `${TEST_CONFIG.apiUrl}/api-key/deactivate`,
         data: {
           key: validApiKey,
         },

@@ -9,7 +9,20 @@ export const HTTP_STATUS = {
   INTERNAL_SERVER_ERROR: 500,
 } as const;
 
+export const SUCCESS_MESSAGES = {
+  API_KEY_REGISTERED: "API key registered successfully",
+  API_KEY_VALIDATED: "API key validated successfully",
+  API_KEY_DEACTIVATED: "API key deactivated successfully",
+
+  IMPRESSION_CREATED: "Impression created successfully",
+  IMPRESSIONS_RETRIEVED: "Impressions retrieved successfully",
+  IMPRESSIONS_DELETED: "Impressions deleted successfully",
+} as const;
+
 export const ERROR_MESSAGES = {
+  // Impression errors
+  FAILED_TO_CREATE_IMPRESSION: "Failed to create impression",
+
   // hivemind errors
   PROFILE_NOT_FOUND_FOR_WALLET: "Profile not found for wallet address",
 
@@ -24,6 +37,7 @@ export const ERROR_MESSAGES = {
   FAILED_TO_CREATE_API_KEY: "Failed to create API key",
   FAILED_TO_GET_API_KEY: "Failed to get API key",
   FAILED_TO_VALIDATE_API_KEY: "Failed to validate API key",
+  FAILED_TO_REGISTER_API_KEY: "Failed to register API key",
 
   // Cache errors
   FAILED_TO_GET_CACHED_DATA: "Failed to get cached data",
@@ -43,6 +57,8 @@ export const ERROR_MESSAGES = {
   FINGERPRINT_EXISTS: "Fingerprint already exists",
   FINGERPRINT_MUST_BE_STRING: "Fingerprint must be a string",
   TARGET_FINGERPRINT_ID_REQUIRED: "Target fingerprint ID is required",
+  FAILED_TO_REGISTER_FINGERPRINT: "Failed to register fingerprint",
+
   // Profile errors
   PROFILE_NOT_FOUND: "Profile not found",
   PROFILE_EXISTS: "Profile already exists for this wallet address",

@@ -38,6 +38,8 @@ export const FingerprintUpdateSchema = z.object({
 });
 
 export const FingerprintParamsSchema = z.object({
+  body: z.object({}).optional(),
+  query: z.object({}).optional(),
   params: z.object({
     fingerprintId: z.string({
       required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,

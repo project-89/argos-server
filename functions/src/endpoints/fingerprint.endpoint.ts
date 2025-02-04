@@ -29,10 +29,11 @@ export const register = [
       return sendSuccess(res, result, "Fingerprint registered successfully", 201);
     } catch (error) {
       console.error(`${LOG_PREFIX} Error registering fingerprint:`, error);
-      if (error instanceof ApiError) {
-        return sendError(res, error, error.statusCode);
-      }
-      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
+
+      return sendError(
+        res,
+        ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_REGISTER_FINGERPRINT),
+      );
     }
   },
 ];
@@ -48,10 +49,11 @@ export const get = [
       return sendSuccess(res, result.data);
     } catch (error) {
       console.error(`${LOG_PREFIX} Error retrieving fingerprint:`, error);
-      if (error instanceof ApiError) {
-        return sendError(res, error, error.statusCode);
-      }
-      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
+
+      return sendError(
+        res,
+        ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_REGISTER_FINGERPRINT),
+      );
     }
   },
 ];
@@ -67,10 +69,10 @@ export const update = [
       return sendSuccess(res, result, "Fingerprint updated successfully");
     } catch (error) {
       console.error(`${LOG_PREFIX} Error updating fingerprint:`, error);
-      if (error instanceof ApiError) {
-        return sendError(res, error, error.statusCode);
-      }
-      return sendError(res, new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR), 500);
+      return sendError(
+        res,
+        ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_REGISTER_FINGERPRINT),
+      );
     }
   },
 ];
