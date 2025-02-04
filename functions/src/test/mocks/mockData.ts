@@ -1,6 +1,6 @@
-import { getCurrentUnixMillis } from "../utils/timestamp";
-import { ROLE } from "../constants/roles.constants";
-import { Fingerprint } from "../types/models/models.types";
+import { getCurrentUnixMillis } from "../../utils/timestamp";
+import { ROLE } from "../../constants/roles.constants";
+import { Fingerprint } from "../../types/models/models.types";
 import { Timestamp } from "firebase-admin/firestore";
 import { PriceResponse } from "@/types/services";
 

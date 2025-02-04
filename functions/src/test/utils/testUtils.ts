@@ -1,5 +1,5 @@
 import fetch, { RequestInit } from "node-fetch";
-import { TEST_CONFIG } from "../setup/testConfig";
+import { TEST_CONFIG } from "../config/testConfig";
 import { COLLECTIONS } from "../../constants/collections.constants";
 import { getFirestore } from "firebase-admin/firestore";
 import { Agent as HttpAgent } from "http";

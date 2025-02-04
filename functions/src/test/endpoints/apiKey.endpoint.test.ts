@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
-import { TEST_CONFIG } from "../setup/testConfig";
+import { TEST_CONFIG } from "../config/testConfig";
 import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants";
 
 describe("API Key Endpoint", () => {
   let fingerprintId: string;

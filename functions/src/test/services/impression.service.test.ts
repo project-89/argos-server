@@ -8,7 +8,7 @@ import {
 } from "../../services/impression.service";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase } from "../utils/testUtils";
-import { MockTimestamp } from "../utils/mockTimestamp";
+import { MockTimestamp } from "../mocks/mockTimestamp";
 import { Timestamp } from "firebase-admin/firestore";
 import { toUnixMillis } from "../../utils/timestamp";
 
