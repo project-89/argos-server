@@ -79,9 +79,9 @@ export interface Site {
 }
 
 export interface PresenceData {
-  status: "online" | "offline";
+  status: "online" | "offline" | "away";
   createdAt: Timestamp; // Converted to Unix timestamp for API responses
-  lastUpdated: number;
+  lastUpdated: Timestamp; // Converted to Unix timestamp for API responses
 }
 
 export interface FingerprintPresence {

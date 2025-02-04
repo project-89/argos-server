@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS } from "../../constants";
 import {
   verifyFingerprint,
   createImpression,
@@ -50,7 +50,7 @@ describe("Impression Service", () => {
         });
 
       // Test
-      await expect(verifyFingerprint(testFingerprintId)).resolves.not.toThrow();
+      await expect(verifyFingerprint({ fingerprintId: testFingerprintId })).resolves.not.toThrow();
     });
 
     it("should verify existing fingerprint with matching authenticated id", async () => {
@@ -74,11 +74,15 @@ describe("Impression Service", () => {
         });
 
       // Test
-      await expect(verifyFingerprint(testFingerprintId, testFingerprintId)).resolves.not.toThrow();
+      await expect(
+        verifyFingerprint({ fingerprintId: testFingerprintId, authenticatedId: testFingerprintId }),
+      ).resolves.not.toThrow();
     });
 
     it("should throw error for non-existent fingerprint", async () => {
-      await expect(verifyFingerprint("non-existent-id")).rejects.toThrow(ApiError);
+      await expect(verifyFingerprint({ fingerprintId: "non-existent-id" })).rejects.toThrow(
+        ApiError,
+      );
     });
 
     it("should throw error for mismatched authenticated id", async () => {
@@ -102,7 +106,9 @@ describe("Impression Service", () => {
         });
 
       // Test
-      await expect(verifyFingerprint(testFingerprintId, "wrong-auth-id")).rejects.toThrow(ApiError);
+      await expect(
+        verifyFingerprint({ fingerprintId: testFingerprintId, authenticatedId: "wrong-auth-id" }),
+      ).rejects.toThrow(ApiError);
     });
   });
 
@@ -128,7 +134,11 @@ describe("Impression Service", () => {
     });
 
     it("should create impression with required fields and proper timestamp format", async () => {
-      const impression = await createImpression(testFingerprintId, testType, testData);
+      const impression = await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
 
       // Check basic fields
       expect(impression).toMatchObject({
@@ -148,9 +158,14 @@ describe("Impression Service", () => {
     });
 
     it("should create impression with optional fields", async () => {
-      const impression = await createImpression(testFingerprintId, testType, testData, {
-        source: testSource,
-        sessionId: testSessionId,
+      const impression = await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+        options: {
+          source: testSource,
+          sessionId: testSessionId,
+        },
       });
 
       expect(impression).toMatchObject({
@@ -184,40 +199,60 @@ describe("Impression Service", () => {
         });
 
       // Create test impressions
-      await createImpression(testFingerprintId, testType, testData);
-      await createImpression(testFingerprintId, "other-type", testData);
-      await createImpression(testFingerprintId, testType, testData, {
-        sessionId: testSessionId,
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: "other-type",
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+        options: { sessionId: testSessionId },
       });
     });
 
     it("should get all impressions for fingerprint", async () => {
-      const impressions = await getImpressions(testFingerprintId);
+      const impressions = await getImpressions({ fingerprintId: testFingerprintId });
       expect(impressions).toHaveLength(3);
     });
 
     it("should filter impressions by type", async () => {
-      const impressions = await getImpressions(testFingerprintId, { type: testType });
+      const impressions = await getImpressions({
+        fingerprintId: testFingerprintId,
+        options: { type: testType },
+      });
       expect(impressions).toHaveLength(2);
       impressions.forEach((imp) => expect(imp.type).toBe(testType));
     });
 
     it("should filter impressions by session id", async () => {
-      const impressions = await getImpressions(testFingerprintId, { sessionId: testSessionId });
+      const impressions = await getImpressions({
+        fingerprintId: testFingerprintId,
+        options: { sessionId: testSessionId },
+      });
       expect(impressions).toHaveLength(1);
       expect(impressions[0].sessionId).toBe(testSessionId);
     });
 
     it("should limit number of impressions", async () => {
-      const impressions = await getImpressions(testFingerprintId, { limit: 2 });
+      const impressions = await getImpressions({
+        fingerprintId: testFingerprintId,
+        options: { limit: 2 },
+      });
       expect(impressions).toHaveLength(2);
     });
 
     it("should filter impressions by time range using unix timestamps", async () => {
       const now = Date.now();
-      const impressions = await getImpressions(testFingerprintId, {
-        startTime: now - 1000,
-        endTime: now + 1000,
+      const impressions = await getImpressions({
+        fingerprintId: testFingerprintId,
+        options: { startTime: now - 1000, endTime: now + 1000 },
       });
       expect(impressions.length).toBeGreaterThan(0);
 
@@ -229,7 +264,7 @@ describe("Impression Service", () => {
     });
 
     it("should return impressions with proper timestamp format", async () => {
-      const impressions = await getImpressions(testFingerprintId);
+      const impressions = await getImpressions({ fingerprintId: testFingerprintId });
       expect(impressions).toHaveLength(3);
 
       impressions.forEach((impression) => {
@@ -241,6 +276,7 @@ describe("Impression Service", () => {
 
   describe("deleteImpressions", () => {
     beforeEach(async () => {
+      // Setup fingerprint only, no impressions
       await db
         .collection(COLLECTIONS.FINGERPRINTS)
         .doc(testFingerprintId)
@@ -258,50 +294,118 @@ describe("Impression Service", () => {
             suspiciousIps: [],
           },
         });
-
-      // Create test impressions
-      await createImpression(testFingerprintId, testType, testData);
-      await createImpression(testFingerprintId, "other-type", testData);
-      await createImpression(testFingerprintId, testType, testData, {
-        sessionId: testSessionId,
-      });
     });
 
     it("should delete all impressions for fingerprint", async () => {
-      const deletedCount = await deleteImpressions(testFingerprintId);
+      // Create test impressions
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: "other-type",
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+        options: { sessionId: testSessionId },
+      });
+
+      const deletedCount = await deleteImpressions({ fingerprintId: testFingerprintId });
       expect(deletedCount).toBe(3);
 
-      const remaining = await getImpressions(testFingerprintId);
+      const remaining = await getImpressions({ fingerprintId: testFingerprintId });
       expect(remaining).toHaveLength(0);
     });
 
     it("should delete impressions by type", async () => {
-      const deletedCount = await deleteImpressions(testFingerprintId, { type: testType });
-      expect(deletedCount).toBe(2);
+      // Create test impressions
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: "other-type",
+        data: testData,
+      });
 
-      const remaining = await getImpressions(testFingerprintId);
+      // Delete impressions of testType
+      const deletedCount = await deleteImpressions({
+        fingerprintId: testFingerprintId,
+        options: { type: testType },
+      });
+      expect(deletedCount).toBe(1);
+
+      // Verify remaining impressions
+      const remaining = await getImpressions({ fingerprintId: testFingerprintId });
       expect(remaining).toHaveLength(1);
       expect(remaining[0].type).toBe("other-type");
     });
 
     it("should delete impressions by session id", async () => {
-      const deletedCount = await deleteImpressions(testFingerprintId, { sessionId: testSessionId });
+      // Create test impressions
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+        options: { sessionId: testSessionId },
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+        options: { sessionId: "other-session" },
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
+
+      // Delete impressions with testSessionId
+      const deletedCount = await deleteImpressions({
+        fingerprintId: testFingerprintId,
+        options: { sessionId: testSessionId },
+      });
       expect(deletedCount).toBe(1);
 
-      const remaining = await getImpressions(testFingerprintId);
+      // Verify remaining impressions
+      const remaining = await getImpressions({ fingerprintId: testFingerprintId });
       expect(remaining).toHaveLength(2);
       remaining.forEach((imp) => expect(imp.sessionId).not.toBe(testSessionId));
     });
 
     it("should delete impressions by time range", async () => {
       const now = Date.now();
-      const deletedCount = await deleteImpressions(testFingerprintId, {
-        startTime: now - 1000,
-        endTime: now + 1000,
-      });
-      expect(deletedCount).toBeGreaterThan(0);
 
-      const remaining = await getImpressions(testFingerprintId);
+      // Create test impressions
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: testType,
+        data: testData,
+      });
+      await createImpression({
+        fingerprintId: testFingerprintId,
+        type: "other-type",
+        data: testData,
+      });
+
+      const deletedCount = await deleteImpressions({
+        fingerprintId: testFingerprintId,
+        options: { startTime: now - 1000, endTime: now + 1000 },
+      });
+      expect(deletedCount).toBe(2);
+
+      const remaining = await getImpressions({
+        fingerprintId: testFingerprintId,
+        options: { startTime: now - 1000, endTime: now + 1000 },
+      });
       expect(remaining).toHaveLength(0);
     });
   });

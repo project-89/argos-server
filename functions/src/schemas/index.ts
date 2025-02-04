@@ -1,4 +1,3 @@
-export * from "./common.schema";
 export * from "./role.schema";
 export * from "./fingerprint.schema";
 export * from "./visit.schema";

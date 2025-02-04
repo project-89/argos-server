@@ -18,12 +18,25 @@ export const calculateStabilityIndex = async (): Promise<{
 }> => {
   try {
     // Get current price data for Project89
-    const prices = await getCurrentPrices(["project89"]);
-    if (!prices || !prices.project89) {
-      throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    const result = await getCurrentPrices(["project89"]);
+
+    // Check if we have any prices at all
+    if (Object.keys(result.prices).length === 0) {
+      throw ApiError.from(null, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
     }
 
-    const priceChange = prices.project89.usd_24h_change;
+    // Check for specific token errors
+    if (result.errors["project89"]) {
+      throw ApiError.from(null, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    }
+
+    // Check if we have the specific token price data
+    if (!result.prices.project89) {
+      throw ApiError.from(null, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    }
+
+    const priceData = result.prices.project89;
+    const priceChange = priceData.usd_24h_change;
     let stabilityIndex = 100;
 
     // Only positive price changes affect stability
@@ -39,15 +52,12 @@ export const calculateStabilityIndex = async (): Promise<{
 
     return {
       stabilityIndex,
-      currentPrice: prices.project89.usd,
+      currentPrice: priceData.usd,
       priceChange: priceChange,
       timestamp: Date.now(),
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error calculating reality stability index:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

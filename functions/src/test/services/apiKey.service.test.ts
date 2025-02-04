@@ -3,14 +3,11 @@ import { cleanDatabase } from "../utils/testUtils";
 import {
   createApiKey,
   getApiKeyByKey,
-  getApiKeys,
   validateApiKey,
   deactivateApiKey,
-  revokeApiKey,
 } from "../../services/apiKey.service";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { COLLECTIONS, ERROR_MESSAGES } from "../../constants";
 
 const db = getFirestore();
 
@@ -110,7 +107,7 @@ describe("API Key Service", () => {
       const fingerprintId = "test-fingerprint";
       await createTestFingerprint(fingerprintId);
       const created = await createApiKey(fingerprintId);
-      await deactivateApiKey(fingerprintId, created.id);
+      await deactivateApiKey({ fingerprintId, keyId: created.id });
 
       const result = await getApiKeyByKey(created.key);
       expect(result).toEqual({
@@ -120,41 +117,6 @@ describe("API Key Service", () => {
         active: false,
         createdAt: expect.any(Number),
       });
-    });
-  });
-
-  describe("getApiKeys", () => {
-    it("should retrieve all API keys for a fingerprint", async () => {
-      const fingerprintId = "test-fingerprint";
-      await createTestFingerprint(fingerprintId);
-
-      // Create first key (will be deactivated)
-      await createApiKey(fingerprintId);
-      // Create second key (will be active)
-      const activeKey = await createApiKey(fingerprintId);
-
-      const results = await getApiKeys(fingerprintId);
-      expect(results).toHaveLength(2);
-
-      // One key should be active, one inactive
-      const activeKeys = results.filter((key) => key.active);
-      const inactiveKeys = results.filter((key) => !key.active);
-
-      expect(activeKeys).toHaveLength(1);
-      expect(inactiveKeys).toHaveLength(1);
-
-      expect(activeKeys[0]).toEqual({
-        id: activeKey.id,
-        key: activeKey.key,
-        fingerprintId,
-        active: true,
-        createdAt: expect.any(Number),
-      });
-    });
-
-    it("should return empty array for fingerprint with no keys", async () => {
-      const results = await getApiKeys("non-existent-fingerprint");
-      expect(results).toEqual([]);
     });
   });
 
@@ -175,7 +137,7 @@ describe("API Key Service", () => {
       const fingerprintId = "test-fingerprint";
       await createTestFingerprint(fingerprintId);
       const created = await createApiKey(fingerprintId);
-      await deactivateApiKey(fingerprintId, created.id);
+      await deactivateApiKey({ fingerprintId, keyId: created.id });
 
       const result = await validateApiKey(created.key);
       expect(result).toEqual({
@@ -199,7 +161,7 @@ describe("API Key Service", () => {
       await createTestFingerprint(fingerprintId);
       const created = await createApiKey(fingerprintId);
 
-      await deactivateApiKey(fingerprintId, created.id);
+      await deactivateApiKey({ fingerprintId, keyId: created.id });
 
       const result = await getApiKeyByKey(created.key);
       expect(result).toEqual({
@@ -212,9 +174,9 @@ describe("API Key Service", () => {
     });
 
     it("should throw error for non-existent key", async () => {
-      await expect(deactivateApiKey("test-fingerprint", "non-existent-id")).rejects.toThrow(
-        ERROR_MESSAGES.NOT_FOUND,
-      );
+      await expect(
+        deactivateApiKey({ fingerprintId: "test-fingerprint", keyId: "non-existent-id" }),
+      ).rejects.toThrow(ERROR_MESSAGES.NOT_FOUND);
     });
 
     it("should throw error when fingerprint doesn't match", async () => {
@@ -222,44 +184,9 @@ describe("API Key Service", () => {
       await createTestFingerprint(fingerprintId);
       const created = await createApiKey(fingerprintId);
 
-      await expect(deactivateApiKey("different-fingerprint", created.id)).rejects.toThrow(
-        ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS,
-      );
-    });
-  });
-
-  describe("revokeApiKey", () => {
-    it("should revoke an API key", async () => {
-      const fingerprintId = "test-fingerprint";
-      await createTestFingerprint(fingerprintId);
-      const created = await createApiKey(fingerprintId);
-
-      await revokeApiKey(created.key, fingerprintId);
-
-      const result = await getApiKeyByKey(created.key);
-      expect(result).toEqual({
-        id: expect.any(String),
-        key: created.key,
-        fingerprintId,
-        active: false,
-        createdAt: expect.any(Number),
-      });
-    });
-
-    it("should throw error for non-existent key", async () => {
-      await expect(revokeApiKey("non-existent-key", "test-fingerprint")).rejects.toThrow(
-        ERROR_MESSAGES.INVALID_API_KEY,
-      );
-    });
-
-    it("should throw error when fingerprint doesn't match", async () => {
-      const fingerprintId = "test-fingerprint";
-      await createTestFingerprint(fingerprintId);
-      const created = await createApiKey(fingerprintId);
-
-      await expect(revokeApiKey(created.key, "different-fingerprint")).rejects.toThrow(
-        ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS,
-      );
+      await expect(
+        deactivateApiKey({ fingerprintId: "different-fingerprint", keyId: created.id }),
+      ).rejects.toThrow(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     });
   });
 });

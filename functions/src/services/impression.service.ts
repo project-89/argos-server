@@ -21,20 +21,17 @@ export const verifyFingerprint = async ({
     const fingerprintDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     if (authenticatedId && fingerprintId !== authenticatedId) {
-      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     }
 
     return { verified: true };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error in verifyFingerprint:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -71,7 +68,7 @@ export const createImpression = async ({
     const impressionRef = await db.collection(COLLECTIONS.IMPRESSIONS).add(impression);
 
     if (!impressionRef.id) {
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
 
     return {
@@ -79,11 +76,8 @@ export const createImpression = async ({
       ...impression,
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error in createImpression:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -142,11 +136,8 @@ export const getImpressions = async ({
       } as Impression;
     });
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error in getImpressions:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -198,10 +189,7 @@ export const deleteImpressions = async ({
     await batch.commit();
     return snapshot.size;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error in deleteImpressions:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

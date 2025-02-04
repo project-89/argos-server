@@ -13,12 +13,9 @@ import {
 import { toUnixMillis } from "../../utils/timestamp";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
-import {
-  SkillAnalysisSchema,
-  SkillAnalysis,
-  SkillSimilaritySchema,
-  DEFAULT_SKILL_ANALYSIS,
-} from "../schemas/schemas";
+import { SkillAnalysisSchema, SkillSimilaritySchema } from "../schemas";
+import { DEFAULT_SKILL_ANALYSIS } from "../constants";
+import { SkillAnalysis } from "../types/schema.types";
 
 // Initialize Gemini model with the Google provider
 const geminiModel = google("gemini-pro");

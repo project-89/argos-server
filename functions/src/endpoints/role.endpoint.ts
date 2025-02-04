@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
-import { ROLE } from "../constants/roles.constants";
+import { ROLE, ERROR_MESSAGES } from "../constants";
 import {
   assignRole as assignRoleService,
   removeRole as removeRoleService,
@@ -8,8 +8,7 @@ import {
 } from "../services/role.service";
 import { sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
-import { AssignRoleSchema, RemoveRoleSchema } from "@/schemas";
+import { AssignRoleSchema, RemoveRoleSchema } from "../schemas";
 
 export const assignRole = [
   validateRequest(AssignRoleSchema),

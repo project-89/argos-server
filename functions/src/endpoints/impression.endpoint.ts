@@ -7,8 +7,8 @@ import {
 } from "../services/impression.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
-import { GetImpressionsSchema, DeleteImpressionsSchema, CreateImpressionSchema } from "@/schemas";
+import { ERROR_MESSAGES } from "../constants";
+import { GetImpressionsSchema, DeleteImpressionsSchema, CreateImpressionSchema } from "../schemas";
 
 // Extend Request type to include fingerprint
 interface AuthenticatedRequest extends Request {

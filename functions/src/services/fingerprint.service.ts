@@ -1,4 +1,3 @@
-import { Request } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/collections.constants";
 import { ROLE } from "../constants/roles.constants";
@@ -7,17 +6,6 @@ import { ERROR_MESSAGES } from "../constants/api.constants";
 import { Fingerprint } from "@/types";
 import { ApiError } from "../utils/error";
 import { deepMerge } from "../utils/object";
-
-/**
- * Extracts client IP from request
- */
-export const getClientIp = (req: Request): string => {
-  const forwardedFor = req.headers["x-forwarded-for"];
-  if (typeof forwardedFor === "string") {
-    return forwardedFor.split(",")[0].trim();
-  }
-  return req.ip || req.socket.remoteAddress || "unknown";
-};
 
 /**
  * Creates a new fingerprint record
@@ -31,30 +19,34 @@ export const createFingerprint = async ({
   ip: string;
   metadata?: Record<string, any>;
 }): Promise<Fingerprint> => {
-  const now = Timestamp.now();
-  const docData: Omit<Fingerprint, "id"> = {
-    fingerprint,
-    roles: [ROLE.USER], // Always use default user role
-    createdAt: now,
-    tags: [], // Initialize empty tags array
-    lastVisited: now,
-    metadata: metadata || {},
-    ipAddresses: [ip],
-    ipMetadata: {
-      primaryIp: ip,
-      ipFrequency: { [ip]: 1 },
-      lastSeenAt: { [ip]: now },
-      suspiciousIps: [],
-    },
-  };
+  try {
+    const now = Timestamp.now();
+    const docData: Omit<Fingerprint, "id"> = {
+      fingerprint,
+      roles: [ROLE.USER], // Always use default user role
+      createdAt: now,
+      tags: [], // Initialize empty tags array
+      lastVisited: now,
+      metadata: metadata || {},
+      ipAddresses: [ip],
+      ipMetadata: {
+        primaryIp: ip,
+        ipFrequency: { [ip]: 1 },
+        lastSeenAt: { [ip]: now },
+        suspiciousIps: [],
+      },
+    };
 
-  const db = getFirestore();
-  const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add(docData);
+    const db = getFirestore();
+    const fingerprintRef = await db.collection(COLLECTIONS.FINGERPRINTS).add(docData);
 
-  return {
-    id: fingerprintRef.id,
-    ...docData,
-  };
+    return {
+      id: fingerprintRef.id,
+      ...docData,
+    };
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
 };
 
 /**
@@ -67,15 +59,15 @@ export const getFingerprintAndUpdateIp = async ({
   fingerprintId: string;
   ip: string;
 }): Promise<{ data: Fingerprint }> => {
-  const db = getFirestore();
-  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-
   try {
+    const db = getFirestore();
+    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+
     const updatedDoc = await db.runTransaction(async (transaction) => {
       const fingerprintDoc = await transaction.get(fingerprintRef);
 
       if (!fingerprintDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.INVALID_FINGERPRINT);
       }
 
       const data = fingerprintDoc.data() as Fingerprint;
@@ -122,12 +114,7 @@ export const getFingerprintAndUpdateIp = async ({
 
     return updatedDoc;
   } catch (error) {
-    // Re-throw ApiErrors
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error(`[Fingerprint ${fingerprintId}] Error updating IP:`, error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -146,11 +133,11 @@ export const verifyFingerprint = async ({
   const fingerprintDoc = await fingerprintRef.get();
 
   if (!fingerprintDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT);
+    throw ApiError.from(null, 404, ERROR_MESSAGES.INVALID_FINGERPRINT);
   }
 
   if (authenticatedId && fingerprintId !== authenticatedId) {
-    throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+    throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   }
 };
 
@@ -164,14 +151,13 @@ export const updateFingerprintMetadata = async ({
   fingerprintId: string;
   metadata: Record<string, any>;
 }): Promise<Fingerprint> => {
-  const db = getFirestore();
-  const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-
   try {
+    const db = getFirestore();
+    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as Fingerprint;
@@ -187,10 +173,6 @@ export const updateFingerprintMetadata = async ({
       metadata: updatedMetadata,
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in updateFingerprintMetadata:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

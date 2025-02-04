@@ -1,19 +1,13 @@
-import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
+import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ApiError } from "../utils/error";
-import { getCurrentUnixMillis } from "../utils/timestamp";
-import { ERROR_MESSAGES } from "../constants/api.constants";
-import { VisitPresence } from "@/types";
+import { getCurrentUnixMillis, toUnixMillis } from "../utils/timestamp";
+import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
+import { PresenceData, VisitPresence } from "@/types";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
 
 type PresenceStatus = VisitPresence["status"];
-
-interface PresenceData {
-  status: PresenceStatus;
-  lastUpdated: number; // Unix timestamp for tracking last activity/status update
-}
 
 /**
  * Check if user should be marked as away based on last activity
@@ -39,13 +33,14 @@ export const updatePresence = async ({
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const now = getCurrentUnixMillis();
+    const now = Timestamp.now();
     const presenceData: PresenceData = {
       status,
       lastUpdated: now,
+      createdAt: now,
     };
 
     await fingerprintRef.update({
@@ -55,15 +50,11 @@ export const updatePresence = async ({
     return {
       fingerprintId,
       status,
-      lastUpdated: now,
-      createdAt: now,
+      lastUpdated: toUnixMillis(now),
+      createdAt: toUnixMillis(now),
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in updatePresence:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS);
   }
 };
 
@@ -81,7 +72,7 @@ export const getPresence = async ({
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data();
@@ -98,7 +89,7 @@ export const getPresence = async ({
     }
 
     // Check if user should be marked as away
-    if (presence.status === "online" && shouldMarkAsAway(presence.lastUpdated)) {
+    if (presence.status === "online" && shouldMarkAsAway(toUnixMillis(presence.lastUpdated))) {
       const awayPresence = await updatePresence({ fingerprintId, status: "away" });
       return awayPresence;
     }
@@ -106,15 +97,11 @@ export const getPresence = async ({
     return {
       fingerprintId,
       status: presence.status,
-      lastUpdated: presence.lastUpdated,
-      createdAt: now,
+      lastUpdated: toUnixMillis(presence.lastUpdated),
+      createdAt: toUnixMillis(presence.createdAt),
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in getPresence:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_PRESENCE);
   }
 };
 
@@ -132,12 +119,12 @@ export const updateActivity = async ({
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data();
     const presence = data?.presence as PresenceData | undefined;
-    const now = getCurrentUnixMillis();
+    const now = Timestamp.now();
 
     // If no presence or currently offline, set as online
     if (!presence || presence.status === "offline") {
@@ -148,6 +135,7 @@ export const updateActivity = async ({
     const presenceData: PresenceData = {
       status: presence.status === "away" ? "online" : presence.status, // Set back to online if away
       lastUpdated: now,
+      createdAt: now,
     };
 
     await fingerprintRef.update({
@@ -157,14 +145,10 @@ export const updateActivity = async ({
     return {
       fingerprintId,
       status: presenceData.status,
-      lastUpdated: now,
-      createdAt: now,
+      lastUpdated: toUnixMillis(presenceData.lastUpdated),
+      createdAt: toUnixMillis(presenceData.createdAt),
     };
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    console.error("Error in updateActivity:", error);
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_UPDATE_ACTIVITY);
   }
 };

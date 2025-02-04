@@ -1,8 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
-import { ROLE } from "../../constants/roles";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { COLLECTIONS, ERROR_MESSAGES, ROLE } from "../../constants";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase } from "../utils/testUtils";
 import {

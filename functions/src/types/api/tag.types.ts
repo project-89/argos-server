@@ -1,14 +1,6 @@
-/**
- * Tag Game Types
- * Contains types for the tag game system and leaderboard
- */
-
 import { ALLOWED_TAG_TYPES } from "@/constants/tag.constants";
 import { Timestamp } from "firebase-admin/firestore";
 
-/**
- * Tag Game Core Types
- */
 export interface TagData {
   type: string;
   taggedBy: string;
@@ -23,9 +15,6 @@ export interface TagLimitData {
   updatedAt: Timestamp;
 }
 
-/**
- * Tag Game Leaderboard
- */
 export interface TagLeaderboardEntry {
   fingerprintId: string;
   totalTags: number;
@@ -38,15 +27,11 @@ export interface TagLeaderboardEntry {
 
 export interface TagLeaderboardResponse {
   timeFrame: "daily" | "weekly" | "monthly" | "allTime";
-  entries: Array<{
-    fingerprintId: string;
-    totalTags: number;
-    lastTagAt: number; // Unix timestamp for API response
-    streak: number;
-    tagTypes: Record<string, number>;
-    createdAt: number; // Unix timestamp for API response
-    updatedAt: number; // Unix timestamp for API response
-  }>;
+  entries: (Omit<TagLeaderboardEntry, "lastTagAt" | "createdAt" | "updatedAt"> & {
+    lastTagAt: number;
+    createdAt: number;
+    updatedAt: number;
+  })[];
   userRank?: number;
   generatedAt: number; // Unix timestamp for API response
 }

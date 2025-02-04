@@ -9,28 +9,25 @@ import { ERROR_MESSAGES } from "../constants/api.constants";
 /**
  * Creates a new API key for a fingerprint
  */
-export const createApiKey = async ({
-  fingerprintId,
-}: {
-  fingerprintId: string;
-}): Promise<{
+export const createApiKey = async (
+  fingerprintId: string,
+): Promise<{
   key: string;
   fingerprintId: string;
   active: boolean;
   id: string;
   createdAt: number;
 }> => {
-  console.log("[createApiKey] Starting with fingerprintId:", fingerprintId);
-  const db = getFirestore();
-
   try {
+    console.log("[createApiKey] Starting with fingerprintId:", fingerprintId);
+    const db = getFirestore();
     // Check if fingerprint exists
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
     const fingerprintDoc = await fingerprintRef.get();
     console.log("[createApiKey] Fingerprint check result:", { exists: fingerprintDoc.exists });
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, "Fingerprint not found");
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     // Deactivate any existing API keys for this fingerprint
@@ -82,15 +79,7 @@ export const createApiKey = async ({
     console.log("[createApiKey] Successfully created key:", { keyId: newKeyRef.id });
     return response;
   } catch (error) {
-    console.error("[createApiKey] Error:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-      fingerprintId,
-    });
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, "Failed to create API key");
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CREATE_API_KEY);
   }
 };
 
@@ -106,26 +95,30 @@ export const getApiKeyByKey = async (
   id: string;
   createdAt: number;
 } | null> => {
-  console.log("[getApiKeyByKey] Starting lookup for key");
-  const db = getFirestore();
-  const snapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", key).get();
+  try {
+    console.log("[getApiKeyByKey] Starting lookup for key");
+    const db = getFirestore();
+    const snapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", key).get();
 
-  if (snapshot.empty) {
-    console.log("[getApiKeyByKey] Key not found");
-    return null;
+    if (snapshot.empty) {
+      console.log("[getApiKeyByKey] Key not found");
+      return null;
+    }
+
+    const doc = snapshot.docs[0];
+    const data = doc.data();
+    console.log("[getApiKeyByKey] Found key data:", { keyId: doc.id, active: data.active });
+
+    return {
+      key: data.key,
+      fingerprintId: data.fingerprintId,
+      active: data.active,
+      id: doc.id,
+      createdAt: toUnixMillis(data.createdAt),
+    };
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_API_KEY);
   }
-
-  const doc = snapshot.docs[0];
-  const data = doc.data();
-  console.log("[getApiKeyByKey] Found key data:", { keyId: doc.id, active: data.active });
-
-  return {
-    key: data.key,
-    fingerprintId: data.fingerprintId,
-    active: data.active,
-    id: doc.id,
-    createdAt: toUnixMillis(data.createdAt),
-  };
 };
 
 /**
@@ -137,8 +130,8 @@ export const validateApiKey = async (
   isValid: boolean;
   needsRefresh: boolean;
 }> => {
-  console.log("[validateApiKey] Starting validation");
   try {
+    console.log("[validateApiKey] Starting validation");
     const apiKey = await getApiKeyByKey(key);
     console.log("[validateApiKey] Key lookup result:", {
       found: !!apiKey,
@@ -157,63 +150,42 @@ export const validateApiKey = async (
       needsRefresh: false,
     };
   } catch (error) {
-    console.error("[validateApiKey] Error:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-    });
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_VALIDATE_API_KEY);
   }
 };
 
 /**
- * Revokes an API key
+ * Deactivates an API key
  */
-export const revokeApiKey = async ({
-  key,
+export const deactivateApiKey = async ({
   fingerprintId,
+  keyId,
 }: {
-  key: string;
   fingerprintId: string;
-}): Promise<void> => {
-  console.log("[revokeApiKey] Starting revocation:", { fingerprintId });
+  keyId: string;
+}): Promise<{ success: boolean; message: string }> => {
   try {
     const db = getFirestore();
-    const snapshot = await db.collection(COLLECTIONS.API_KEYS).where("key", "==", key).get();
-    console.log("[revokeApiKey] Key lookup result:", { found: !snapshot.empty });
+    const keyRef = db.collection(COLLECTIONS.API_KEYS).doc(keyId);
+    const keyDoc = await keyRef.get();
 
-    if (snapshot.empty) {
-      throw new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY);
+    if (!keyDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.NOT_FOUND);
     }
 
-    const doc = snapshot.docs[0];
-    const data = doc.data();
-    console.log("[revokeApiKey] Key data:", {
-      keyId: doc.id,
-      keyFingerprintId: data.fingerprintId,
-      active: data.active,
-    });
-
-    // Check ownership first
-    if (data.fingerprintId !== fingerprintId) {
+    if (keyDoc.data()?.fingerprintId !== fingerprintId) {
       throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     }
 
-    // Finally revoke
-    console.log("[revokeApiKey] Updating key status");
-    await doc.ref.update({
+    const result = await keyRef.update({
       active: false,
-      revokedAt: Timestamp.now(),
     });
-    console.log("[revokeApiKey] Successfully revoked key");
+
+    return {
+      success: result.writeTime !== undefined,
+      message: "API key deactivated successfully",
+    };
   } catch (error) {
-    console.error("[revokeApiKey] Error:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-      fingerprintId,
-    });
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_DEACTIVATE_API_KEY);
   }
 };

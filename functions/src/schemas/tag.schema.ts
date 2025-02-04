@@ -1,48 +1,35 @@
+import { ERROR_MESSAGES } from "../constants";
 import { z } from "zod";
-import { ROLE } from "../constants/roles.constants";
-import { TagsSchema } from "./common.schema";
 
-export const AddOrUpdateTagsSchema = z.object({
-  body: z.object({
-    fingerprintId: z.string(),
-    tags: TagsSchema,
-  }),
-  query: z.object({}).optional(),
-  params: z.object({}).optional(),
-});
-
-export const UpdateRolesBasedOnTagsSchema = z.object({
-  body: z.object({
-    fingerprintId: z.string(),
-    tagRules: z.record(
-      z.object({
-        min: z.number(),
-        role: z.enum(Object.values(ROLE) as [string, ...string[]]),
-      }),
-    ),
-  }),
-  query: z.object({}).optional(),
-  params: z.object({}).optional(),
-});
+export const TagsSchema = z.record(z.string());
 
 export const CheckTagSchema = z.object({
+  query: z.object({}).optional(),
   params: z.object({
     fingerprintId: z.string(),
     tagType: z.string(),
   }),
+  body: z.object({}).optional(),
 });
 
 export const GetTagLeaderboardSchema = z.object({
   query: z.object({
-    timeframe: z.string(),
+    timeFrame: z.string(),
     limit: z.number(),
     offset: z.number(),
     fingerprintId: z.string(),
   }),
+  params: z.object({}).optional(),
+  body: z.object({}).optional(),
 });
 
 export const TagUserSchema = z.object({
+  query: z.object({}).optional(),
   body: z.object({
-    targetFingerprintId: z.string(),
+    targetFingerprintId: z.string({
+      required_error: ERROR_MESSAGES.TARGET_FINGERPRINT_ID_REQUIRED,
+      invalid_type_error: ERROR_MESSAGES.FINGERPRINT_MUST_BE_STRING,
+    }),
   }),
+  params: z.object({}).optional(),
 });

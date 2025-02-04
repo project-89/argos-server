@@ -14,6 +14,22 @@ export const ERROR_MESSAGES = {
   INVALID_API_KEY: "Invalid API key",
   MISSING_API_KEY: "API key is required",
   INSUFFICIENT_PERMISSIONS: "Insufficient permissions",
+  API_KEY_MUST_BE_STRING: "API key must be a string",
+  API_KEY_NOT_FOUND: "API key not found",
+  API_KEY_DEACTIVATED: "API key deactivated",
+  FAILED_TO_DEACTIVATE_API_KEY: "Failed to deactivate API key",
+  FAILED_TO_CREATE_API_KEY: "Failed to create API key",
+  FAILED_TO_GET_API_KEY: "Failed to get API key",
+  FAILED_TO_VALIDATE_API_KEY: "Failed to validate API key",
+
+  // Cache errors
+  FAILED_TO_GET_CACHED_DATA: "Failed to get cached data",
+  FAILED_TO_SET_CACHED_DATA: "Failed to set cached data",
+
+  // Cleanup errors
+  FAILED_TO_CLEANUP_DATA: "Failed to cleanup data",
+  FAILED_TO_CLEANUP_RATE_LIMITS: "Failed to cleanup rate limits",
+  FAILED_TO_ANALYZE_VISIT_PATTERNS: "Failed to analyze visit patterns",
 
   // CORS errors
   CORS_ERROR: "Request origin not allowed",
@@ -22,7 +38,8 @@ export const ERROR_MESSAGES = {
   FINGERPRINT_NOT_FOUND: "Fingerprint not found",
   INVALID_FINGERPRINT: "Invalid fingerprint",
   FINGERPRINT_EXISTS: "Fingerprint already exists",
-
+  FINGERPRINT_MUST_BE_STRING: "Fingerprint must be a string",
+  TARGET_FINGERPRINT_ID_REQUIRED: "Target fingerprint ID is required",
   // Profile errors
   PROFILE_NOT_FOUND: "Profile not found",
   PROFILE_EXISTS: "Profile already exists for this wallet address",
@@ -57,6 +74,7 @@ export const ERROR_MESSAGES = {
   // Price errors
   PRICE_DATA_NOT_FOUND: "Price data not found",
   FAILED_GET_TOKEN_PRICE: "Failed to get token price",
+  ALL_PRICE_FETCHES_FAILED: "All price fetches failed",
   INVALID_REQUEST: "Invalid request",
 
   // Generic errors

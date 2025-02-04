@@ -12,16 +12,11 @@ import {
   FingerprintParamsSchema,
   GetTagLeaderboardSchema,
   TagUserSchema,
-} from "@/schemas";
-import { sendSuccess } from "../utils/response";
+} from "../schemas";
+import { sendError, sendSuccess } from "../utils/response";
 import { ERROR_MESSAGES, ALLOWED_TAG_TYPES } from "../constants";
 import { ApiError } from "../utils/error";
-import {
-  TagUserResponse,
-  GetUserTagsResponse,
-  TagData,
-  TagLeaderboardResponse,
-} from "../types/old-api.types";
+import { TagData, TagLeaderboardResponse } from "../types";
 
 type TimeframeType = "daily" | "weekly" | "monthly" | "allTime";
 
@@ -44,9 +39,15 @@ export const tagUser = [
         targetFingerprintId,
         tagType: ALLOWED_TAG_TYPES.IT,
       });
-      return sendSuccess<TagUserResponse>(res, result);
+      return sendSuccess<{
+        success: boolean;
+        message: string;
+      }>(res, result);
     } catch (error) {
-      return next(error);
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      );
     }
   },
 ];
@@ -60,9 +61,15 @@ export const getUserTags = [
     try {
       const { fingerprintId } = req.params;
       const result = await getUserTagsService(fingerprintId);
-      return sendSuccess<GetUserTagsResponse>(res, result);
+      return sendSuccess<{
+        hasTags: boolean;
+        activeTags: string[];
+      }>(res, result);
     } catch (error) {
-      return next(error);
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      );
     }
   },
 ];
@@ -78,7 +85,10 @@ export const getTagHistory = [
       const history = await getTagHistoryService(fingerprintId);
       return sendSuccess<{ tags: TagData[] }>(res, { tags: history });
     } catch (error) {
-      return next(error);
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      );
     }
   },
 ];
@@ -94,7 +104,10 @@ export const checkTag = [
       const hasTag = await hasTagService({ fingerprintId, tagType });
       return sendSuccess<{ hasTag: boolean }>(res, { hasTag });
     } catch (error) {
-      return next(error);
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      );
     }
   },
 ];
@@ -120,7 +133,10 @@ export const getLeaderboard = [
       });
       return sendSuccess<TagLeaderboardResponse>(res, leaderboard);
     } catch (error) {
-      return next(error);
+      return sendError(
+        res,
+        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      );
     }
   },
 ];

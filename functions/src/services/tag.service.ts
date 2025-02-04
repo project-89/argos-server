@@ -1,7 +1,6 @@
 import { getFirestore, Timestamp, QueryDocumentSnapshot } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import {
   TagData,
   TagLeaderboardEntry,
@@ -9,10 +8,10 @@ import {
   TagType,
   TagStats,
   FingerprintData,
-} from "@/types";
+} from "../types";
 
-import { ALLOWED_TAG_TYPES } from "@/constants/tag.constants";
-import { toUnixMillis } from "@/utils/timestamp";
+import { ALLOWED_TAG_TYPES } from "../constants/tag.constants";
+import { toUnixMillis } from "../utils/timestamp";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = 10;
@@ -53,7 +52,7 @@ const checkAndUpdateTagLimits = async ({
     // If target is already "it", we need to deduct a tag
     if (targetIsIt) {
       if (tagLimits.remainingDailyTags <= 0 && !shouldReset) {
-        throw new ApiError(429, ERROR_MESSAGES.NO_TAGS_REMAINING);
+        throw ApiError.from(null, 429, ERROR_MESSAGES.NO_TAGS_REMAINING);
       }
     }
 
@@ -69,10 +68,7 @@ const checkAndUpdateTagLimits = async ({
     await taggerRef.update({ tagLimits: newTagLimits });
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in checkAndUpdateTagLimits:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -98,12 +94,12 @@ export const tagUser = async ({
 
     // Validate tag type
     if (!Object.values(ALLOWED_TAG_TYPES).includes(tagType as TagType)) {
-      throw new ApiError(400, ERROR_MESSAGES.INVALID_TAG_TYPE);
+      throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_TAG_TYPE);
     }
 
     // Validate inputs
     if (taggerFingerprintId === targetFingerprintId) {
-      throw new ApiError(400, ERROR_MESSAGES.CANNOT_TAG_SELF);
+      throw ApiError.from(null, 400, ERROR_MESSAGES.CANNOT_TAG_SELF);
     }
 
     const db = getFirestore();
@@ -113,13 +109,13 @@ export const tagUser = async ({
     const taggerDoc = await taggerRef.get();
 
     if (!taggerDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.TAGGER_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.TAGGER_NOT_FOUND);
     }
 
     // Check if tagger has the tag they're trying to pass
     const taggerData = taggerDoc.data() as FingerprintData;
     if (!taggerData.tags?.[tagType]) {
-      throw new ApiError(403, ERROR_MESSAGES.NOT_IT);
+      throw ApiError.from(null, 403, ERROR_MESSAGES.NOT_IT);
     }
 
     // Get target fingerprint
@@ -127,7 +123,7 @@ export const tagUser = async ({
     const targetDoc = await targetRef.get();
 
     if (!targetDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const targetData = targetDoc.data() as FingerprintData;
@@ -136,7 +132,7 @@ export const tagUser = async ({
     if (targetData.tags?.[tagType]) {
       // Check and update tag limits before returning error
       await checkAndUpdateTagLimits({ taggerRef, taggerData, targetIsIt: true });
-      throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
+      throw ApiError.from(null, 400, ERROR_MESSAGES.ALREADY_TAGGED);
     }
 
     // Check and update tag limits
@@ -164,10 +160,7 @@ export const tagUser = async ({
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in tagUser:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -183,7 +176,7 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     const data = fingerprintDoc.data() as FingerprintData;
@@ -204,10 +197,7 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
     return tagLimits.remainingDailyTags;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getRemainingTags:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -236,10 +226,7 @@ export const hasTag = async ({
     return !!data.tags?.[tagType];
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in hasTag:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -262,10 +249,7 @@ export const getTagHistory = async (fingerprintId: string): Promise<TagData[]> =
     return stats.tagHistory || [];
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getTagHistory:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -298,10 +282,7 @@ export const getUserTags = async (
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getUserTags:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -393,10 +374,7 @@ const updateTagStats = async ({
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in updateTagStats:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -489,9 +467,6 @@ export const getTagLeaderboard = async ({
     return response;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in getTagLeaderboard:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

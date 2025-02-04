@@ -1,7 +1,6 @@
 import { calculateStabilityIndex } from "../../services/realityStability.service";
 import { getCurrentPrices } from "../../services/price.service";
-import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants";
 
 jest.mock("../../services/price.service");
 const mockGetCurrentPrices = getCurrentPrices as jest.Mock;
@@ -13,14 +12,15 @@ describe("Stability Service", () => {
 
   describe("calculateStabilityIndex", () => {
     it("should calculate stability index correctly for negative changes", async () => {
-      const mockPrices = {
-        project89: {
-          usd: 1.0,
-          usd_24h_change: -5,
+      mockGetCurrentPrices.mockResolvedValue({
+        prices: {
+          project89: {
+            usd: 1.0,
+            usd_24h_change: -5,
+          },
         },
-      };
-
-      mockGetCurrentPrices.mockResolvedValue(mockPrices);
+        errors: {},
+      });
 
       const result = await calculateStabilityIndex();
 
@@ -34,30 +34,32 @@ describe("Stability Service", () => {
     });
 
     it("should handle missing token price data", async () => {
-      mockGetCurrentPrices.mockResolvedValue({});
+      mockGetCurrentPrices.mockResolvedValue({
+        prices: {},
+        errors: {},
+      });
 
       await expect(calculateStabilityIndex()).rejects.toThrow(
-        new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE),
+        ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE,
       );
     });
 
     it("should handle price service errors", async () => {
-      mockGetCurrentPrices.mockRejectedValue(new Error("Price service error"));
+      mockGetCurrentPrices.mockRejectedValue(new Error(ERROR_MESSAGES.INTERNAL_ERROR));
 
-      await expect(calculateStabilityIndex()).rejects.toThrow(
-        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
+      await expect(calculateStabilityIndex()).rejects.toThrow(ERROR_MESSAGES.INTERNAL_ERROR);
     });
 
     it("should handle positive price changes correctly", async () => {
-      const mockPrices = {
-        project89: {
-          usd: 1.0,
-          usd_24h_change: 50, // 50% increase
+      mockGetCurrentPrices.mockResolvedValue({
+        prices: {
+          project89: {
+            usd: 1.0,
+            usd_24h_change: 50, // 50% increase
+          },
         },
-      };
-
-      mockGetCurrentPrices.mockResolvedValue(mockPrices);
+        errors: {},
+      });
 
       const result = await calculateStabilityIndex();
 
@@ -69,14 +71,15 @@ describe("Stability Service", () => {
     });
 
     it("should handle extreme positive price changes", async () => {
-      const mockPrices = {
-        project89: {
-          usd: 1.0,
-          usd_24h_change: 200, // 200% increase
+      mockGetCurrentPrices.mockResolvedValue({
+        prices: {
+          project89: {
+            usd: 1.0,
+            usd_24h_change: 200, // 200% increase
+          },
         },
-      };
-
-      mockGetCurrentPrices.mockResolvedValue(mockPrices);
+        errors: {},
+      });
 
       const result = await calculateStabilityIndex();
 

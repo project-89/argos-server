@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS } from "../../constants";
 import { cleanDatabase } from "../utils/testUtils";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
 import {
@@ -117,22 +117,22 @@ describe("Cleanup Service", () => {
         {
           fingerprintId: testFingerprint,
           siteId: "site-1",
-          timestamp: mockNow - 3000,
+          createdAt: mockNow - 3000,
         },
         {
           fingerprintId: testFingerprint,
           siteId: "site-2",
-          timestamp: mockNow - 2000,
+          createdAt: mockNow - 2000,
         },
         {
           fingerprintId: testFingerprint,
           siteId: "site-1",
-          timestamp: mockNow - 1000,
+          createdAt: mockNow - 1000,
         },
         {
           fingerprintId: testFingerprint,
           siteId: "site-2",
-          timestamp: mockNow,
+          createdAt: mockNow,
         },
       ];
 

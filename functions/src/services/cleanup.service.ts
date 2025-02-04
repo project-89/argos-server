@@ -1,7 +1,8 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
+import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-import { SiteEngagement, VisitPattern, Visit } from "@/types";
+import { SiteEngagement, VisitPattern, Visit } from "../types";
+import { ApiError } from "../utils/error";
 
 interface CleanupResult {
   cleanupTime: number;
@@ -82,8 +83,7 @@ export const cleanupService = async (): Promise<CleanupResult> => {
 
     return result;
   } catch (error) {
-    console.error("Error in cleanup service:", error);
-    throw error;
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CLEANUP_DATA);
   }
 };
 
@@ -108,8 +108,7 @@ export const cleanupRateLimits = async (identifier: string): Promise<void> => {
       }
     }
   } catch (error) {
-    console.error(`Error cleaning up rate limits for ${identifier}:`, error);
-    throw error;
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CLEANUP_RATE_LIMITS);
   }
 };
 
@@ -119,76 +118,80 @@ export const analyzeVisitPatterns = async (
   patterns: VisitPattern[];
   engagement: SiteEngagement[];
 }> => {
-  const db = getFirestore();
+  try {
+    const db = getFirestore();
 
-  // Get all visits for this fingerprint, ordered by timestamp
-  const visitsSnapshot = await db
-    .collection(COLLECTIONS.VISITS)
-    .where("fingerprintId", "==", fingerprintId)
-    .orderBy("timestamp", "asc")
-    .get();
+    // Get all visits for this fingerprint, ordered by timestamp
+    const visitsSnapshot = await db
+      .collection(COLLECTIONS.VISITS)
+      .where("fingerprintId", "==", fingerprintId)
+      .orderBy("createdAt", "asc")
+      .get();
 
-  const visits: Visit[] = visitsSnapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...(doc.data() as Omit<Visit, "id">),
-  }));
+    const visits: Visit[] = visitsSnapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<Visit, "id">),
+    }));
 
-  // Analyze site transitions
-  const patterns: Map<string, VisitPattern> = new Map();
-  const siteVisits: Map<string, number[]> = new Map();
+    // Analyze site transitions
+    const patterns: Map<string, VisitPattern> = new Map();
+    const siteVisits: Map<string, number[]> = new Map();
 
-  for (let i = 0; i < visits.length - 1; i++) {
-    const current = visits[i];
-    const next = visits[i + 1];
-    const timeSpent = next.createdAt.seconds - current.createdAt.seconds;
+    for (let i = 0; i < visits.length - 1; i++) {
+      const current = visits[i];
+      const next = visits[i + 1];
+      const timeSpent = next.createdAt.seconds - current.createdAt.seconds;
 
-    // Track site transitions
-    const key = `${current.siteId}-${next.siteId}`;
-    const existing = patterns.get(key) || {
-      currentSite: current.siteId,
-      nextSite: next.siteId,
-      transitionCount: 0,
-      averageTimeSpent: 0,
-    };
+      // Track site transitions
+      const key = `${current.siteId}-${next.siteId}`;
+      const existing = patterns.get(key) || {
+        currentSite: current.siteId,
+        nextSite: next.siteId,
+        transitionCount: 0,
+        averageTimeSpent: 0,
+      };
 
-    existing.transitionCount++;
-    existing.averageTimeSpent =
-      (existing.averageTimeSpent * (existing.transitionCount - 1) + timeSpent) /
-      existing.transitionCount;
-    patterns.set(key, existing);
+      existing.transitionCount++;
+      existing.averageTimeSpent =
+        (existing.averageTimeSpent * (existing.transitionCount - 1) + timeSpent) /
+        existing.transitionCount;
+      patterns.set(key, existing);
 
-    // Track visits per site
-    const siteVisitTimes = siteVisits.get(current.siteId) || [];
-    siteVisitTimes.push(timeSpent);
-    siteVisits.set(current.siteId, siteVisitTimes);
-  }
+      // Track visits per site
+      const siteVisitTimes = siteVisits.get(current.siteId) || [];
+      siteVisitTimes.push(timeSpent);
+      siteVisits.set(current.siteId, siteVisitTimes);
+    }
 
-  // Calculate site engagement metrics
-  const engagement: SiteEngagement[] = Array.from(siteVisits.entries()).map(([siteId, times]) => {
-    const totalVisits = times.length;
-    const averageTimeSpent = times.reduce((a, b) => a + b, 0) / totalVisits;
+    // Calculate site engagement metrics
+    const engagement: SiteEngagement[] = Array.from(siteVisits.entries()).map(([siteId, times]) => {
+      const totalVisits = times.length;
+      const averageTimeSpent = times.reduce((a, b) => a + b, 0) / totalVisits;
 
-    // Find most common next sites
-    const nextSites = Array.from(patterns.values())
-      .filter((p) => p.currentSite === siteId)
-      .sort((a, b) => b.transitionCount - a.transitionCount)
-      .slice(0, 3)
-      .map((p) => p.nextSite);
+      // Find most common next sites
+      const nextSites = Array.from(patterns.values())
+        .filter((p) => p.currentSite === siteId)
+        .sort((a, b) => b.transitionCount - a.transitionCount)
+        .slice(0, 3)
+        .map((p) => p.nextSite);
 
-    // Calculate return rate (visits > 1 indicates returns)
-    const returnRate = totalVisits > 1 ? ((totalVisits - 1) / totalVisits) * 100 : 0;
+      // Calculate return rate (visits > 1 indicates returns)
+      const returnRate = totalVisits > 1 ? ((totalVisits - 1) / totalVisits) * 100 : 0;
+
+      return {
+        siteId,
+        totalVisits,
+        averageTimeSpent,
+        returnRate,
+        commonNextSites: nextSites,
+      };
+    });
 
     return {
-      siteId,
-      totalVisits,
-      averageTimeSpent,
-      returnRate,
-      commonNextSites: nextSites,
+      patterns: Array.from(patterns.values()),
+      engagement: engagement,
     };
-  });
-
-  return {
-    patterns: Array.from(patterns.values()),
-    engagement: engagement,
-  };
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_ANALYZE_VISIT_PATTERNS);
+  }
 };

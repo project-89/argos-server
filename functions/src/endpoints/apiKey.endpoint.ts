@@ -1,10 +1,10 @@
 import { Request, Response } from "express";
 import { validateRequest } from "../middleware/validation.middleware";
 
-import { createApiKey, validateApiKey, revokeApiKey } from "../services/apiKey.service";
+import { createApiKey, validateApiKey, deactivateApiKey } from "../services/apiKey.service";
 import { sendSuccess, sendError } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ApiKeyRegisterSchema, ApiKeyRevokeSchema, ApiKeyValidateSchema } from "@/schemas";
+import { ApiKeyRegisterSchema, ApiKeyValidateSchema, ApiKeyDeactivateSchema } from "../schemas";
 
 /**
  * Register a new API key
@@ -76,39 +76,24 @@ export const validate = [
 ];
 
 /**
- * Revoke an API key
+ * Deactivate an API key
  */
-export const revoke = [
-  validateRequest(ApiKeyRevokeSchema),
+export const deactivate = [
+  validateRequest(ApiKeyDeactivateSchema),
   async (req: Request, res: Response): Promise<Response> => {
     try {
-      console.log("[Revoke API Key] Starting revocation with:", {
-        body: req.body,
-        fingerprintId: req.fingerprintId,
-      });
       const { key } = req.body;
-      const fingerprintId = req.fingerprintId;
+      const fingerprintId = req.fingerprintId || "";
 
-      if (!fingerprintId) {
-        console.log("[Revoke API Key] No fingerprintId in request");
-        return sendError(res, "Authentication required", 401);
-      }
-
-      await revokeApiKey({ key, fingerprintId });
-      console.log("[Revoke API Key] Successfully revoked key:", { key, fingerprintId });
-
-      return sendSuccess(res, null, "API key revoked successfully");
+      const result = await deactivateApiKey({ keyId: key, fingerprintId });
+      return sendSuccess(res, result, "API key deactivated successfully");
     } catch (error) {
-      console.error("[Revoke API Key] Error:", {
+      console.error("[Deactivate API Key] Error:", {
         error,
         stack: error instanceof Error ? error.stack : undefined,
         body: req.body,
-        fingerprintId: req.fingerprintId,
       });
-      if (error instanceof ApiError) {
-        return sendError(res, error.message, error.statusCode);
-      }
-      return sendError(res, "Failed to revoke API key", 500);
+      return sendError(res, "Failed to deactivate API key", 500);
     }
   },
 ];

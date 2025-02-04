@@ -4,16 +4,16 @@ import {
   FingerprintParamsSchema,
   FingerprintRegisterSchema,
   FingerprintUpdateSchema,
-} from "@/schemas";
+} from "../schemas";
 import { sendError, sendSuccess } from "../utils/response";
 import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { ERROR_MESSAGES } from "../constants";
 import {
   createFingerprint,
   getFingerprintAndUpdateIp,
   updateFingerprintMetadata,
-  getClientIp,
 } from "../services/fingerprint.service";
+import { getClientIp } from "../utils/request";
 
 const LOG_PREFIX = "[Fingerprint Endpoint]";
 

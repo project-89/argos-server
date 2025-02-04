@@ -1,16 +1,15 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { extractDomain } from "../../utils/request";
+import { COLLECTIONS, ERROR_MESSAGES } from "../../constants";
 import {
   logVisit,
   getVisitHistory,
   updatePresenceStatus,
   removeSiteAndVisits,
-  extractDomain,
   verifyFingerprint,
 } from "../../services/visit.service";
 import { ApiError } from "../../utils/error";
 import { getCurrentUnixMillis } from "../../utils/timestamp";
-import { ERROR_MESSAGES } from "../../constants/api";
 
 class MockTimestamp {
   private seconds: number;
@@ -45,6 +44,7 @@ jest.mock("firebase-admin/firestore", () => ({
 
 jest.mock("../../utils/timestamp", () => ({
   getCurrentUnixMillis: jest.fn(),
+  toUnixMillis: (timestamp: any) => timestamp.toMillis(),
 }));
 
 jest.mock("../../services/presence.service", () => ({
@@ -110,7 +110,12 @@ describe("Visit Service", () => {
       const visitId = "test-visit-id";
       mockCollection.add.mockResolvedValueOnce({ id: visitId });
 
-      const result = await logVisit(fingerprintId, url, title, clientIp);
+      const result = await logVisit({
+        fingerprintId,
+        url,
+        title,
+        clientIp,
+      });
 
       expect(mockFirestore.collection).toHaveBeenCalledWith(COLLECTIONS.SITES);
       expect(mockCollection.where).toHaveBeenCalledWith("domain", "==", "example.com");
@@ -118,11 +123,14 @@ describe("Visit Service", () => {
 
       expect(result).toMatchObject({
         id: visitId,
-        fingerprintId,
-        url,
-        title,
-        siteId,
-        clientIp,
+        visit: {
+          fingerprintId,
+          url,
+          title,
+          siteId,
+          createdAt: expect.any(Number),
+          clientIp,
+        },
         site: expect.objectContaining({
           id: siteId,
           domain: "example.com",
@@ -137,12 +145,12 @@ describe("Visit Service", () => {
       });
 
       // Verify timestamps are recent
-      expect(typeof result.timestamp === "number").toBe(true);
+      expect(typeof result.visit.createdAt === "number").toBe(true);
       expect(result.site).toBeDefined();
       if (result.site) {
         expect(typeof result.site.lastVisited === "number").toBe(true);
         expect(typeof result.site.createdAt === "number").toBe(true);
-        expect(Date.now() - result.timestamp).toBeLessThan(1000);
+        expect(Date.now() - result.visit.createdAt).toBeLessThan(1000);
         expect(Date.now() - result.site.lastVisited).toBeLessThan(1000);
         expect(Date.now() - result.site.createdAt).toBeLessThan(1000);
       }
@@ -184,43 +192,54 @@ describe("Visit Service", () => {
 
       // Mock visit creation
       const visitId = "test-visit-id";
+      const clientIp = "192.168.1.1";
       mockCollection.add.mockResolvedValueOnce({ id: visitId });
 
-      const result = await logVisit(fingerprintId, url, title);
-
-      expect(mockDoc.update).toHaveBeenCalledWith(
-        expect.objectContaining({
-          visits: 6,
-          title,
-        }),
-      );
-
-      expect(result).toMatchObject({
-        id: visitId,
+      const result = await logVisit({
         fingerprintId,
         url,
         title,
-        siteId,
+        clientIp,
+      });
+
+      expect(mockDoc.update).toHaveBeenCalledWith({
+        lastVisited: expect.any(MockTimestamp),
+        visits: 6,
+        title: title || "example.com",
+      });
+
+      expect(result).toMatchObject({
+        id: visitId,
+        visit: expect.objectContaining({
+          fingerprintId,
+          url,
+          title,
+          siteId,
+          createdAt: expect.any(Number),
+          clientIp,
+        }),
         site: expect.objectContaining({
           id: siteId,
           domain: "example.com",
           fingerprintId,
-          title,
+          title: existingSite.title,
           visits: 6,
-          settings: {
+          settings: expect.objectContaining({
             notifications: true,
             privacy: "private",
-          },
+          }),
+          lastVisited: expect.any(Number),
+          createdAt: expect.any(Number),
         }),
       });
 
       // Verify timestamps
-      expect(typeof result.timestamp === "number").toBe(true);
+      expect(typeof result.visit.createdAt === "number").toBe(true);
       expect(result.site).toBeDefined();
       if (result.site) {
         expect(typeof result.site.lastVisited === "number").toBe(true);
         expect(typeof result.site.createdAt === "number").toBe(true);
-        expect(Date.now() - result.timestamp).toBeLessThan(1000);
+        expect(Date.now() - result.visit.createdAt).toBeLessThan(1000);
         expect(Date.now() - result.site.lastVisited).toBeLessThan(1000);
         expect(result.site.createdAt).toBe(mockPast.toMillis());
       }
@@ -240,7 +259,7 @@ describe("Visit Service", () => {
           url: "https://example.com/page1",
           title: "Page 1",
           siteId: "site-1",
-          timestamp: mockNow,
+          createdAt: mockNow,
         },
         {
           id: "visit-2",
@@ -248,7 +267,7 @@ describe("Visit Service", () => {
           url: "https://example.com/page2",
           title: "Page 2",
           siteId: "site-2",
-          timestamp: mockPast,
+          createdAt: mockPast,
         },
       ];
 
@@ -282,7 +301,7 @@ describe("Visit Service", () => {
             url: visit.url,
             title: visit.title,
             siteId: visit.siteId,
-            timestamp: visit.timestamp, // This is a Firestore timestamp
+            createdAt: visit.createdAt,
           }),
         })),
       });
@@ -299,19 +318,14 @@ describe("Visit Service", () => {
               return null;
             }
             return {
-              domain: siteData.domain,
-              fingerprintId: siteData.fingerprintId,
-              lastVisited: siteData.lastVisited, // This is a Firestore timestamp
-              createdAt: siteData.createdAt, // This is a Firestore timestamp
-              title: siteData.title,
-              visits: siteData.visits,
-              settings: siteData.settings,
+              id: siteId,
+              ...siteData,
             };
           },
         }),
       }));
 
-      const result = await getVisitHistory(fingerprintId);
+      const result = await getVisitHistory({ fingerprintId });
 
       expect(result).toHaveLength(2);
       expect(result[0]).toMatchObject({
@@ -320,15 +334,15 @@ describe("Visit Service", () => {
         url: visits[0].url,
         title: visits[0].title,
         siteId: visits[0].siteId,
-        timestamp: mockNow.toMillis(), // Expect Unix timestamp in response
+        createdAt: mockNow.toMillis(),
         site: {
           id: "site-1",
           domain: "example.com",
           fingerprintId,
           title: "Example Site 1",
           visits: 5,
-          lastVisited: mockNow.toMillis(), // Expect Unix timestamp in response
-          createdAt: mockPast.toMillis(), // Expect Unix timestamp in response
+          lastVisited: mockNow.toMillis(),
+          createdAt: mockPast.toMillis(),
           settings: { notifications: true, privacy: "private" },
         },
       });
@@ -340,15 +354,15 @@ describe("Visit Service", () => {
         url: visits[1].url,
         title: visits[1].title,
         siteId: visits[1].siteId,
-        timestamp: mockPast.toMillis(), // Expect Unix timestamp in response
+        createdAt: mockPast.toMillis(),
         site: {
           id: "site-2",
           domain: "example.com",
           fingerprintId,
           title: "Example Site 2",
           visits: 3,
-          lastVisited: mockPast.toMillis(), // Expect Unix timestamp in response
-          createdAt: mockPast.toMillis(), // Expect Unix timestamp in response
+          lastVisited: mockPast.toMillis(),
+          createdAt: mockPast.toMillis(),
           settings: { notifications: true, privacy: "private" },
         },
       });
@@ -365,7 +379,7 @@ describe("Visit Service", () => {
           url: "https://example.com/page1",
           title: "Page 1",
           siteId: "site-1",
-          timestamp: mockNow,
+          createdAt: mockNow,
         },
       ];
 
@@ -382,12 +396,12 @@ describe("Visit Service", () => {
         exists: false,
       });
 
-      const result = await getVisitHistory(fingerprintId);
+      const result = await getVisitHistory({ fingerprintId });
 
       expect(result).toHaveLength(1);
       expect(result[0]).toEqual({
         ...visits[0],
-        timestamp: mockNow.toMillis(),
+        createdAt: mockNow.toMillis(),
       });
     });
 
@@ -400,8 +414,8 @@ describe("Visit Service", () => {
 
       mockCollection.get.mockRejectedValueOnce(error);
 
-      await expect(getVisitHistory(fingerprintId)).rejects.toThrow(
-        new ApiError(500, ERROR_MESSAGES.DATABASE_NOT_READY),
+      await expect(getVisitHistory({ fingerprintId })).rejects.toThrow(
+        ERROR_MESSAGES.INTERNAL_ERROR,
       );
     });
   });
@@ -427,12 +441,11 @@ describe("Visit Service", () => {
 
       mockBatch.commit.mockResolvedValueOnce(undefined);
 
-      const result = await removeSiteAndVisits(fingerprintId, siteId);
+      const result = await removeSiteAndVisits({ fingerprintId, siteId });
 
       expect(result).toEqual({
         fingerprintId,
         siteId,
-        timestamp: mockTimestamp,
       });
     });
 
@@ -444,7 +457,7 @@ describe("Visit Service", () => {
         exists: false,
       });
 
-      await expect(removeSiteAndVisits(fingerprintId, siteId)).rejects.toThrow(
+      await expect(removeSiteAndVisits({ fingerprintId, siteId })).rejects.toThrow(
         new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND),
       );
     });
@@ -460,7 +473,7 @@ describe("Visit Service", () => {
         }),
       });
 
-      await expect(removeSiteAndVisits(fingerprintId, siteId)).rejects.toThrow(
+      await expect(removeSiteAndVisits({ fingerprintId, siteId })).rejects.toThrow(
         new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED),
       );
     });
@@ -478,12 +491,12 @@ describe("Visit Service", () => {
 
       require("../../services/presence.service").updatePresence.mockResolvedValueOnce(mockResult);
 
-      const result = await updatePresenceStatus(fingerprintId, status);
+      const result = await updatePresenceStatus({ fingerprintId, status });
 
-      expect(require("../../services/presence.service").updatePresence).toHaveBeenCalledWith(
+      expect(require("../../services/presence.service").updatePresence).toHaveBeenCalledWith({
         fingerprintId,
         status,
-      );
+      });
       expect(result).toEqual(mockResult);
     });
   });
@@ -509,7 +522,7 @@ describe("Visit Service", () => {
         exists: true,
       });
 
-      await expect(verifyFingerprint(fingerprintId)).resolves.not.toThrow();
+      await expect(verifyFingerprint({ fingerprintId })).resolves.not.toThrow();
     });
 
     it("should throw error for non-existent fingerprint", async () => {
@@ -519,8 +532,8 @@ describe("Visit Service", () => {
         exists: false,
       });
 
-      await expect(verifyFingerprint(fingerprintId)).rejects.toThrow(
-        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
+      await expect(verifyFingerprint({ fingerprintId })).rejects.toThrow(
+        ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
 
@@ -532,8 +545,8 @@ describe("Visit Service", () => {
         exists: true,
       });
 
-      await expect(verifyFingerprint(fingerprintId, authenticatedId)).rejects.toThrow(
-        new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS),
+      await expect(verifyFingerprint({ fingerprintId, authenticatedId })).rejects.toThrow(
+        ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS),
       );
     });
   });

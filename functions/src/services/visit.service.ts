@@ -2,8 +2,8 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ApiError } from "../utils/error";
 import { updatePresence } from "./presence.service";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { toUnixMillis } from "@/utils/timestamp";
-
+import { toUnixMillis } from "../utils/timestamp";
+import { extractDomain } from "../utils/request";
 import {
   SiteResponse,
   VisitPresence,
@@ -11,19 +11,7 @@ import {
   VisitHistoryResponse,
   Visit,
   Site,
-} from "@/types";
-
-/**
- * Extracts domain from URL
- */
-export const extractDomain = (url: string): string => {
-  try {
-    const domain = new URL(url).hostname;
-    return domain.replace(/^www\./, "");
-  } catch (error) {
-    return url;
-  }
-};
+} from "../types";
 
 /**
  * Verifies fingerprint exists and ownership
@@ -41,18 +29,15 @@ export const verifyFingerprint = async ({
     const fingerprintDoc = await fingerprintRef.get();
 
     if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     if (authenticatedId && fingerprintId !== authenticatedId) {
-      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     }
   } catch (error) {
     console.error(`[Visit Service] Error in verifyFingerprint:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -116,6 +101,7 @@ export const logVisit = async ({
       const siteData = siteDoc.data() as Site;
       site = {
         ...siteData,
+        id: siteId,
         lastVisited: now.toMillis(),
         createdAt: siteData.createdAt.toMillis(),
         visits: (siteData.visits || 0) + 1,
@@ -124,6 +110,7 @@ export const logVisit = async ({
       await siteDoc.ref.update({
         lastVisited: now,
         visits: site.visits,
+        title: title || domain,
       });
     }
 
@@ -147,17 +134,18 @@ export const logVisit = async ({
     return {
       id: visitRef.id,
       visit: {
-        ...visitData,
+        fingerprintId,
+        url,
+        title: title || undefined,
+        siteId,
         createdAt: toUnixMillis(now),
+        ...(clientIp && { clientIp }),
       },
       site,
     };
   } catch (error) {
     console.error(`[Visit Service] Error in logVisit:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -176,10 +164,7 @@ export const updatePresenceStatus = async ({
     return result;
   } catch (error) {
     console.error(`[Visit Service] Error in updatePresenceStatus:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -192,7 +177,7 @@ export const removeSiteAndVisits = async ({
 }: {
   fingerprintId: string;
   siteId: string;
-}): Promise<{ fingerprintId: string; siteId: string; timestamp: number }> => {
+}): Promise<{ fingerprintId: string; siteId: string }> => {
   try {
     const db = getFirestore();
 
@@ -200,12 +185,12 @@ export const removeSiteAndVisits = async ({
     const siteDoc = await siteRef.get();
 
     if (!siteDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.SITE_NOT_FOUND);
+      throw ApiError.from(null, 404, ERROR_MESSAGES.SITE_NOT_FOUND);
     }
 
     const siteData = siteDoc.data() as Site;
     if (siteData.fingerprintId !== fingerprintId) {
-      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
+      throw ApiError.from(null, 403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Delete all visits for this site
@@ -224,27 +209,27 @@ export const removeSiteAndVisits = async ({
     return {
       fingerprintId,
       siteId,
-      timestamp: toUnixMillis(siteData.lastVisited),
     };
   } catch (error) {
     console.error(`[Visit Service] Error in removeSiteAndVisits:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
 /**
  * Gets visit history for a fingerprint
  */
-export const getVisitHistory = async (fingerprintId: string): Promise<VisitHistoryResponse[]> => {
+export const getVisitHistory = async ({
+  fingerprintId,
+}: {
+  fingerprintId: string;
+}): Promise<VisitHistoryResponse[]> => {
   try {
     const db = getFirestore();
     const snapshot = await db
       .collection(COLLECTIONS.VISITS)
       .where("fingerprintId", "==", fingerprintId)
-      .orderBy("timestamp", "desc")
+      .orderBy("createdAt", "desc")
       .get();
 
     // Get site information for each visit
@@ -253,8 +238,11 @@ export const getVisitHistory = async (fingerprintId: string): Promise<VisitHisto
         const visitData = doc.data() as Visit;
         const siteDoc = await db.collection(COLLECTIONS.SITES).doc(visitData.siteId).get();
         const response: VisitHistoryResponse = {
-          ...visitData,
           id: doc.id,
+          fingerprintId: visitData.fingerprintId,
+          url: visitData.url,
+          title: visitData.title,
+          siteId: visitData.siteId,
           createdAt: toUnixMillis(visitData.createdAt),
         };
         if (siteDoc.exists) {
@@ -272,9 +260,6 @@ export const getVisitHistory = async (fingerprintId: string): Promise<VisitHisto
     return visits;
   } catch (error: any) {
     console.error(`[Visit Service] Error in getVisitHistory:`, error);
-    if (error instanceof ApiError) {
-      throw error;
-    }
-    throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

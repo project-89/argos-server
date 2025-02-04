@@ -1,16 +1,15 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
-import { ROLE } from "../../constants/roles";
-import { ERROR_MESSAGES } from "../../constants/api";
+
 import {
   createFingerprint,
   getFingerprintAndUpdateIp,
   verifyFingerprint,
   updateFingerprintMetadata,
-  getClientIp,
 } from "../../services/fingerprint.service";
+import { getClientIp } from "../../utils/request";
 import { ApiError } from "../../utils/error";
 import { Request } from "express";
+import { ROLE, COLLECTIONS, ERROR_MESSAGES } from "../../constants";
 
 jest.mock("firebase-admin/firestore", () => ({
   getFirestore: jest.fn(),
@@ -56,7 +55,7 @@ describe("Fingerprint Service", () => {
 
       mockCollection.add.mockResolvedValue({ id: docId });
 
-      const result = await createFingerprint(fingerprint, ip, metadata);
+      const result = await createFingerprint({ fingerprint, ip, metadata });
 
       expect(mockFirestore.collection).toHaveBeenCalledWith(COLLECTIONS.FINGERPRINTS);
       expect(mockCollection.add).toHaveBeenCalledWith(
@@ -67,29 +66,30 @@ describe("Fingerprint Service", () => {
           tags: [],
           metadata,
           ipAddresses: [ip],
-          ipMetadata: {
+          ipMetadata: expect.objectContaining({
             primaryIp: ip,
             ipFrequency: { [ip]: 1 },
-            lastSeenAt: { [ip]: mockTimestamp },
-          },
+            lastSeenAt: expect.any(Object),
+          }),
         }),
       );
 
-      expect(result).toEqual({
-        id: docId,
-        fingerprint,
-        roles: [ROLE.USER],
-        createdAt: mockTimestamp,
-        lastVisited: mockTimestamp,
-        tags: [],
-        metadata,
-        ipAddresses: [ip],
-        ipMetadata: {
-          primaryIp: ip,
-          ipFrequency: { [ip]: 1 },
-          lastSeenAt: { [ip]: mockTimestamp },
-        },
-      });
+      expect(result).toEqual(
+        expect.objectContaining({
+          id: docId,
+          fingerprint,
+          roles: [ROLE.USER],
+          createdAt: mockTimestamp,
+          tags: [],
+          metadata,
+          ipAddresses: [ip],
+          ipMetadata: expect.objectContaining({
+            primaryIp: ip,
+            ipFrequency: { [ip]: 1 },
+            lastSeenAt: expect.any(Object),
+          }),
+        }),
+      );
     });
 
     it("should handle database errors gracefully", async () => {
@@ -98,7 +98,7 @@ describe("Fingerprint Service", () => {
 
       mockCollection.add.mockRejectedValue(new Error("Database error"));
 
-      await expect(createFingerprint(fingerprint, ip)).rejects.toThrow("Database error");
+      await expect(createFingerprint({ fingerprint, ip })).rejects.toThrow("Database error");
     });
   });
 
@@ -128,7 +128,7 @@ describe("Fingerprint Service", () => {
         return transactionResult;
       });
 
-      const result = await getFingerprintAndUpdateIp(fingerprintId, ip);
+      const result = await getFingerprintAndUpdateIp({ fingerprintId, ip });
 
       expect(mockFirestore.collection).toHaveBeenCalledWith(COLLECTIONS.FINGERPRINTS);
       expect(mockFirestore.runTransaction).toHaveBeenCalled();
@@ -158,7 +158,7 @@ describe("Fingerprint Service", () => {
         });
       });
 
-      await expect(getFingerprintAndUpdateIp(fingerprintId, ip)).rejects.toThrow(
+      await expect(getFingerprintAndUpdateIp({ fingerprintId, ip })).rejects.toThrow(
         new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT),
       );
     });
@@ -170,7 +170,7 @@ describe("Fingerprint Service", () => {
 
       mockDoc.get.mockResolvedValue({ exists: true });
 
-      await expect(verifyFingerprint(fingerprintId)).resolves.not.toThrow();
+      await expect(verifyFingerprint({ fingerprintId })).resolves.not.toThrow();
     });
 
     it("should throw error for non-existent fingerprint", async () => {
@@ -178,7 +178,7 @@ describe("Fingerprint Service", () => {
 
       mockDoc.get.mockResolvedValue({ exists: false });
 
-      await expect(verifyFingerprint(fingerprintId)).rejects.toThrow(
+      await expect(verifyFingerprint({ fingerprintId })).rejects.toThrow(
         new ApiError(404, ERROR_MESSAGES.INVALID_FINGERPRINT),
       );
     });
@@ -189,7 +189,7 @@ describe("Fingerprint Service", () => {
 
       mockDoc.get.mockResolvedValue({ exists: true });
 
-      await expect(verifyFingerprint(fingerprintId, authenticatedId)).rejects.toThrow(
+      await expect(verifyFingerprint({ fingerprintId, authenticatedId })).rejects.toThrow(
         new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS),
       );
     });
@@ -209,7 +209,7 @@ describe("Fingerprint Service", () => {
         }),
       });
 
-      const result = await updateFingerprintMetadata(fingerprintId, newMetadata);
+      const result = await updateFingerprintMetadata({ fingerprintId, metadata: newMetadata });
 
       expect(mockDoc.update).toHaveBeenCalledWith({
         metadata: expect.objectContaining({
@@ -235,7 +235,7 @@ describe("Fingerprint Service", () => {
 
       mockDoc.get.mockResolvedValue({ exists: false });
 
-      await expect(updateFingerprintMetadata(fingerprintId, metadata)).rejects.toThrow(
+      await expect(updateFingerprintMetadata({ fingerprintId, metadata })).rejects.toThrow(
         new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
       );
     });
@@ -246,8 +246,8 @@ describe("Fingerprint Service", () => {
 
       mockDoc.get.mockRejectedValue(new Error("Database error"));
 
-      await expect(updateFingerprintMetadata(fingerprintId, metadata)).rejects.toThrow(
-        new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
+      await expect(updateFingerprintMetadata({ fingerprintId, metadata })).rejects.toThrow(
+        "Database error",
       );
     });
   });

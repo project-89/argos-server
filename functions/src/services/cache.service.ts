@@ -1,7 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { getCurrentUnixMillis } from "../utils/timestamp";
-
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+import { CACHE_DURATION } from "@/constants";
 
 export const getCachedData = async <T>(key: string, collection: string): Promise<T | null> => {
   try {
@@ -13,7 +12,7 @@ export const getCachedData = async <T>(key: string, collection: string): Promise
     }
 
     const data = doc.data();
-    if (!data || getCurrentUnixMillis() - data.timestamp > CACHE_DURATION) {
+    if (!data || getCurrentUnixMillis() - data.timestamp > CACHE_DURATION.PRICE) {
       return null;
     }
 

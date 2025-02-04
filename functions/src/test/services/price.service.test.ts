@@ -1,7 +1,6 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS, ERROR_MESSAGES } from "../../constants";
 import { getCurrentPrices, getPriceHistory } from "../../services/price.service";
-import { ERROR_MESSAGES } from "../../constants/api";
 
 jest.mock("node-fetch", () => {
   return jest.fn();
@@ -33,8 +32,9 @@ describe("Price Service", () => {
         createdAt: now,
       });
 
-      const prices = await getCurrentPrices([testSymbol]);
-      expect(prices[testSymbol]).toEqual(testPrice);
+      const result = await getCurrentPrices([testSymbol]);
+      expect(result.prices[testSymbol]).toEqual(testPrice);
+      expect(Object.keys(result.errors)).toHaveLength(0);
       expect(mockFetch).not.toHaveBeenCalled();
     });
 
@@ -53,8 +53,9 @@ describe("Price Service", () => {
         json: () => Promise.resolve({ [testSymbol]: testPrice }),
       });
 
-      const prices = await getCurrentPrices([testSymbol]);
-      expect(prices[testSymbol]).toEqual(testPrice);
+      const result = await getCurrentPrices([testSymbol]);
+      expect(result.prices[testSymbol]).toEqual(testPrice);
+      expect(Object.keys(result.errors)).toHaveLength(0);
       expect(mockFetch).toHaveBeenCalledTimes(1);
 
       // Verify cache was updated
@@ -71,8 +72,9 @@ describe("Price Service", () => {
         json: () => Promise.resolve({ [testSymbol]: testPrice }),
       });
 
-      const prices = await getCurrentPrices([testSymbol]);
-      expect(prices[testSymbol]).toEqual(testPrice);
+      const result = await getCurrentPrices([testSymbol]);
+      expect(result.prices[testSymbol]).toEqual(testPrice);
+      expect(Object.keys(result.errors)).toHaveLength(0);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -89,8 +91,9 @@ describe("Price Service", () => {
           }),
       });
 
-      const prices = await getCurrentPrices();
-      expect(prices["project89"]).toEqual(testPrice);
+      const result = await getCurrentPrices();
+      expect(result.prices["project89"]).toEqual(testPrice);
+      expect(Object.keys(result.errors)).toHaveLength(0);
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
@@ -100,9 +103,9 @@ describe("Price Service", () => {
         status: 500,
       });
 
-      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(
-        ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE,
-      );
+      const result = await getCurrentPrices([testSymbol]);
+      expect(result.errors[testSymbol]).toBe(ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+      expect(Object.keys(result.prices)).toHaveLength(0);
     });
 
     it("should handle missing price data", async () => {
@@ -111,9 +114,26 @@ describe("Price Service", () => {
         json: () => Promise.resolve({}),
       });
 
-      await expect(getCurrentPrices([testSymbol])).rejects.toThrow(
-        ERROR_MESSAGES.PRICE_DATA_NOT_FOUND,
-      );
+      const result = await getCurrentPrices([testSymbol]);
+      expect(result.errors[testSymbol]).toBe(ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
+      expect(Object.keys(result.prices)).toHaveLength(0);
+    });
+
+    it("should handle multiple tokens with partial failures", async () => {
+      const secondSymbol = "other-token";
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ [testSymbol]: testPrice }),
+        })
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 404,
+        });
+
+      const result = await getCurrentPrices([testSymbol, secondSymbol]);
+      expect(result.prices[testSymbol]).toEqual(testPrice);
+      expect(result.errors[secondSymbol]).toBe(ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
     });
   });
 

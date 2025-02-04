@@ -5,6 +5,7 @@
 
 import { Timestamp } from "firebase-admin/firestore";
 import type { Impression as ImpressionModel } from "./models/models";
+import { TagData, TagLimitData } from "./api/tag.types";
 
 /**
  * Standard API Response Format
@@ -260,76 +261,6 @@ export interface SiteEngagement {
 export interface VisitAnalysis {
   patterns: VisitPattern[];
   engagement: SiteEngagement[];
-}
-
-/**
- * Tag Game Types
- */
-export interface TagData {
-  type: string;
-  taggedBy: string;
-  taggedAt: Timestamp;
-}
-
-export interface TagLimitData {
-  firstTaggedAt: Timestamp;
-  remainingDailyTags: number;
-  lastTagResetAt: Timestamp;
-}
-
-export interface TagUserRequest {
-  targetFingerprintId: string;
-  tagType: string;
-}
-
-export interface TagUserResponse {
-  success: boolean;
-  message: string;
-}
-
-export interface TagHistoryResponse {
-  tags: TagData[];
-}
-
-export interface GetUserTagsResponse {
-  hasTags: boolean;
-  activeTags: string[];
-}
-
-export interface GetRemainingTagsResponse {
-  remainingTags: number;
-}
-
-/**
- * Tag Game Leaderboard Types
- */
-export interface TagLeaderboardEntry {
-  fingerprintId: string;
-  totalTags: number;
-  lastTagAt: Timestamp;
-  streak: number;
-  tagTypes: Record<string, number>;
-}
-
-export interface TagLeaderboardResponse {
-  timeFrame: "daily" | "weekly" | "monthly" | "allTime";
-  entries: Omit<TagLeaderboardEntry, "lastTagAt"> | { lastTagAt: number }[];
-  userRank?: number;
-}
-
-export interface TagStatsDocument {
-  id: string;
-  fingerprintId: string;
-  totalTagsMade: number;
-  lastTagAt: Timestamp;
-  dailyTags: number;
-  weeklyTags: number;
-  monthlyTags: number;
-  streak: number;
-  tagTypes: Record<string, number>;
-  createdAt: Timestamp;
-  updatedAt: Timestamp;
-  tagHistory?: TagData[];
 }
 
 /**

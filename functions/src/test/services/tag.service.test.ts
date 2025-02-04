@@ -7,10 +7,9 @@ import {
   getUserTags,
   getTagLeaderboard,
 } from "../../services/tag.service";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES, COLLECTIONS } from "../../constants";
 import { ApiError } from "../../utils/error";
 import { cleanDatabase, createTestData } from "../utils/testUtils";
-import { COLLECTIONS } from "../../constants/collections";
 
 describe("Tag Service", () => {
   let testTaggerId: string;
@@ -114,7 +113,11 @@ describe("Tag Service", () => {
 
   describe("tagUser", () => {
     it("should successfully tag a user with a specific tag type", async () => {
-      const result = await tagUser(testTaggerId, testTargetId, testTagType);
+      const result = await tagUser({
+        taggerFingerprintId: testTaggerId,
+        targetFingerprintId: testTargetId,
+        tagType: testTagType,
+      });
       expect(result.success).toBe(true);
       expect(result.message).toBe(`Successfully tagged user with ${testTagType}`);
 
@@ -130,63 +133,104 @@ describe("Tag Service", () => {
     });
 
     it("should prevent self-tagging", async () => {
-      await expect(tagUser(testTaggerId, testTaggerId, testTagType)).rejects.toThrow(
-        new ApiError(400, ERROR_MESSAGES.CANNOT_TAG_SELF),
-      );
+      await expect(
+        tagUser({
+          taggerFingerprintId: testTaggerId,
+          targetFingerprintId: testTaggerId,
+          tagType: testTagType,
+        }),
+      ).rejects.toThrow(new ApiError(400, ERROR_MESSAGES.CANNOT_TAG_SELF));
     });
 
     it("should prevent tagging a user who already has the tag", async () => {
       // First tag
-      await tagUser(testTaggerId, testTargetId, testTagType);
+      await tagUser({
+        taggerFingerprintId: testTaggerId,
+        targetFingerprintId: testTargetId,
+        tagType: testTagType,
+      });
 
       // Attempt to tag again
-      await expect(tagUser(testTaggerId, testTargetId, testTagType)).rejects.toThrow(
-        new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED),
-      );
+      await expect(
+        tagUser({
+          taggerFingerprintId: testTaggerId,
+          targetFingerprintId: testTargetId,
+          tagType: testTagType,
+        }),
+      ).rejects.toThrow(new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED));
     });
 
     it("should throw error for non-existent target", async () => {
-      await expect(tagUser(testTaggerId, nonExistentId, testTagType)).rejects.toThrow(
-        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
-      );
+      await expect(
+        tagUser({
+          taggerFingerprintId: testTaggerId,
+          targetFingerprintId: nonExistentId,
+          tagType: testTagType,
+        }),
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     });
 
     it("should throw error for non-existent tagger", async () => {
-      await expect(tagUser(nonExistentId, testTargetId, testTagType)).rejects.toThrow(
-        new ApiError(404, ERROR_MESSAGES.TAGGER_NOT_FOUND),
-      );
+      await expect(
+        tagUser({
+          taggerFingerprintId: nonExistentId,
+          targetFingerprintId: testTargetId,
+          tagType: testTagType,
+        }),
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.TAGGER_NOT_FOUND));
     });
 
     it("should reject invalid tag types", async () => {
-      await expect(tagUser(testTaggerId, testTargetId, "invalid-tag")).rejects.toThrow(
-        new ApiError(400, ERROR_MESSAGES.INVALID_TAG_TYPE),
-      );
+      await expect(
+        tagUser({
+          taggerFingerprintId: testTaggerId,
+          targetFingerprintId: testTargetId,
+          tagType: "invalid-tag",
+        }),
+      ).rejects.toThrow(new ApiError(400, ERROR_MESSAGES.INVALID_TAG_TYPE));
     });
   });
 
   describe("hasTag", () => {
     it("should return true for user with specific tag", async () => {
-      await tagUser(testTaggerId, testTargetId, testTagType);
-      const result = await hasTag(testTargetId, testTagType);
+      await tagUser({
+        taggerFingerprintId: testTaggerId,
+        targetFingerprintId: testTargetId,
+        tagType: testTagType,
+      });
+      const result = await hasTag({
+        fingerprintId: testTargetId,
+        tagType: testTagType,
+      });
       expect(result).toBe(true);
     });
 
     it("should return false for user without specific tag", async () => {
-      const result = await hasTag(testTargetId, "nonexistent-tag");
+      const result = await hasTag({
+        fingerprintId: testTargetId,
+        tagType: "nonexistent-tag",
+      });
       expect(result).toBe(false);
     });
 
     it("should throw error for non-existent user", async () => {
-      await expect(hasTag(nonExistentId, testTagType)).rejects.toThrow(
-        new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND),
-      );
+      await expect(
+        hasTag({
+          fingerprintId: nonExistentId,
+          tagType: testTagType,
+        }),
+      ).rejects.toThrow(new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     });
   });
 
   describe("getUserTags", () => {
     it("should return active tags for a user", async () => {
       // Add tag
-      await tagUser(testTaggerId, testTargetId, testTagType);
+      await tagUser({
+        taggerFingerprintId: testTaggerId,
+        targetFingerprintId: testTargetId,
+        tagType: testTagType,
+      });
 
       const result = await getUserTags(testTargetId);
       expect(result.hasTags).toBe(true);
@@ -209,7 +253,11 @@ describe("Tag Service", () => {
 
   describe("getTagHistory", () => {
     it("should return tag history from tag stats", async () => {
-      await tagUser(testTaggerId, testTargetId, testTagType);
+      await tagUser({
+        taggerFingerprintId: testTaggerId,
+        targetFingerprintId: testTargetId,
+        tagType: testTagType,
+      });
       const history = await getTagHistory(testTaggerId);
 
       expect(history.length).toBeGreaterThan(0);
@@ -227,63 +275,108 @@ describe("Tag Service", () => {
 
   describe("getTagLeaderboard", () => {
     it("should return daily leaderboard", async () => {
-      const result = await getTagLeaderboard("daily");
-      expect(result.timeframe).toBe("daily");
+      const result = await getTagLeaderboard({
+        timeFrame: "daily",
+        limit: 3,
+        offset: 0,
+        currentUserId: user2FingerprintId,
+      });
+      expect(result.timeFrame).toBe("daily");
       expect(result.entries).toHaveLength(3);
       expect(result.entries[0].fingerprintId).toBe(user2FingerprintId); // Most daily tags
       expect(result.entries[0].totalTags).toBe(15);
     });
 
     it("should return weekly leaderboard", async () => {
-      const result = await getTagLeaderboard("weekly");
-      expect(result.timeframe).toBe("weekly");
+      const result = await getTagLeaderboard({
+        timeFrame: "weekly",
+        limit: 3,
+        offset: 0,
+        currentUserId: user3FingerprintId,
+      });
+      expect(result.timeFrame).toBe("weekly");
       expect(result.entries).toHaveLength(3);
       expect(result.entries[0].fingerprintId).toBe(user3FingerprintId); // Most weekly tags
       expect(result.entries[0].totalTags).toBe(60);
     });
 
     it("should return monthly leaderboard", async () => {
-      const result = await getTagLeaderboard("monthly");
-      expect(result.timeframe).toBe("monthly");
+      const result = await getTagLeaderboard({
+        timeFrame: "monthly",
+        limit: 3,
+        offset: 0,
+        currentUserId: user1FingerprintId,
+      });
+      expect(result.timeFrame).toBe("monthly");
       expect(result.entries).toHaveLength(3);
       expect(result.entries[0].fingerprintId).toBe(user3FingerprintId); // Most monthly tags
       expect(result.entries[0].totalTags).toBe(100);
     });
 
     it("should return all-time leaderboard", async () => {
-      const result = await getTagLeaderboard("allTime");
-      expect(result.timeframe).toBe("allTime");
+      const result = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 3,
+        offset: 0,
+        currentUserId: user1FingerprintId,
+      });
+      expect(result.timeFrame).toBe("allTime");
       expect(result.entries).toHaveLength(3);
       expect(result.entries[0].fingerprintId).toBe(user3FingerprintId); // Most total tags
       expect(result.entries[0].totalTags).toBe(120);
     });
 
     it("should respect limit parameter", async () => {
-      const result = await getTagLeaderboard("allTime", 2);
+      const result = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 2,
+        offset: 0,
+        currentUserId: user1FingerprintId,
+      });
       expect(result.entries).toHaveLength(2);
     });
 
     it("should respect offset parameter", async () => {
       // First verify the order without offset
-      const fullResult = await getTagLeaderboard("allTime", 3);
+      const fullResult = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 3,
+        offset: 0,
+        currentUserId: user1FingerprintId,
+      });
       expect(fullResult.entries[0].fingerprintId).toBe(user3FingerprintId);
       expect(fullResult.entries[1].fingerprintId).toBe(user1FingerprintId);
       expect(fullResult.entries[2].fingerprintId).toBe(user2FingerprintId);
 
       // Then check with offset
-      const result = await getTagLeaderboard("allTime", 2, 1);
+      const result = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 2,
+        offset: 1,
+        currentUserId: user2FingerprintId,
+      });
       expect(result.entries).toHaveLength(2);
       expect(result.entries[0].fingerprintId).toBe(user1FingerprintId); // Second highest total
       expect(result.entries[1].fingerprintId).toBe(user2FingerprintId); // Third highest total
     });
 
     it("should include user rank when requested", async () => {
-      const result = await getTagLeaderboard("allTime", 10, 0, user2FingerprintId);
+      const result = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 10,
+        offset: 0,
+        currentUserId: user2FingerprintId,
+      });
       expect(result.userRank).toBe(3); // user2 has third most total tags (120 > 100 > 80)
     });
 
     it("should handle user not in leaderboard", async () => {
-      const result = await getTagLeaderboard("allTime", 10, 0, "nonexistent");
+      const result = await getTagLeaderboard({
+        timeFrame: "allTime",
+        limit: 10,
+        offset: 0,
+        currentUserId: "nonexistent",
+      });
       expect(result.userRank).toBeUndefined();
     });
   });

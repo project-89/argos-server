@@ -1,15 +1,19 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fetch from "node-fetch";
-import { COLLECTIONS } from "../constants/collections.constants";
+
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
 import { PriceHistory } from "../types/models/models";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { ERROR_MESSAGES, CACHE_DURATION, COLLECTIONS } from "../constants";
 import { PriceResponse } from "@/types";
 
 const DEFAULT_TOKENS = ["project89"];
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+type PriceResult = {
+  prices: PriceResponse;
+  errors: { [symbol: string]: string };
+};
 
 // Get Coingecko configuration
 const getCoingeckoConfig = () => {
@@ -23,7 +27,7 @@ const getCoingeckoConfig = () => {
 /**
  * Get current prices for specified tokens
  */
-export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceResponse> => {
+export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceResult> => {
   try {
     const { apiUrl, apiKey } = getCoingeckoConfig();
 
@@ -32,8 +36,10 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
     const db = getFirestore();
     const now = Timestamp.now();
-    const prices: PriceResponse = {};
-    const errors: string[] = [];
+    const results: PriceResult = {
+      prices: {},
+      errors: {},
+    };
 
     for (const symbol of tokenSymbols) {
       try {
@@ -43,8 +49,11 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
         if (cacheDoc.exists) {
           const cacheData = cacheDoc.data();
-          if (cacheData && now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION) {
-            prices[symbol] = {
+          if (
+            cacheData &&
+            now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION.PRICE
+          ) {
+            results.prices[symbol] = {
               usd: cacheData.usd,
               usd_24h_change: cacheData.usd_24h_change,
             };
@@ -65,21 +74,21 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
+            throw ApiError.from(null, 404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
           }
           if (response.status === 429) {
-            throw new ApiError(429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+            throw ApiError.from(null, 429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
           }
-          throw new ApiError(response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+          throw ApiError.from(null, response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
         }
 
         const responseData = await response.json();
         const data = responseData[symbol];
         if (!data) {
-          throw new ApiError(404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
+          throw ApiError.from(null, 404, ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
         }
 
-        prices[symbol] = {
+        results.prices[symbol] = {
           usd: data.usd,
           usd_24h_change: data.usd_24h_change,
         };
@@ -91,25 +100,20 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
           createdAt: now,
         });
       } catch (error) {
-        if (error instanceof ApiError) {
-          errors.push(error.message);
-        } else {
-          errors.push(ERROR_MESSAGES.PRICE_DATA_NOT_FOUND);
-        }
+        results.errors[symbol] =
+          error instanceof ApiError ? error.message : ERROR_MESSAGES.PRICE_DATA_NOT_FOUND;
       }
     }
 
-    if (Object.keys(prices).length === 0) {
-      throw new ApiError(404, errors.join(", "));
+    if (Object.keys(results.prices).length === 0 && Object.keys(results.errors).length === 0) {
+      // Only throw if we have no prices AND no specific errors
+      throw ApiError.from(null, 404, ERROR_MESSAGES.ALL_PRICE_FETCHES_FAILED);
     }
 
-    return prices;
+    return results;
   } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
-    }
     console.error("Error fetching prices:", error);
-    throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };
 
@@ -131,7 +135,7 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
         cacheData.history &&
         Array.isArray(cacheData.history) &&
         cacheData.history.length > 0 &&
-        now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION
+        now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION.PRICE
       ) {
         return cacheData.history;
       }
@@ -150,17 +154,17 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
 
     if (!response.ok) {
       if (response.status === 404) {
-        throw new ApiError(404, ERROR_MESSAGES.TOKEN_NOT_FOUND);
+        throw ApiError.from(null, 404, ERROR_MESSAGES.TOKEN_NOT_FOUND);
       }
       if (response.status === 429) {
-        throw new ApiError(429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
+        throw ApiError.from(null, 429, ERROR_MESSAGES.RATE_LIMIT_EXCEEDED);
       }
-      throw new ApiError(response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+      throw ApiError.from(null, response.status, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
     }
 
     const data = await response.json();
     if (!data || !Array.isArray(data.prices)) {
-      throw new ApiError(500, ERROR_MESSAGES.INVALID_REQUEST);
+      throw ApiError.from(null, 500, ERROR_MESSAGES.INVALID_REQUEST);
     }
 
     const history = data.prices.map(([timestamp, price]: [number, number]) => ({
@@ -180,9 +184,9 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistory[]> =
     return history;
   } catch (error) {
     if (error instanceof ApiError) {
-      throw error;
+      throw error; // Preserve specific API errors
     }
     console.error("Unexpected error fetching price history:", error);
-    throw new ApiError(500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };
