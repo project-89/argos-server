@@ -1,9 +1,8 @@
 import { Request, Response } from "express";
-import { profileService } from "../services/profile.service";
-import { validateRequest } from "../../middleware/validation.middleware";
-
-import { sendError, sendSuccess } from "../../utils/response";
-import { ApiError } from "../../utils/error";
+import { profileService } from "../services/profile.hivemind.service";
+import { validateRequest } from "../middleware/validation.middleware";
+import { sendError, sendSuccess } from "../utils/response";
+import { ApiError } from "../utils/error";
 import {
   ProfileCreateSchema,
   ProfileGetByWalletSchema,

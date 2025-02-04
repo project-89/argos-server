@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { capabilityService } from "../services/capability.service";
-import { skillMatchingService } from "../services/skillMatching.service";
-import { validateRequest } from "../../middleware/validation.middleware";
-import { sendError, sendSuccess } from "../../utils/response";
-import { ApiError } from "../../utils/error";
+import { capabilityService } from "../services/capability.hivemind.service";
+import { skillMatchingService } from "../services/skillMatching.hivemind.service";
+import { validateRequest } from "../middleware/validation.middleware";
+import { sendError, sendSuccess } from "../utils/response";
+import { ApiError } from "../utils/error";
 import {
   CapabilityCreateSchema,
   CapabilityDeleteSchema,

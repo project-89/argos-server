@@ -4,7 +4,7 @@ import fetch from "node-fetch";
 import * as functions from "firebase-functions";
 import { ApiError } from "../utils/error";
 import { toUnixMillis } from "../utils/timestamp";
-import { PriceHistory } from "../types/models/models";
+import { PriceHistory } from "../types/models/models.types";
 import { ERROR_MESSAGES, CACHE_DURATION, COLLECTIONS } from "../constants";
 import { PriceResponse } from "@/types";
 

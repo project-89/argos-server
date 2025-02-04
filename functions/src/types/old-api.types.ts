@@ -4,8 +4,8 @@
  */
 
 import { Timestamp } from "firebase-admin/firestore";
-import type { Impression as ImpressionModel } from "./models/models";
-import { TagData, TagLimitData } from "./api/tag.types";
+import type { Impression as ImpressionModel } from "./models/models.types";
+import { TagData, TagLimitData } from "./services/tag.types";
 
 /**
  * Standard API Response Format

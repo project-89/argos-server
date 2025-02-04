@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ContactInfoSchema, PreferencesSchema } from "./common.schema";
+import { ContactInfoSchema, PreferencesSchema } from "./common.hivemind.schema";
 
 export const ProfileCreateSchema = z.object({
   body: z.object({

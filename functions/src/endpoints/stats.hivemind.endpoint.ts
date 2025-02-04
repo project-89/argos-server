@@ -1,9 +1,9 @@
 import { Request, Response } from "express";
-import { statsService } from "../services/stats.service";
-import { validateRequest } from "../../middleware/validation.middleware";
+import { statsService } from "../services/stats.hivemind.service";
+import { validateRequest } from "../middleware/validation.middleware";
 import { StatsGetSchema, StatsUpdateSchema } from "../schemas";
-import { sendError, sendSuccess } from "../../utils/response";
-import { ApiError } from "../../utils/error";
+import { sendError, sendSuccess } from "../utils/response";
+import { ApiError } from "../utils/error";
 
 /**
  * Get stats for a profile

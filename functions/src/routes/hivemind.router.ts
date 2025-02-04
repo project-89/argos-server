@@ -1,20 +1,20 @@
 import { Router } from "express";
-import { verifyProfileAccess } from "../middleware/profileOwnership.middleware";
-import { verifyOwnership } from "../../middleware/ownershipCheck.middleware";
+import { verifyProfileAccess } from "../middleware/profileOwnership.hivemind.middleware";
+import { verifyOwnership } from "../middleware/ownershipCheck.middleware";
 import {
   createProfile,
   getProfile,
   getProfileByWallet,
   updateProfile,
-} from "../endpoints/profile.endpoint";
-import { getStats, updateStats } from "../endpoints/stats.endpoint";
+} from "../endpoints/profile.hivemind.endpoint";
+import { getStats, updateStats } from "../endpoints/stats.hivemind.endpoint";
 import {
   createCapability,
   deleteCapability,
   getCapabilities,
   updateCapability,
   findSimilarSkills,
-} from "../endpoints/capability.endpoint";
+} from "../endpoints/capability.hivemind.endpoint";
 
 const router = Router();
 

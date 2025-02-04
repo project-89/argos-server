@@ -1,7 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections.constants";
-import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api.constants";
+import { COLLECTIONS } from "../constants/collections.constants";
+import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api.constants";
 import {
   AnalyzeSkillInput,
   AnalyzeSkillResponse,
@@ -9,13 +9,13 @@ import {
   SkillMatch,
   Skill,
   SkillModel,
-} from "../types/capability.types";
-import { toUnixMillis } from "../../utils/timestamp";
+} from "../types/services";
+import { toUnixMillis } from "../utils/timestamp";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
 import { SkillAnalysisSchema, SkillSimilaritySchema } from "../schemas";
 import { DEFAULT_SKILL_ANALYSIS } from "../constants";
-import { SkillAnalysis } from "../types/schema.types";
+import { SkillAnalysis } from "../types/services/skills.hivemind.types";
 
 // Initialize Gemini model with the Google provider
 const geminiModel = google("gemini-pro");

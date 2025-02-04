@@ -1,4 +1,4 @@
-import { Site, Visit } from "../models/models";
+import { Site, Visit } from "../models/models.types";
 
 /**
  * Visit Tracking

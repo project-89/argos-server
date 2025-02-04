@@ -1,9 +1,9 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections.constants";
-import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api.constants";
-import { toUnixMillis } from "../../utils/timestamp";
-import { skillMatchingService } from "./skillMatching.service";
+
+import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
+import { toUnixMillis } from "../utils/timestamp";
+import { skillMatchingService } from "./skillMatching.hivemind.service";
 
 import {
   Skill,
@@ -13,7 +13,7 @@ import {
   CreateCapabilityInput,
   UpdateCapabilityInput,
   SkillLevel,
-} from "../types/capability.types";
+} from "../types/services";
 
 export const capabilityService = {
   async createCapability(

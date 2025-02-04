@@ -1,8 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections.constants";
-import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api.constants";
-import { StatsModel, StatsResponse } from "../types/stats.types";
+import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
+import { ApiError } from "../utils/error";
+import { StatsModel, StatsResponse } from "../types/services";
 
 class StatsService {
   private db = getFirestore();

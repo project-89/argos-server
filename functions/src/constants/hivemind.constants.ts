@@ -1,4 +1,5 @@
-import { SkillAnalysis } from "../types/schema.types";
+import { SkillAnalysis } from "../types/services/skills.hivemind.types";
+
 /**
  * Default values for when skill analysis fails
  */

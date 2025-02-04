@@ -6,3 +6,7 @@ export * from "./api-key.schema";
 export * from "./impression.schema";
 export * from "./presence.schema";
 export * from "./roles.schema";
+export * from "./capability.hivemind.schema";
+export * from "./profile.hivemind.schema";
+export * from "./skill.hivemind.schema";
+export * from "./stats.hivemind.schema";

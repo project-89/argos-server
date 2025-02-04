@@ -1,16 +1,16 @@
 import { getFirestore, Timestamp, CollectionReference, Query } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections.constants";
-import { ApiError } from "../../utils/error";
-import { ERROR_MESSAGES } from "../../constants/api.constants";
-import { toUnixMillis } from "../../utils/timestamp";
+import { COLLECTIONS } from "../constants/collections.constants";
+import { ApiError } from "../utils/error";
+import { ERROR_MESSAGES } from "../constants/api.constants";
+import { toUnixMillis } from "../utils/timestamp";
 import {
   Profile,
   ProfileModel,
   CreateProfileInput,
   UpdateProfileInput,
   ProfileWithStats,
-} from "../types/profile.types";
-import { StatsModel } from "../types/stats.types";
+  StatsModel,
+} from "../types/services";
 
 export const profileService = {
   async createProfile(input: CreateProfileInput): Promise<Profile> {
