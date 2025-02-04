@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
-import { TEST_CONFIG } from "../../setup/testConfig";
-import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../../utils/testUtils";
-import { ERROR_MESSAGES } from "../../../constants/api";
-import { SkillLevel } from "../../../hivemind/types/capability.types";
+import { TEST_CONFIG } from "../setup/testConfig";
+import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants";
+import { SkillLevel } from "../../types/services";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../../constants/collections";
+import { COLLECTIONS } from "../../constants";
 
 describe("Capability Endpoints", () => {
   let fingerprintId: string;

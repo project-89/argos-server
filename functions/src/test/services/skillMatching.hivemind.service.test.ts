@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../../constants/collections";
-import { cleanDatabase } from "../../utils/testUtils";
-import { skillMatchingService } from "../../../hivemind/services/skillMatching.service";
-import { SkillModel } from "../../../hivemind/types/capability.types";
+import { COLLECTIONS } from "../../constants";
+import { cleanDatabase } from "../utils/testUtils";
+import { skillMatchingService } from "../../services/skillMatching.hivemind.service";
+import { SkillModel } from "../../types/services";
 
 // Increase timeout for all tests in this file
 jest.setTimeout(60000); // 60 seconds

@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { verifyProfileAccess } from "../../../hivemind/middleware/profileOwnership.middleware";
-import { profileService } from "../../../hivemind/services/profile.service";
-import { Profile } from "../../../hivemind/types/profile.types";
-import { ERROR_MESSAGES } from "../../../constants/api";
+import { verifyProfileAccess } from "../../middleware/profileOwnership.hivemind.middleware";
+import { profileService } from "../../services/profile.hivemind.service";
+import { Profile } from "../../types/services";
+import { ERROR_MESSAGES } from "../../constants";
 
 // Extend Request to include fingerprintId
 declare global {
@@ -14,7 +14,7 @@ declare global {
 }
 
 // Mock profileService
-jest.mock("../../../hivemind/services/profile.service");
+jest.mock("../../services/profile.hivemind.service");
 
 describe("Profile Ownership Middleware", () => {
   let mockReq: Partial<Request>;

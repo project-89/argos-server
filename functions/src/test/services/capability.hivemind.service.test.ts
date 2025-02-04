@@ -1,17 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../../constants/collections";
-import { cleanDatabase } from "../../utils/testUtils";
-import { capabilityService } from "../../../hivemind/services/capability.service";
-import { profileService } from "../../../hivemind/services/profile.service";
-import { ERROR_MESSAGES } from "../../../constants/api";
-import { toUnixMillis } from "../../../utils/timestamp";
-import {
-  SkillLevel,
-  SkillModel,
-  ProfileCapabilityModel,
-} from "../../../hivemind/types/capability.types";
-import { skillMatchingService } from "../../../hivemind/services/skillMatching.service";
+import { COLLECTIONS, ERROR_MESSAGES } from "../../constants";
+import { cleanDatabase } from "../utils/testUtils";
+import { capabilityService } from "../../services/capability.hivemind.service";
+import { profileService } from "../../services/profile.hivemind.service";
+import { toUnixMillis } from "../../utils/timestamp";
+import { SkillLevel, SkillModel, ProfileCapabilityModel } from "../../types/services";
+import { skillMatchingService } from "../../services/skillMatching.hivemind.service";
 
 describe("CapabilityService", () => {
   const db = getFirestore();

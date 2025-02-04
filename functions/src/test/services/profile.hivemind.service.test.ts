@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from "@jest/globals";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../../constants/collections";
-import { cleanDatabase } from "../../utils/testUtils";
-import { profileService } from "../../../hivemind/services/profile.service";
+import { COLLECTIONS } from "../../constants";
+import { cleanDatabase } from "../utils/testUtils";
+import { profileService } from "../../services/profile.hivemind.service";
 
 describe("ProfileService", () => {
   const db = getFirestore();

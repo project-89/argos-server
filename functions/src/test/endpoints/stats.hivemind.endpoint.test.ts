@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
-import { TEST_CONFIG } from "../../setup/testConfig";
-import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../../utils/testUtils";
-import { ERROR_MESSAGES } from "../../../constants/api";
+import { TEST_CONFIG } from "../setup/testConfig";
+import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
+import { ERROR_MESSAGES } from "../../constants";
 
 describe("Stats Endpoints", () => {
   let fingerprintId: string;
