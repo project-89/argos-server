@@ -5,8 +5,4 @@ export * from "./models/models.types";
 export * from "./middleware/middleware.types";
 
 // API types
-export * from "./services/api-core.types";
-export * from "./services/price.types";
-export * from "./services/tag.types";
-export * from "./services/fingerprint.types";
-export * from "./services/visit.types";
+export * from "./services";
