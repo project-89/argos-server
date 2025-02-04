@@ -3,7 +3,7 @@ import { Request, Response, NextFunction } from "express";
 import { ipRateLimit } from "../../middleware/ipRateLimit.middleware";
 import { Timestamp, getFirestore } from "firebase-admin/firestore";
 import { cleanDatabase } from "../utils/testUtils";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS } from "../../constants";
 
 // Extend Request type to include fingerprintId
 interface AuthenticatedRequest extends Request {

@@ -29,7 +29,7 @@ export const verifyFingerprintExists = async (req: Request, res: Response, next:
     const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
 
     if (!doc.exists) {
-      return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+      return sendError(res, ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     }
 
     next();
@@ -78,7 +78,7 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
     const targetDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
     if (!targetDoc.exists) {
       console.log(`${LOG_PREFIX} Target fingerprint does not exist`);
-      return sendError(res, new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+      return sendError(res, ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
     }
 
     // Check if caller has admin role - admins can bypass all ownership checks
@@ -100,9 +100,9 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
       // For GET requests, return 401 as it's an authentication issue
       // For modification requests, return 403 as it's a permissions issue
       if (req.method === "GET") {
-        return sendError(res, new ApiError(401, ERROR_MESSAGES.INVALID_API_KEY));
+        return sendError(res, ApiError.from(null, 401, ERROR_MESSAGES.INVALID_API_KEY));
       } else {
-        return sendError(res, new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS));
+        return sendError(res, ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS));
       }
     }
 

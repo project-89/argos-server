@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase } from "../utils/testUtils";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES, COLLECTIONS } from "../../constants";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
 
 describe("Auth Test Suite", () => {
   const API_URL = TEST_CONFIG.apiUrl;

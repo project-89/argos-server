@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants";
 
 describe("Ownership Check Middleware Test Suite", () => {
   let validApiKey: string;
@@ -88,7 +88,7 @@ describe("Ownership Check Middleware Test Suite", () => {
 
     expect(response.status).toBe(403);
     expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
+    expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   });
 
   it("should deny when second user tries to access first user's data via URL params", async () => {
@@ -122,7 +122,7 @@ describe("Ownership Check Middleware Test Suite", () => {
 
     expect(response.status).toBe(403);
     expect(response.data.success).toBe(false);
-    expect(response.data.error).toBe("API key does not match fingerprint");
+    expect(response.data.error).toBe(ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
   });
 
   it("should allow access to public protected routes", async () => {

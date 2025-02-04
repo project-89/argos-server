@@ -3,7 +3,7 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import { ApiError } from "../../utils/error";
 import { errorHandler } from "../../middleware/error.middleware";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants";
 
 describe("Error Middleware", () => {
   let mockRequest: Partial<Request>;

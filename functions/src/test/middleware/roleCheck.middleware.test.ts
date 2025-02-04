@@ -1,9 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "@jest/globals";
 import { TEST_CONFIG } from "../setup/testConfig";
 import { makeRequest, createTestData, cleanDatabase, destroyAgent } from "../utils/testUtils";
-import { ROLE } from "../../constants/roles";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../../constants/collections";
+import { COLLECTIONS, ROLE } from "../../constants";
 import { validateApiKey } from "../../services/apiKey.service";
 
 describe("Role Check Middleware Test Suite", () => {

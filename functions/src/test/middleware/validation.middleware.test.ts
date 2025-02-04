@@ -2,7 +2,7 @@ import { describe, it, expect } from "@jest/globals";
 import { Request, Response } from "express";
 import { z } from "zod";
 import { validateRequest } from "../../middleware/validation.middleware";
-import { ERROR_MESSAGES } from "../../constants/api";
+import { ERROR_MESSAGES } from "../../constants";
 
 // Mock request creation helper
 const createMockRequest = (data: { body?: any; params?: any; query?: any }): Request => {
