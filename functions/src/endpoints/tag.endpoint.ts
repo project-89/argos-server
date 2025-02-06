@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
-import { tagUserBySocialIdentity, getTagLeaderboard, getUserTags } from "../services/tag.service";
-import { sendError, sendSuccess } from "../utils/response";
+import { tagUserBySocialIdentity, getTagLeaderboard, getUserTags } from "../services";
+import { sendError, sendSuccess, ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
-import { ApiError } from "../utils/error";
 
 const LOG_PREFIX = "[Tag Endpoint]";
 

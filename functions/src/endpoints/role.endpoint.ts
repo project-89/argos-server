@@ -1,49 +1,39 @@
 import { Request, Response, NextFunction } from "express";
-import { validateRequest } from "../middleware/validation.middleware";
 import { ROLE, ERROR_MESSAGES } from "../constants";
-import {
-  assignRole as assignRoleService,
-  removeRole as removeRoleService,
-  getAvailableRoles as getAvailableRolesService,
-} from "../services/role.service";
-import { sendSuccess } from "../utils/response";
-import { ApiError } from "../utils/error";
-import { AssignRoleSchema, RemoveRoleSchema } from "../schemas";
+import { assignRole, removeRole, getAvailableRoles as getAvailableRolesService } from "../services";
+import { sendError, sendSuccess, ApiError } from "../utils";
 
-export const assignRole = [
-  validateRequest(AssignRoleSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { fingerprintId, role } = req.body;
-      const callerFingerprintId = req.fingerprintId as string;
+export const handleAssignRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fingerprintId, role } = req.body;
+    const callerFingerprintId = req.fingerprintId as string;
 
-      const result = await assignRoleService(fingerprintId, callerFingerprintId, role as ROLE);
-      sendSuccess(res, result);
-    } catch (error) {
-      console.error("Error assigning role:", error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_ASSIGN_ROLE));
-    }
-  },
-];
+    const result = await assignRole(fingerprintId, callerFingerprintId, role as ROLE);
+    return sendSuccess(res, result);
+  } catch (error) {
+    console.error("Error assigning role:", error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_ASSIGN_ROLE));
+  }
+};
 
-export const removeRole = [
-  validateRequest(RemoveRoleSchema),
-  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    try {
-      const { fingerprintId, role } = req.body;
-      const callerFingerprintId = req.fingerprintId as string;
+export const handleRemoveRole = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { fingerprintId, role } = req.body;
+    const callerFingerprintId = req.fingerprintId as string;
 
-      const result = await removeRoleService(fingerprintId, callerFingerprintId, role as ROLE);
-      sendSuccess(res, result);
-    } catch (error) {
-      console.error("Error removing role:", error);
-      next(error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_ROLE));
-    }
-  },
-];
+    const result = await removeRole(fingerprintId, callerFingerprintId, role as ROLE);
+    return sendSuccess(res, result);
+  } catch (error) {
+    console.error("Error removing role:", error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_REMOVE_ROLE));
+  }
+};
 
-export const getAvailableRoles = [
-  async (_req: Request, res: Response): Promise<Response> => {
+export const handleGetAvailableRoles = async (_req: Request, res: Response) => {
+  try {
     return sendSuccess(res, getAvailableRolesService());
-  },
-];
+  } catch (error) {
+    console.error("Error getting available roles:", error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_AVAILABLE_ROLES));
+  }
+};

@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { ApiError } from "../utils/error";
+import { ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 import {
   createAccount,
@@ -8,9 +8,9 @@ import {
   updateAccount,
   linkFingerprint,
   unlinkFingerprint,
-} from "../services/account.service";
+} from "../services";
 
-export const create = async (req: Request, res: Response) => {
+export const handleCreateAccount = async (req: Request, res: Response) => {
   try {
     const account = await createAccount(req.body);
     res.status(201).json(account);
@@ -19,7 +19,7 @@ export const create = async (req: Request, res: Response) => {
   }
 };
 
-export const get = async (req: Request, res: Response) => {
+export const handleGetAccount = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const account = await getAccountById(id);
@@ -34,7 +34,7 @@ export const get = async (req: Request, res: Response) => {
   }
 };
 
-export const getByWallet = async (req: Request, res: Response) => {
+export const handleGetAccountByWallet = async (req: Request, res: Response) => {
   try {
     const { walletAddress } = req.params;
     const account = await getAccountByWalletAddress(walletAddress);
@@ -49,30 +49,30 @@ export const getByWallet = async (req: Request, res: Response) => {
   }
 };
 
-export const update = async (req: Request, res: Response) => {
+export const handleUpdateAccount = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const account = await updateAccount(id, req.body);
+    const account = await updateAccount({ accountId: id, request: req.body });
     res.json(account);
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
-export const link = async (req: Request, res: Response) => {
+export const handleLinkFingerprint = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const account = await linkFingerprint(id, req.body);
+    const account = await linkFingerprint({ accountId: id, request: req.body });
     res.json(account);
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
-export const unlink = async (req: Request, res: Response) => {
+export const handleUnlinkFingerprint = async (req: Request, res: Response) => {
   try {
     const { id, fingerprintId } = req.params;
-    const account = await unlinkFingerprint(id, fingerprintId);
+    const account = await unlinkFingerprint({ accountId: id, fingerprintId });
     res.json(account);
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
