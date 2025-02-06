@@ -1,11 +1,6 @@
 import { Request, Response, NextFunction } from "express";
-import { ApiError } from "../utils/error";
-
-type Middleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => void | Promise<void> | Response | Promise<Response | void>;
+import { ApiError } from "../utils";
+import { Middleware } from "../types";
 
 /**
  * Composes multiple middleware functions into a single middleware

@@ -1,8 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { COLLECTIONS } from "../constants";
+import { ApiError } from "../utils";
+import { ERROR_MESSAGES } from "../constants";
 
 /**
  * Middleware to verify fingerprint exists for write operations

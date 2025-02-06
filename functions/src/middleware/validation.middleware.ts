@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { z } from "zod";
-import { sendError } from "../utils/response";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { sendError } from "../utils";
+import { ERROR_MESSAGES } from "../constants";
 
 export const validateRequest = (schema: z.ZodType) => {
   return (req: Request, res: Response, next: NextFunction): void | Response => {

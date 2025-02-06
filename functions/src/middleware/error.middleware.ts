@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
 import { sendError } from "../utils/response";
 import { ZodError } from "zod";
-import { ERROR_MESSAGES, HTTP_STATUS } from "../constants/api.constants";
+import { ERROR_MESSAGES, HTTP_STATUS } from "../constants";
 
 const LOG_PREFIX = "[Error Handler]";
 

@@ -1,24 +1,14 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-import { sendWarning } from "../utils/response";
-import { Fingerprint } from "../types/models/models.types";
-
-interface RateLimitConfig {
-  windowMs: number;
-  max: number;
-}
-
-const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 60 * 60 * 1000, // 1 hour window
-  max: 300, // limit each IP to 300 requests per hour (more restrictive to prevent DDoS)
-};
+import { COLLECTIONS, DEFAULT_IP_RATE_LIMIT_CONFIG } from "../constants";
+import { sendWarning } from "../utils";
+import { Fingerprint, RateLimitConfig } from "../types";
 
 const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed to establish an IP as trusted
 const SUSPICIOUS_TIME_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
-  const { windowMs } = { ...DEFAULT_CONFIG, ...config };
+  const { windowMs } = { ...DEFAULT_IP_RATE_LIMIT_CONFIG, ...config };
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Check environment variables on each request
@@ -26,7 +16,7 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
       process.env.RATE_LIMIT_DISABLED === "true" || process.env.IP_RATE_LIMIT_DISABLED === "true";
     const max = process.env.IP_RATE_LIMIT_MAX
       ? parseInt(process.env.IP_RATE_LIMIT_MAX, 10)
-      : config.max || DEFAULT_CONFIG.max;
+      : config.max || DEFAULT_IP_RATE_LIMIT_CONFIG.max;
 
     console.log("[IP Rate Limit] Starting middleware execution with config:", {
       isDisabled,

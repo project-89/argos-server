@@ -1,9 +1,8 @@
 import { Request, Response, NextFunction } from "express";
-import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
-import { sendError } from "../utils/response";
-import { Profile } from "../types/services";
-import { profileService } from "../services/profile.hivemind.service";
+import { ApiError, sendError } from "../utils";
+import { ERROR_MESSAGES } from "../constants";
+import { Profile } from "../types";
+import { profileService } from "../services";
 
 // Extend the Request type to include profile
 declare global {

@@ -1,19 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-
-type Middleware = (
-  req: Request,
-  res: Response,
-  next: NextFunction,
-) => Promise<void | Response> | void | Response;
-
-interface MetricsData {
-  name: string;
-  startTime: [number, number];
-  endTime?: [number, number];
-  duration?: number;
-  success: boolean;
-  error?: string;
-}
+import { MetricsData, Middleware } from "../types";
 
 /**
  * Global metrics storage
@@ -88,33 +74,8 @@ export const withMetrics = (middleware: Middleware, name: string) => {
     };
 
     try {
-      const result = await new Promise<void | Response>((resolve, reject) => {
-        try {
-          const middlewareResult = middleware(req, res, (err?: any) => {
-            if (err) {
-              reject(err);
-            } else {
-              resolve();
-            }
-          });
-
-          // Handle middleware that returns a Response
-          if (middlewareResult instanceof Promise) {
-            middlewareResult.then(resolve).catch(reject);
-          } else {
-            resolve(middlewareResult);
-          }
-        } catch (error) {
-          reject(error);
-        }
-      });
-
+      await middleware(req, res, next);
       metricsData.success = true;
-
-      // If middleware returned a Response, return it
-      if (result instanceof Response) {
-        return result;
-      }
     } catch (error) {
       metricsData.success = false;
       metricsData.error = error instanceof Error ? error.message : "Unknown error";
@@ -127,12 +88,9 @@ export const withMetrics = (middleware: Middleware, name: string) => {
 
       metrics.addMetric(metricsData);
 
-      // Log metrics in development
       if (process.env.NODE_ENV === "development") {
         console.log(`[Metrics] ${name}: ${metricsData.duration.toFixed(2)}ms`);
       }
     }
-
-    next();
   };
 };

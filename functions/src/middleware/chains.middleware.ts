@@ -1,10 +1,12 @@
 import { RequestHandler } from "express";
-import { validateAuthToken } from "./auth.middleware";
-import { verifyAccountOwnership } from "./ownershipCheck.middleware";
 import { ZodSchema } from "zod";
-import { validateRequest } from "./validation.middleware";
-import { verifyFingerprintExists } from "./fingerprintVerify.middleware";
-import { verifyAdminRole } from "./verifyAdmin.middleware";
+import {
+  verifyFingerprintExists,
+  verifyAdminRole,
+  validateRequest,
+  verifyAccountOwnership,
+  validateAuthToken,
+} from "./";
 
 /**
  * Middleware chain factory functions for different endpoint types

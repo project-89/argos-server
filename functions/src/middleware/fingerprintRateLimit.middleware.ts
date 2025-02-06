@@ -1,26 +1,17 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-
-interface RateLimitConfig {
-  windowMs: number;
-  max: number;
-}
-
-const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 60 * 60 * 1000, // 1 hour window
-  max: 1000, // limit each fingerprint to 1000 requests per hour (more lenient for authenticated users)
-};
+import { COLLECTIONS, DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG } from "../constants";
+import { RateLimitConfig } from "../types";
 
 export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
-  const { windowMs } = { ...DEFAULT_CONFIG, ...config };
+  const { windowMs } = { ...DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG, ...config };
   // Use environment variables or fallback to config/default
   const isDisabled =
     process.env.RATE_LIMIT_DISABLED === "true" ||
     process.env.FINGERPRINT_RATE_LIMIT_DISABLED === "true";
   const max = process.env.FINGERPRINT_RATE_LIMIT_MAX
     ? parseInt(process.env.FINGERPRINT_RATE_LIMIT_MAX, 10)
-    : config.max || DEFAULT_CONFIG.max;
+    : config.max || DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG.max;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Check if rate limiting is explicitly disabled

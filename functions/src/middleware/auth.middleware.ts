@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { getAuth } from "firebase-admin/auth";
-import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { ApiError } from "../utils";
+import { ERROR_MESSAGES } from "../constants";
 
 /**
  * Middleware to validate JWT token and set accountId and walletAddress on request

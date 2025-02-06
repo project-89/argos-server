@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-import { ApiError } from "../utils/error";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
+import { ApiError } from "../utils";
 
 export const verifyAdminRole = async (req: Request, res: Response, next: NextFunction) => {
   try {
