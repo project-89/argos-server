@@ -15,9 +15,8 @@ import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
 import cors from "cors";
-import { validateApiKeyMiddleware } from "./middleware/auth.middleware";
 import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
-import { fingerprintRateLimit } from "./middleware/fingerprintRateLimit.middleware";
+
 import { CORS_CONFIG } from "./constants/config.constants";
 import { composeMiddleware } from "./middleware/compose.middleware";
 import { MiddlewareConfig } from "./middleware/config.middleware";
@@ -26,11 +25,6 @@ import { errorHandler } from "./middleware/error.middleware";
 import { ApiError } from "./utils/error";
 import { ERROR_MESSAGES } from "./constants/api.constants";
 import { sendError } from "./utils/response";
-
-// Import routers
-import { publicRouter } from "./routes/public.router";
-import protectedRouter from "./routes/protected.router";
-import adminRouter from "./routes/admin.router";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -134,30 +128,6 @@ const healthMiddleware = composeMiddleware(
   withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.health")), "healthIpRateLimit"),
 );
 
-// Public endpoints rate limiting (more restrictive)
-const publicMiddleware = composeMiddleware(
-  withMetrics(
-    ipRateLimit({
-      ...middlewareConfig.get("rateLimit.ip"),
-      max: 100, // More restrictive for public endpoints
-    }),
-    "publicIpRateLimit",
-  ),
-);
-
-// Protected routes rate limiting
-const protectedMiddleware = composeMiddleware(
-  // IP Rate Limit first - most broad check
-  withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.ip")), "protectedIpRateLimit"),
-  // Then API Key validation which sets fingerprintId
-  withMetrics(validateApiKeyMiddleware, "auth"),
-  // Then Fingerprint rate limit which uses fingerprintId
-  withMetrics(
-    fingerprintRateLimit(middlewareConfig.get("rateLimit.fingerprint")),
-    "fingerprintRateLimit",
-  ),
-);
-
 // Apply health check rate limiting
 app.use("/health", healthMiddleware);
 app.use("/metrics", healthMiddleware);
@@ -175,15 +145,6 @@ app.get("/", (req, res) => {
     });
   }
 });
-
-// Public routes (with rate limiting but no auth)
-app.use("/", publicMiddleware, publicRouter);
-
-// Protected routes (with auth and rate limiting)
-app.use("/", protectedMiddleware, protectedRouter);
-
-// Admin routes (with auth and rate limiting)
-app.use("/admin", protectedMiddleware, adminRouter);
 
 // CORS error handler
 app.use(
