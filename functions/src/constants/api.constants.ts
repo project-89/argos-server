@@ -20,6 +20,13 @@ export const SUCCESS_MESSAGES = {
 } as const;
 
 export const ERROR_MESSAGES = {
+  // Account errors
+  ACCOUNT_ALREADY_EXISTS: "Account with this wallet address already exists",
+  ACCOUNT_NOT_FOUND: "Account not found",
+  INVALID_SIGNATURE: "Invalid wallet signature",
+  FINGERPRINT_ALREADY_LINKED: "Fingerprint is already linked to another account",
+  FINGERPRINT_NOT_LINKED: "Fingerprint is not linked to this account",
+
   // Impression errors
   FAILED_TO_CREATE_IMPRESSION: "Failed to create impression",
 
@@ -88,7 +95,9 @@ export const ERROR_MESSAGES = {
   NOT_IT: "You're not it",
   CANNOT_TAG_SELF: "Cannot tag yourself",
   ALREADY_TAGGED: "Target is already tagged",
+  NO_REMAINING_TAGS: "No tags remaining",
   NO_TAGS_REMAINING: "No tags remaining",
+  NO_TAGS_REMAINING_GAME: "No tags remaining in the game",
 
   // Role errors
   FAILED_ASSIGN_ROLE: "Failed to assign role",
@@ -110,12 +119,7 @@ export const ERROR_MESSAGES = {
   INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
   MISSING_FINGERPRINT: "Fingerprint is required",
   CANNOT_REMOVE_USER_ROLE: "Cannot remove user role",
-  DATABASE_NOT_READY: "Database index not ready. Please try again in a few minutes.",
   TAG_NOT_FOUND: "Tag not found",
-
-  // Tag game errors
-  NO_TAGS_REMAINING_GAME: "No tags remaining in the game",
-
   // Operation errors
   FAILED_CREATE_IMPRESSION: "Failed to create impression",
   FAILED_GET_IMPRESSIONS: "Failed to get impressions",
@@ -150,4 +154,9 @@ export const ERROR_MESSAGES = {
   INVALID_TAG_TYPE: "Invalid tag type. Must be one of the allowed types.",
 
   TOKEN_NOT_FOUND: "Token not found",
+
+  // JWT Auth errors
+  INVALID_TOKEN: "Invalid or expired token",
+  TOKEN_REQUIRED: "Authentication token is required",
+  INVALID_TOKEN_FORMAT: "Invalid token format",
 } as const;
