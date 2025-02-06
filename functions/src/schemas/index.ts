@@ -10,3 +10,5 @@ export * from "./capability.hivemind.schema";
 export * from "./profile.hivemind.schema";
 export * from "./skill.hivemind.schema";
 export * from "./stats.hivemind.schema";
+export * from "./account.schema";
+export * from "./price.schema";
