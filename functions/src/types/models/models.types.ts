@@ -1,4 +1,5 @@
 import { Timestamp } from "firebase-admin/firestore";
+import { TagData } from "../services";
 
 // Domain Models
 export interface Fingerprint {
@@ -89,4 +90,28 @@ export interface FingerprintPresence {
   status: "online" | "offline";
   createdAt: Timestamp; // Converted to Unix timestamp for API responses
   lastUpdated: number;
+}
+
+export interface TransitoryFingerprint {
+  id: string;
+  socialIdentifier: {
+    platform: "x" | "discord";
+    username: string;
+    profileUrl?: string;
+    discoveredFrom: {
+      action: "tagging" | "being_tagged" | "mentioned";
+      relatedUsername: string;
+      timestamp: Timestamp;
+    }[];
+  };
+  status: "pending" | "claimed";
+  tags: TagData[];
+  createdAt: Timestamp;
+  claimedAt?: Timestamp;
+  linkedFingerprintId?: string;
+  tagLimits?: {
+    firstTaggedAt: Timestamp;
+    remainingDailyTags: number;
+    lastTagResetAt: Timestamp;
+  };
 }
