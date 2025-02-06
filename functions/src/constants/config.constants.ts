@@ -1,3 +1,5 @@
+import { RateLimitConfig } from "../types";
+
 export const FIREBASE_CONFIG = {
   region: "us-central1",
   timeoutSeconds: 60,
@@ -62,3 +64,13 @@ export const CORS_CONFIG = {
     optionsSuccessStatus: 204,
   },
 } as const;
+
+export const DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour window
+  max: 1000, // limit each fingerprint to 1000 requests per hour (more lenient for authenticated users)
+};
+
+export const DEFAULT_IP_RATE_LIMIT_CONFIG: RateLimitConfig = {
+  windowMs: 60 * 60 * 1000, // 1 hour window
+  max: 300, // limit each IP to 300 requests per hour (more restrictive to prevent DDoS)
+};
