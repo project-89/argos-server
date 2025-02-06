@@ -435,3 +435,77 @@ argos-server/           # Repository root
 - Follow existing patterns for service/endpoint structure
 - Add tests for all new functionality
 - Update API documentation as we go
+
+## [2024-03-XX] - Wallet Authentication System Implementation
+
+### Overview
+Transitioning from API key-based authentication to wallet-based authentication with JWT tokens.
+This change will allow users to claim their fingerprint data by connecting their Phantom wallet.
+
+### Tasks
+
+1. **Database Schema Updates**
+   - [ ] Create `accounts` collection schema
+     - Account-fingerprint relationships
+     - Wallet address storage
+     - JWT token management
+   - [ ] Update `fingerprints` collection schema
+     - Add account relationship
+     - Maintain backwards compatibility
+   - [ ] Define relationships between collections
+   - [ ] Create Firestore rules for new schema
+
+2. **Authentication System**
+   - [ ] Create Phantom wallet authentication endpoint
+   - [ ] Implement message signing/verification
+   - [ ] Create JWT token generation and validation
+   - [ ] Add Firebase custom claims for wallet addresses
+   - [ ] Create account linking system (wallet -> fingerprints)
+
+3. **Middleware Updates**
+   - [ ] Remove API key middleware
+   - [ ] Create JWT verification middleware
+   - [ ] Update ownership verification middleware to use accounts
+   - [ ] Update rate limiting to work with accounts
+
+4. **Route Updates**
+   - [ ] Update public routes
+     - [ ] Keep fingerprint registration public
+     - [ ] Keep basic tracking endpoints public
+   - [ ] Update protected routes
+     - [ ] Add JWT auth to data access endpoints
+     - [ ] Update ownership checks
+   - [ ] Add new auth routes
+     - [ ] Wallet connection endpoint
+     - [ ] Account management endpoints
+
+5. **Testing**
+   - [ ] Create test utilities for wallet auth
+   - [ ] Update existing tests to remove API key dependencies
+   - [ ] Add new tests for account system
+   - [ ] Add integration tests for wallet flow
+
+6. **Security & Validation**
+   - [ ] Add request validation for new endpoints
+   - [ ] Update error messages
+   - [ ] Add rate limiting for auth endpoints
+   - [ ] Add security headers
+
+7. **Documentation**
+   - [ ] Update API documentation
+   - [ ] Add wallet integration guide
+   - [ ] Update development guide
+   - [ ] Add migration guide for existing users
+
+8. **Client SDK Updates**
+   - [ ] Add Phantom wallet integration
+   - [ ] Update authentication flow
+   - [ ] Add account management methods
+   - [ ] Update error handling
+
+### Implementation Notes
+- Follow existing patterns in the codebase
+- Maintain backwards compatibility during transition
+- Implement changes incrementally
+- Thoroughly test each component
+- Document all changes and decisions

@@ -8,12 +8,14 @@
     "@ai-sdk/provider": "^1.0.6",
     "@google-cloud/firestore": "^7.1.0",
     "@google/generative-ai": "^0.21.0",
+    "@solana/web3.js": "^1.98.0",
     "@types/cookiejar": "^2.1.5",
     "@types/express": "^4.17.3",
     "@types/methods": "^1.1.4",
     "@types/superagent": "^8.1.9",
     "ai": "^4.1.10",
     "axios": "^1.7.9",
+    "bs58": "^6.0.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
     "firebase-admin": "^12.0.0",
@@ -21,6 +23,7 @@
     "module-alias": "^2.2.3",
     "superagent": "^8.1.2",
     "technicalindicators": "^3.1.0",
+    "tweetnacl": "^1.0.3",
     "zod": "^3.24.1"
   },
   "engines": {
