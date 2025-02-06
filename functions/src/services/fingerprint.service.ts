@@ -1,11 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-import { ROLE } from "../constants/roles.constants";
-import { ERROR_MESSAGES } from "../constants/api.constants";
-
-import { Fingerprint } from "@/types";
-import { ApiError } from "../utils/error";
-import { deepMerge } from "../utils/object";
+import { COLLECTIONS, ERROR_MESSAGES, ROLE } from "../constants";
+import { Fingerprint } from "../types";
+import { ApiError, deepMerge } from "../utils";
 
 /**
  * Creates a new fingerprint record
@@ -172,6 +168,28 @@ export const updateFingerprintMetadata = async ({
       id: fingerprintDoc.id,
       metadata: updatedMetadata,
     };
+  } catch (error) {
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+};
+
+/**
+ * Gets a fingerprint by ID
+ */
+export const getFingerprintById = async (fingerprintId: string): Promise<Fingerprint | null> => {
+  try {
+    const db = getFirestore();
+    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
+    const fingerprintDoc = await fingerprintRef.get();
+
+    if (!fingerprintDoc.exists) {
+      return null;
+    }
+
+    return {
+      id: fingerprintDoc.id,
+      ...fingerprintDoc.data(),
+    } as Fingerprint;
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }

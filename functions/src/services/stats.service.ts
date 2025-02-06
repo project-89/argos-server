@@ -1,7 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import { ApiError } from "../utils/error";
-import { StatsModel, StatsResponse } from "../types/services";
+import { ApiError } from "../utils";
+import { StatsModel, StatsResponse } from "../types";
 
 export const getStats = async (profileId: string): Promise<StatsResponse> => {
   try {

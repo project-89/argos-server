@@ -1,39 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS } from "../constants/collections.constants";
-import { Impression } from "@/types";
-import { ApiError } from "../utils/error";
-
-import { ERROR_MESSAGES } from "../constants/api.constants";
-
-/**
- * Verifies fingerprint ownership
- */
-export const verifyFingerprint = async ({
-  fingerprintId,
-  authenticatedId,
-}: {
-  fingerprintId: string;
-  authenticatedId?: string;
-}): Promise<{ verified: true }> => {
-  try {
-    // First check if fingerprint exists
-    const db = getFirestore();
-    const fingerprintDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-
-    if (!fingerprintDoc.exists) {
-      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    }
-
-    if (authenticatedId && fingerprintId !== authenticatedId) {
-      throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
-    }
-
-    return { verified: true };
-  } catch (error) {
-    console.error("Error in verifyFingerprint:", error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
+import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
+import { Impression } from "../types";
+import { ApiError } from "../utils";
 
 /**
  * Creates a new impression record
@@ -68,7 +36,7 @@ export const createImpression = async ({
     const impressionRef = await db.collection(COLLECTIONS.IMPRESSIONS).add(impression);
 
     if (!impressionRef.id) {
-      throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
 
     return {

@@ -2,11 +2,9 @@ import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fetch from "node-fetch";
 
 import * as functions from "firebase-functions";
-import { ApiError } from "../utils/error";
-import { toUnixMillis } from "../utils/timestamp";
-import { PriceHistory } from "../types/models/models.types";
+import { ApiError, toUnixMillis } from "../utils";
+import { PriceHistory, PriceResponse } from "../types";
 import { ERROR_MESSAGES, CACHE_DURATION, COLLECTIONS } from "../constants";
-import { PriceResponse } from "@/types";
 
 const DEFAULT_TOKENS = ["project89"];
 

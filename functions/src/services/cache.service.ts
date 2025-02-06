@@ -1,6 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { getCurrentUnixMillis } from "../utils/timestamp";
-import { CACHE_DURATION } from "@/constants";
+import { getCurrentUnixMillis } from "../utils";
+import { CACHE_DURATION } from "../constants";
 
 export const getCachedData = async <T>(key: string, collection: string): Promise<T | null> => {
   try {

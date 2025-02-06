@@ -1,9 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { ApiError } from "../utils/error";
-import { updatePresence } from "./presence.service";
+import { ApiError, extractDomain, toUnixMillis } from "../utils";
+import { updatePresence } from "./";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { toUnixMillis } from "../utils/timestamp";
-import { extractDomain } from "../utils/request";
 import {
   SiteResponse,
   VisitPresence,
@@ -12,34 +10,6 @@ import {
   Visit,
   Site,
 } from "../types";
-
-/**
- * Verifies fingerprint exists and ownership
- */
-export const verifyFingerprint = async ({
-  fingerprintId,
-  authenticatedId,
-}: {
-  fingerprintId: string;
-  authenticatedId?: string;
-}): Promise<void> => {
-  try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-
-    if (!fingerprintDoc.exists) {
-      throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    }
-
-    if (authenticatedId && fingerprintId !== authenticatedId) {
-      throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
-    }
-  } catch (error) {
-    console.error(`[Visit Service] Error in verifyFingerprint:`, error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
 
 /**
  * Logs a visit and updates site information

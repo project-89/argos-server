@@ -1,8 +1,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import { getCurrentUnixMillis } from "../utils/timestamp";
+import { getCurrentUnixMillis, ApiError } from "../utils";
 import { SiteEngagement, VisitPattern, Visit } from "../types";
-import { ApiError } from "../utils/error";
 
 interface CleanupResult {
   cleanupTime: number;

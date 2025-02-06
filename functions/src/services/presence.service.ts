@@ -1,8 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { ApiError } from "../utils/error";
-import { getCurrentUnixMillis, toUnixMillis } from "../utils/timestamp";
+import { ApiError, getCurrentUnixMillis, toUnixMillis } from "../utils";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { PresenceData, VisitPresence } from "@/types";
+import { PresenceData, VisitPresence } from "../types";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
