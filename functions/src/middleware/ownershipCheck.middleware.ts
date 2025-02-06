@@ -2,48 +2,27 @@ import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils/error";
 import { ERROR_MESSAGES } from "../constants/api.constants";
 import { getFirestore } from "firebase-admin/firestore";
-import { sendError } from "../utils/response";
+
 import { COLLECTIONS } from "../constants/collections.constants";
 
 const LOG_PREFIX = "[Ownership Check]";
 
 /**
- * Middleware to verify fingerprint exists
- * Should be run before ownership check
+ * Middleware to verify account ownership of resources
+ * Requires auth middleware to be run first to set req.accountId
+ * Used for both read and write operations on account-owned resources
+ *
+ * This middleware verifies:
+ * 1. Account exists and is authenticated
+ * 2. For profile/account operations - the accountId matches the authenticated user
+ * 3. For fingerprint-based resources:
+ *    - If the resource is associated with a fingerprintId (in params, body, or query)
+ *    - Verifies that fingerprint belongs to the authenticated account
+ *    - This allows access to ALL resources associated with owned fingerprints
+ *
+ * Admin users bypass all ownership checks
  */
-export const verifyFingerprintExists = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Skip OPTIONS requests
-    if (req.method === "OPTIONS") {
-      return next();
-    }
-
-    const targetFingerprintId = req.params.fingerprintId || req.params.id || req.body.fingerprintId;
-
-    // If no target fingerprint is specified in body or params, allow the request
-    if (!targetFingerprintId) {
-      return next();
-    }
-
-    const db = getFirestore();
-    const doc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
-
-    if (!doc.exists) {
-      return sendError(res, ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
-    }
-
-    next();
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * Middleware to ensure a caller can only access/modify their own data
- * Requires auth middleware to be run first to set req.fingerprintId
- * Admins can bypass ownership checks for all endpoints
- */
-export const verifyOwnership = async (req: Request, res: Response, next: NextFunction) => {
+export const verifyAccountOwnership = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Skip OPTIONS requests
     if (req.method === "OPTIONS") {
@@ -51,61 +30,71 @@ export const verifyOwnership = async (req: Request, res: Response, next: NextFun
       return next();
     }
 
-    const callerFingerprintId = req.fingerprintId;
-    const targetFingerprintId = req.params.fingerprintId || req.params.id || req.body.fingerprintId;
+    const { accountId } = req;
+    if (!accountId) {
+      throw new ApiError(401, ERROR_MESSAGES.TOKEN_REQUIRED);
+    }
+
+    // Get the target resource IDs
+    const targetAccountId = req.params.accountId || req.body.accountId;
+    const targetFingerprintId =
+      req.params.fingerprintId ||
+      req.params.id ||
+      req.body.fingerprintId ||
+      req.query.fingerprintId;
 
     console.log(`${LOG_PREFIX} Checking ownership:`, {
       method: req.method,
       path: req.path,
-      url: req.url,
-      callerFingerprintId,
+      accountId,
+      targetAccountId,
       targetFingerprintId,
-      params: req.params,
-      body: req.body,
-      baseUrl: req.baseUrl,
-      originalUrl: req.originalUrl,
     });
 
-    // If no target fingerprint is specified in body or params, allow the request
-    // This handles cases like /role/available which don't need a fingerprint
-    if (!targetFingerprintId) {
-      console.log(`${LOG_PREFIX} No target fingerprint specified, allowing request`);
-      return next();
-    }
-
-    // Check if target fingerprint exists first
+    // Get the account document
     const db = getFirestore();
-    const targetDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(targetFingerprintId).get();
-    if (!targetDoc.exists) {
-      console.log(`${LOG_PREFIX} Target fingerprint does not exist`);
-      return sendError(res, ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND));
+    const accountDoc = await db.collection(COLLECTIONS.ACCOUNTS).doc(accountId).get();
+
+    if (!accountDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    // Check if caller has admin role - admins can bypass all ownership checks
-    const callerDoc = await db.collection(COLLECTIONS.FINGERPRINTS).doc(callerFingerprintId!).get();
-    const callerData = callerDoc.data();
+    const accountData = accountDoc.data();
 
-    if (callerData?.roles?.includes("admin")) {
-      console.log(`${LOG_PREFIX} Admin user bypassing ownership check`);
+    // Check if account has admin role - admins bypass all ownership checks
+    if (accountData?.roles?.includes("admin")) {
+      console.log(`${LOG_PREFIX} Admin account bypassing ownership check`);
       return next();
     }
 
-    // For non-admins, verify ownership
-    if (callerFingerprintId !== targetFingerprintId) {
-      console.log(`${LOG_PREFIX} Insufficient permissions - fingerprint mismatch`, {
-        callerFingerprintId,
-        targetFingerprintId,
-      });
-
-      // For GET requests, return 401 as it's an authentication issue
-      // For modification requests, return 403 as it's a permissions issue
-      if (req.method === "GET") {
-        return sendError(res, ApiError.from(null, 401, ERROR_MESSAGES.INVALID_API_KEY));
-      } else {
-        return sendError(res, ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS));
+    // Case 1: Account/Profile operations
+    if (targetAccountId) {
+      // For account operations, verify the authenticated user matches the target account
+      if (targetAccountId !== accountId) {
+        throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
       }
+      return next();
     }
 
+    // Case 2: Fingerprint-based resource operations
+    if (targetFingerprintId) {
+      // Verify fingerprint exists and is linked to account
+      if (!accountData?.fingerprintIds?.includes(targetFingerprintId)) {
+        console.log(`${LOG_PREFIX} Fingerprint not linked to account`, {
+          accountId,
+          targetFingerprintId,
+        });
+        throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      }
+
+      // If fingerprint is owned, allow access to ALL resources associated with this fingerprint
+      // This includes the fingerprint itself and any other resources using fingerprintId as identifier
+      return next();
+    }
+
+    // Case 3: Other resources
+    // By default, if no specific resource ID is provided, we assume the operation
+    // is allowed as the auth middleware has already verified the user
     next();
   } catch (error) {
     next(error);
