@@ -13,6 +13,9 @@ export const SUCCESS_MESSAGES = {
   IMPRESSION_CREATED: "Impression created successfully",
   IMPRESSIONS_RETRIEVED: "Impressions retrieved successfully",
   IMPRESSIONS_DELETED: "Impressions deleted successfully",
+  PROFILE_CREATED: "Profile created successfully",
+  PROFILE_UPDATED: "Profile updated successfully",
+  PROFILE_DELETED: "Profile deleted successfully",
 } as const;
 
 export const ERROR_MESSAGES = {
@@ -28,6 +31,26 @@ export const ERROR_MESSAGES = {
   FAILED_TO_LINK_FINGERPRINT: "Failed to link fingerprint",
   FAILED_TO_UNLINK_FINGERPRINT: "Failed to unlink fingerprint",
   FAILED_TO_VERIFY_ACCOUNT_OWNERSHIP: "Failed to verify account ownership",
+
+  FAILED_TO_CREATE_PROFILE: "Failed to create profile",
+  FAILED_TO_GET_PROFILE: "Failed to get profile",
+  FAILED_TO_UPDATE_PROFILE: "Failed to update profile",
+  FAILED_TO_DELETE_PROFILE: "Failed to delete profile",
+  FAILED_TO_SEARCH_PROFILES: "Failed to search profiles",
+
+  // Role errors
+  FAILED_TO_GET_AVAILABLE_ROLES: "Failed to get available roles",
+
+  // Stats errors
+  FAILED_TO_GET_STATS: "Failed to get stats",
+  FAILED_TO_UPDATE_STATS: "Failed to update stats",
+
+  // Capability errors
+  FAILED_TO_CREATE_CAPABILITY: "Failed to create capability",
+  FAILED_TO_GET_CAPABILITIES: "Failed to get capabilities",
+  FAILED_TO_UPDATE_CAPABILITY: "Failed to update capability",
+  FAILED_TO_DELETE_CAPABILITY: "Failed to delete capability",
+  FAILED_TO_FIND_SIMILAR_SKILLS: "Failed to find similar skills",
   // Impression errors
   FAILED_TO_CREATE_IMPRESSION: "Failed to create impression",
 
