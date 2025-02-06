@@ -5,6 +5,7 @@ export interface TagData {
   type: string;
   taggedBy: string;
   taggedAt: Timestamp;
+  platform?: "x" | "discord";
 }
 
 export interface TagLimitData {
