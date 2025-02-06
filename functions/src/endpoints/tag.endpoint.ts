@@ -1,142 +1,62 @@
-import { Request, Response, NextFunction } from "express";
-import {
-  tagUser as tagUserService,
-  hasTag as hasTagService,
-  getTagHistory as getTagHistoryService,
-  getUserTags as getUserTagsService,
-  getTagLeaderboard as getTagLeaderboardService,
-} from "../services/tag.service";
-import { validateRequest } from "../middleware/validation.middleware";
-import {
-  CheckTagSchema,
-  FingerprintParamsSchema,
-  GetTagLeaderboardSchema,
-  TagUserSchema,
-} from "../schemas";
+import { Request, Response } from "express";
+import { tagUserBySocialIdentity, getTagLeaderboard, getUserTags } from "../services/tag.service";
 import { sendError, sendSuccess } from "../utils/response";
-import { ERROR_MESSAGES, ALLOWED_TAG_TYPES } from "../constants";
+import { ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils/error";
-import { TagData, TagLeaderboardResponse } from "../types";
 
-type TimeframeType = "daily" | "weekly" | "monthly" | "allTime";
-
-/**
- * Tag another user
- */
-export const tagUser = [
-  validateRequest(TagUserSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { targetFingerprintId } = req.body;
-      const taggerFingerprintId = req.fingerprintId;
-
-      if (!taggerFingerprintId) {
-        throw new ApiError(401, ERROR_MESSAGES.AUTHENTICATION_REQUIRED);
-      }
-
-      const result = await tagUserService({
-        taggerFingerprintId,
-        targetFingerprintId,
-        tagType: ALLOWED_TAG_TYPES.IT,
-      });
-      return sendSuccess<{
-        success: boolean;
-        message: string;
-      }>(res, result);
-    } catch (error) {
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
-    }
-  },
-];
+const LOG_PREFIX = "[Tag Endpoint]";
 
 /**
- * Get user's active tags
+ * Tag a user
  */
-export const getUserTags = [
-  validateRequest(FingerprintParamsSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { fingerprintId } = req.params;
-      const result = await getUserTagsService(fingerprintId);
-      return sendSuccess<{
-        hasTags: boolean;
-        activeTags: string[];
-      }>(res, result);
-    } catch (error) {
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
-    }
-  },
-];
+export const handleTagUser = async (req: Request, res: Response) => {
+  try {
+    const { taggerUsername, username: targetUsername, platform } = req.body;
+    const { tagType } = req.params;
+
+    const result = await tagUserBySocialIdentity({
+      taggerUsername,
+      targetUsername,
+      platform,
+      tagType,
+    });
+
+    return sendSuccess(res, result);
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in handleTagUser:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
+  }
+};
 
 /**
- * Get tag history for a user
+ * Get user's current tags
  */
-export const getTagHistory = [
-  validateRequest(FingerprintParamsSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { fingerprintId } = req.params;
-      const history = await getTagHistoryService(fingerprintId);
-      return sendSuccess<{ tags: TagData[] }>(res, { tags: history });
-    } catch (error) {
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
-    }
-  },
-];
-
-/**
- * Check if user has a specific tag
- */
-export const checkTag = [
-  validateRequest(CheckTagSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const { fingerprintId, tagType } = req.params;
-      const hasTag = await hasTagService({ fingerprintId, tagType });
-      return sendSuccess<{ hasTag: boolean }>(res, { hasTag });
-    } catch (error) {
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
-    }
-  },
-];
+export const handleGetUserTags = async (req: Request, res: Response) => {
+  try {
+    const { username } = req.params;
+    const { platform = "x" } = req.query;
+    const result = await getUserTags(username, platform as "x");
+    return sendSuccess(res, result);
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in handleGetUserTags:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
+  }
+};
 
 /**
  * Get tag leaderboard
- * Public competitive data - no ownership check needed
  */
-export const getLeaderboard = [
-  validateRequest(GetTagLeaderboardSchema),
-  async (req: Request, res: Response, next: NextFunction) => {
-    try {
-      const timeFrame = (req.query.timeFrame || "allTime") as TimeframeType;
-      const limit = req.query.limit ? parseInt(req.query.limit as string) : undefined;
-      const offset = req.query.offset ? parseInt(req.query.offset as string) : undefined;
-      const fingerprintId = req.query.fingerprintId as string | undefined;
-
-      const leaderboard = await getTagLeaderboardService({
-        timeFrame,
-        limit: limit || 100,
-        offset: offset || 0,
-        currentUserId: fingerprintId || "",
-      });
-      return sendSuccess<TagLeaderboardResponse>(res, leaderboard);
-    } catch (error) {
-      return sendError(
-        res,
-        error instanceof Error ? error : new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR),
-      );
-    }
-  },
-];
+export const getLeaderboard = async (req: Request, res: Response) => {
+  try {
+    const { timeframe = "daily", limit = 10, offset = 0 } = req.query;
+    const leaderboard = await getTagLeaderboard({
+      timeFrame: timeframe as "daily" | "weekly" | "monthly" | "allTime",
+      limit: Number(limit),
+      offset: Number(offset),
+    });
+    return sendSuccess(res, leaderboard);
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error in getLeaderboard:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
+  }
+};
