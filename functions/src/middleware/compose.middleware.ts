@@ -15,7 +15,6 @@ type Middleware = (
  * // Basic usage
  * app.use(composeMiddleware(
  *   ipRateLimit(),
- *   validateApiKeyMiddleware,
  *   fingerprintRateLimit()
  * ));
  *
@@ -23,7 +22,6 @@ type Middleware = (
  * // With error handling
  * app.use(composeMiddleware(
  *   validateRequest(schema),
- *   validateApiKeyMiddleware,
  *   requirePermission("admin")
  * ));
  */
