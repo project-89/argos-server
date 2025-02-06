@@ -10,10 +10,6 @@ export const HTTP_STATUS = {
 } as const;
 
 export const SUCCESS_MESSAGES = {
-  API_KEY_REGISTERED: "API key registered successfully",
-  API_KEY_VALIDATED: "API key validated successfully",
-  API_KEY_DEACTIVATED: "API key deactivated successfully",
-
   IMPRESSION_CREATED: "Impression created successfully",
   IMPRESSIONS_RETRIEVED: "Impressions retrieved successfully",
   IMPRESSIONS_DELETED: "Impressions deleted successfully",
@@ -26,25 +22,19 @@ export const ERROR_MESSAGES = {
   INVALID_SIGNATURE: "Invalid wallet signature",
   FINGERPRINT_ALREADY_LINKED: "Fingerprint is already linked to another account",
   FINGERPRINT_NOT_LINKED: "Fingerprint is not linked to this account",
-
+  FAILED_TO_CREATE_ACCOUNT: "Failed to create account",
+  FAILED_TO_GET_ACCOUNT: "Failed to get account",
+  FAILED_TO_UPDATE_ACCOUNT: "Failed to update account",
+  FAILED_TO_LINK_FINGERPRINT: "Failed to link fingerprint",
+  FAILED_TO_UNLINK_FINGERPRINT: "Failed to unlink fingerprint",
+  FAILED_TO_VERIFY_ACCOUNT_OWNERSHIP: "Failed to verify account ownership",
   // Impression errors
   FAILED_TO_CREATE_IMPRESSION: "Failed to create impression",
 
   // hivemind errors
   PROFILE_NOT_FOUND_FOR_WALLET: "Profile not found for wallet address",
 
-  // API Key errors
-  INVALID_API_KEY: "Invalid API key",
-  MISSING_API_KEY: "API key is required",
   INSUFFICIENT_PERMISSIONS: "Insufficient permissions",
-  API_KEY_MUST_BE_STRING: "API key must be a string",
-  API_KEY_NOT_FOUND: "API key not found",
-  API_KEY_DEACTIVATED: "API key deactivated",
-  FAILED_TO_DEACTIVATE_API_KEY: "Failed to deactivate API key",
-  FAILED_TO_CREATE_API_KEY: "Failed to create API key",
-  FAILED_TO_GET_API_KEY: "Failed to get API key",
-  FAILED_TO_VALIDATE_API_KEY: "Failed to validate API key",
-  FAILED_TO_REGISTER_API_KEY: "Failed to register API key",
 
   // Cache errors
   FAILED_TO_GET_CACHED_DATA: "Failed to get cached data",
@@ -159,4 +149,6 @@ export const ERROR_MESSAGES = {
   INVALID_TOKEN: "Invalid or expired token",
   TOKEN_REQUIRED: "Authentication token is required",
   INVALID_TOKEN_FORMAT: "Invalid token format",
+
+  TRANSITORY_FINGERPRINT_NOT_FOUND: "Transitory fingerprint record not found",
 } as const;
