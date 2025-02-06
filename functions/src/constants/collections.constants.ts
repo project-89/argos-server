@@ -18,4 +18,6 @@ export const COLLECTIONS = {
   TAGS: "tags",
   SKILLS: "skills",
   PROFILE_CAPABILITIES: "profile-capabilities",
+  ACCOUNTS: "accounts",
+  TRANSITORY_FINGERPRINTS: "transitory-fingerprints",
 } as const;
