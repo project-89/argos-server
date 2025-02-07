@@ -45,7 +45,7 @@ export const handleGetUserTags = async (req: Request, res: Response) => {
 /**
  * Get tag leaderboard
  */
-export const getLeaderboard = async (req: Request, res: Response) => {
+export const handleGetLeaderboard = async (req: Request, res: Response) => {
   try {
     const { timeframe = "daily", limit = 10, offset = 0 } = req.query;
     const leaderboard = await getTagLeaderboard({
