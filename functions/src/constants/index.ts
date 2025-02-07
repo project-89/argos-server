@@ -1,20 +1,20 @@
 // HTTP exports
-export * from "./HTTP/status";
-export * from "./HTTP/messages";
-export * from "./HTTP/errors";
+export * from "./http/status";
+export * from "./http/messages";
+export * from "./http/errors";
 
 // Database exports
-export * from "./Database/collections";
-export * from "./Database/cache";
+export * from "./database/collections";
+export * from "./database/cache";
 
 // Auth exports
-export * from "./Auth/roles";
+export * from "./auth/roles";
 
 // Features exports
-export * from "./Features/tags";
-export * from "./Features/skills";
+export * from "./features/tags";
+export * from "./features/skills";
 
 // Config exports
-export * from "./Config/firebase";
-export * from "./Config/cors";
-export * from "./Config/limits";
+export * from "./config/firebase";
+export * from "./config/cors";
+export * from "./config/limits";
