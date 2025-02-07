@@ -1,129 +1,138 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Common validation functions
-    function isValidUnixTime(timeInMillis) {
-      return timeInMillis is number 
-        && timeInMillis <= request.time.toMillis() + 60000  // Within 1 minute future
-        && timeInMillis >= request.time.toMillis() - 60000; // Within 1 minute past
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    function isValidFirestoreTimestamp(firestoreTimestamp) {
-      return firestoreTimestamp is timestamp
-        && firestoreTimestamp.toMillis() <= request.time.toMillis() + 60000
-        && firestoreTimestamp.toMillis() >= request.time.toMillis() - 60000;
+    function isAdmin() {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/fingerprints/$(request.auth.uid)/roles) &&
+        'admin' in get(/databases/$(database)/documents/fingerprints/$(request.auth.uid)/roles).data;
     }
 
-    function isValidRole(role) {
-      return role in ['user', 'agent-initiate', 'agent-field', 'agent-senior', 'agent-master', 'admin'];
+    function fingerprintExists(fingerprintId) {
+      return exists(/databases/$(database)/documents/fingerprints/$(fingerprintId));
     }
 
-    function isValidTag(tag) {
-      return tag is string && tag.matches('^[a-zA-Z0-9_-]+$');
+    function isAccountOwner(accountId) {
+      return isAuthenticated() && request.auth.uid == accountId;
     }
 
-    // Rules for fingerprints collection
+    function accountOwnsFingerprint(fingerprintId) {
+      return isAuthenticated() && 
+        exists(/databases/$(database)/documents/accounts/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/accounts/$(request.auth.uid)).data.fingerprintId == fingerprintId;
+    }
+
+    function isInternalService() {
+      return request.headers['x-internal-service-token'] == resource.data.internalServiceToken;
+    }
+
+    // Public Collections (Read Only)
+    match /stats/{document=**} {
+      allow read: if true;
+      allow write: if isInternalService();
+    }
+
+    match /profiles/{profileId} {
+      allow read: if true;
+      // Only account owners can create/modify profiles
+      allow create, update, delete: if isAccountOwner(request.auth.uid);
+    }
+
+    match /capabilities/{capabilityId} {
+      allow read: if true;
+      // Only account owners can modify capabilities
+      allow write: if isAccountOwner(request.auth.uid);
+    }
+
+    match /price_cache/{document=**} {
+      allow read: if true;
+      allow write: if isInternalService();
+    }
+
+    // Protected Collections (Authenticated + Ownership)
     match /fingerprints/{fingerprintId} {
-      allow read: if request.path.matches('/fingerprints/[^/]+$');
-      allow write: if false;  // Only Cloud Functions can write
-
-      function isValidFingerprintData() {
-        let data = request.resource.data;
-        return data.createdAt is timestamp
-          && (!data.keys().hasAny(['ipMetadata']) 
-              || (data.ipMetadata.lastSeenAt is map 
-                  && data.ipMetadata.lastSeenAt.values().hasAll([request.time])));
-      }
+      // Anyone can create a fingerprint
+      allow create: if true;
+      // Read/Update requires account ownership
+      allow read, update: if accountOwnsFingerprint(fingerprintId) || isAdmin();
+      allow delete: if isAdmin();
     }
 
-    // Rules for visits collection
     match /visits/{visitId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-
-      function isValidVisitData() {
-        let data = request.resource.data;
-        return data.unixTime is number  // Unix timestamp
-          && isValidUnixTime(data.unixTime);
-      }
+      // Create just needs fingerprint to exist (fingerprintWriteEndpoint)
+      allow create: if fingerprintExists(request.resource.data.fingerprintId);
+      // Read and delete need account ownership (protectedEndpoint)
+      allow read, delete: if accountOwnsFingerprint(resource.data.fingerprintId) || isAdmin();
     }
 
-    // Rules for presence tracking
     match /presence/{fingerprintId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-
-      function isValidPresenceData() {
-        let data = request.resource.data;
-        return data.unixTime is number  // Unix timestamp
-          && isValidUnixTime(data.unixTime);
-      }
+      allow read: if true;
+      // Just needs fingerprint to exist for writes
+      allow write: if fingerprintExists(fingerprintId) || isInternalService();
     }
 
-    // Rules for API keys
-    match /apiKeys/{keyId} {
-      allow read, write: if false;  // Strictly Cloud Functions only
-
-      function isValidApiKeyData() {
-        let data = request.resource.data;
-        return data.createdAt is timestamp
-          && data.expiresAt is timestamp
-          && (!data.keys().hasAny(['revokedAt']) || data.revokedAt is timestamp)
-          && isValidFirestoreTimestamp(data.createdAt)
-          && isValidFirestoreTimestamp(data.expiresAt);
-      }
-    }
-
-    // Rules for impressions
     match /impressions/{impressionId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-
-      function isValidImpressionData() {
-        let data = request.resource.data;
-        return data.fingerprintId is string
-          && data.type is string
-          && data.data is map
-          && data.createdAt is timestamp
-          && isValidFirestoreTimestamp(data.createdAt);
-      }
+      // Create just needs fingerprint to exist (fingerprintWriteEndpoint)
+      allow create: if fingerprintExists(request.resource.data.fingerprintId);
+      // Read and delete need account ownership (protectedEndpoint)
+      allow read, delete: if accountOwnsFingerprint(resource.data.fingerprintId) || isAdmin();
     }
 
-    // Rules for price cache
-    match /priceCache/{docId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-
-      function isValidPriceCacheData() {
-        let data = request.resource.data;
-        return data.unixTime is number  // Unix timestamp
-          && isValidUnixTime(data.unixTime);
-      }
+    match /sites/{siteId} {
+      // All operations require account ownership of the linked fingerprint
+      allow read, write: if accountOwnsFingerprint(resource.data.fingerprintId) || isAdmin();
     }
 
-    // Rules for price history - public data
-    match /price-history/{docId} {
-      allow read: if true;  // Public read for price data
-      allow write: if false;  // Only Cloud Functions can write
+    // Internal Collections (System Only)
+    match /{path=**}/rate_limits/{document=**} {
+      allow read, write: if isInternalService();
     }
 
-    // Rules for stability metrics - public data
-    match /stability-metrics/{docId} {
-      allow read: if true;  // Public read for stability data
-      allow write: if false;  // Only Cloud Functions can write
+    match /{path=**}/rate_limit_stats/{document=**} {
+      allow read, write: if isInternalService();
     }
 
-    // Rules for rate limits - private data
-    match /rate-limits/{docId} {
-      allow read, write: if false;  // Strictly Cloud Functions only
+    match /{path=**}/tag_rules/{document=**} {
+      allow read, write: if isInternalService();
     }
 
-    // Rules for tags - private data
-    match /tags/{tagId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-      allow update: if false && isValidTag(request.resource.data.tag);  // Additional validation even though write is false
+    match /{path=**}/tag_stats/{document=**} {
+      allow read, write: if isInternalService();
     }
 
-    // Rules for role assignments - private data
-    match /roles/{roleId} {
-      allow read, write: if false;  // Only Cloud Functions can access
-      allow update: if false && isValidRole(request.resource.data.role);  // Additional validation even though write is false
+    match /{path=**}/stats_history/{document=**} {
+      allow read, write: if isInternalService();
+    }
+
+    // Account-Based Collections
+    match /accounts/{accountId} {
+      // Must have valid fingerprint to create account
+      allow create: if fingerprintExists(request.resource.data.fingerprintId);
+      // Only account owner can read/update/delete their account
+      allow read, update, delete: if isAccountOwner(accountId);
+      // Admin can also delete
+      allow delete: if isAdmin();
+    }
+
+    match /transitory_fingerprints/{fingerprintId} {
+      // Anyone can create and update transitory fingerprints
+      allow create, update: if true;
+      // Only internal services and accounts that own the linked fingerprint can read
+      allow read: if isInternalService() || 
+        (request.auth != null && resource.data.linkedFingerprintId != null && 
+         accountOwnsFingerprint(resource.data.linkedFingerprintId));
+      // Only internal services can delete
+      allow delete: if isInternalService();
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
