@@ -34,36 +34,54 @@ export const AUTH_ERRORS = {
   TOKEN_REQUIRED: "Authentication token is required",
   TOKEN_NOT_FOUND: "Token not found",
   INVALID_TOKEN_FORMAT: "Invalid token format",
+  PERMISSION_REQUIRED: "Permission required",
 } as const;
 
 // Operation related errors
 export const OPERATION_ERRORS = {
+  // Should move to FEATURE_ERRORS.Impression
   FAILED_CREATE_IMPRESSION: "Failed to create impression",
   FAILED_GET_IMPRESSIONS: "Failed to get impressions",
   FAILED_DELETE_IMPRESSIONS: "Failed to delete impressions",
+
+  // Should move to FEATURE_ERRORS.Presence
   FAILED_UPDATE_PRESENCE: "Failed to update presence status",
   FAILED_GET_PRESENCE: "Failed to get presence status",
-  FAILED_REMOVE_ROLE: "Failed to remove role",
-  FAILED_LOG_VISIT: "Failed to log visit",
   FAILED_UPDATE_PRESENCE_STATUS: "Failed to update presence status",
+  FAILED_UPDATE_ACTIVITY: "Failed to update activity timestamp",
+
+  // Should move to FEATURE_ERRORS.Role
+  FAILED_REMOVE_ROLE: "Failed to remove role",
+  FAILED_TO_GET_AVAILABLE_ROLES: "Failed to get available roles",
+
+  // Should move to FEATURE_ERRORS.Visit/Site
+  FAILED_LOG_VISIT: "Failed to log visit",
   FAILED_REMOVE_SITE: "Failed to remove site",
   FAILED_GET_VISIT_HISTORY: "Failed to get visit history",
+
+  // Should move to FEATURE_ERRORS.Stats
   FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
-  FAILED_UPDATE_ACTIVITY: "Failed to update activity timestamp",
+  FAILED_TO_GET_STATS: "Failed to get stats",
+  FAILED_TO_UPDATE_STATS: "Failed to update stats",
+
+  // Should move to FEATURE_ERRORS.Skills
+  FAILED_TO_FIND_SIMILAR_SKILLS: "Failed to find similar skills",
+
+  // These can stay as they're truly operational
   FAILED_TO_CLEANUP_RATE_LIMITS: "Failed to cleanup rate limits",
   FAILED_TO_CLEANUP_DATA: "Failed to cleanup data",
   FAILED_TO_ANALYZE_VISIT_PATTERNS: "Failed to analyze visit patterns",
-  FAILED_TO_FIND_SIMILAR_SKILLS: "Failed to find similar skills",
-  FAILED_TO_GET_AVAILABLE_ROLES: "Failed to get available roles",
-  FAILED_TO_GET_STATS: "Failed to get stats",
-  FAILED_TO_UPDATE_STATS: "Failed to update stats",
 } as const;
 
 // Validation errors
 export const VALIDATION_ERRORS = {
+  // These should move to FEATURE_ERRORS.Fingerprint
+  MISSING_FINGERPRINT: "Fingerprint is required",
+  INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
+
+  // These can stay as they're generic validation
   INVALID_QUERY: "Invalid query parameters",
   INVALID_PARAMS: "Invalid path parameters",
-  INVALID_REQUEST: "Invalid request",
   MISSING_METADATA: "Metadata is required",
   INVALID_METADATA: "Expected object, received string",
   REQUIRED_FIELD: "Required",
@@ -72,9 +90,7 @@ export const VALIDATION_ERRORS = {
   MISSING_TITLE: "Title is required",
   MISSING_STATUS: "Status is required",
   INVALID_STATUS: "Status must be either 'online', 'offline', or 'away'",
-  MISSING_FINGERPRINT: "Fingerprint is required",
-  INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
-} as const;
+};
 
 // System errors
 export const SYSTEM_ERRORS = {
@@ -84,6 +100,7 @@ export const SYSTEM_ERRORS = {
   NOT_FOUND: "Not found",
   INTERNAL_ERROR: "Internal server error",
   INVALID_INPUT: "Invalid input",
+  INVALID_REQUEST: "Invalid request",
 } as const;
 
 // Feature specific errors
@@ -96,6 +113,27 @@ export const FEATURE_ERRORS = {
   TARGET_FINGERPRINT_ID_REQUIRED: "Target fingerprint ID is required",
   FAILED_TO_REGISTER_FINGERPRINT: "Failed to register fingerprint",
   TRANSITORY_FINGERPRINT_NOT_FOUND: "Transitory fingerprint record not found",
+  MISSING_FINGERPRINT: "Fingerprint is required",
+  INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
+
+  // Impression
+  FAILED_CREATE_IMPRESSION: "Failed to create impression",
+  FAILED_GET_IMPRESSIONS: "Failed to get impressions",
+  FAILED_DELETE_IMPRESSIONS: "Failed to delete impressions",
+
+  // Presence
+  FAILED_UPDATE_PRESENCE: "Failed to update presence status",
+  FAILED_GET_PRESENCE: "Failed to get presence status",
+  FAILED_UPDATE_PRESENCE_STATUS: "Failed to update presence status",
+  FAILED_UPDATE_ACTIVITY: "Failed to update activity timestamp",
+
+  // Visit
+  FAILED_LOG_VISIT: "Failed to log visit",
+  FAILED_GET_VISIT_HISTORY: "Failed to get visit history",
+
+  // Site
+  SITE_NOT_FOUND: "Site not found",
+  FAILED_REMOVE_SITE: "Failed to remove site",
 
   // Tag
   TAGGER_NOT_FOUND: "Tagger not found",
@@ -109,11 +147,7 @@ export const FEATURE_ERRORS = {
   INVALID_TAG_TYPE: "Invalid tag type. Must be one of the allowed types.",
   TAG_NOT_FOUND: "Tag not found",
 
-  // Site
-  SITE_NOT_FOUND: "Site not found",
-  PERMISSION_REQUIRED: "Permission required",
-
-  // Capability
+  // Capability/Skills
   CAPABILITY_EXISTS: "Capability already exists for this profile",
   SIMILAR_CAPABILITY_EXISTS: "A similar capability already exists",
   INVALID_SKILL_LEVEL: "Skill level must be between 1 and 100",
@@ -126,6 +160,7 @@ export const FEATURE_ERRORS = {
   FAILED_TO_GET_CAPABILITIES: "Failed to get capabilities",
   FAILED_TO_UPDATE_CAPABILITY: "Failed to update capability",
   FAILED_TO_DELETE_CAPABILITY: "Failed to delete capability",
+  FAILED_TO_FIND_SIMILAR_SKILLS: "Failed to find similar skills",
 
   // Price
   PRICE_DATA_NOT_FOUND: "Price data not found",
@@ -133,17 +168,17 @@ export const FEATURE_ERRORS = {
   FAILED_GET_PRICE_HISTORY: "Failed to get price history",
   ALL_PRICE_FETCHES_FAILED: "All price fetches failed",
 
-  // Profile
-  PROFILE_NOT_FOUND: "Profile not found",
-  PROFILE_EXISTS: "Profile already exists",
-  USERNAME_TAKEN: "Username already taken",
-
   // Role
   FAILED_ASSIGN_ROLE: "Failed to assign role",
   CANNOT_REMOVE_USER_ROLE: "Cannot remove user role",
+  FAILED_REMOVE_ROLE: "Failed to remove role",
+  FAILED_TO_GET_AVAILABLE_ROLES: "Failed to get available roles",
 
   // Stats
   STATS_NOT_FOUND: "Stats not found",
+  FAILED_TO_GET_STATS: "Failed to get stats",
+  FAILED_TO_UPDATE_STATS: "Failed to update stats",
+  FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
 } as const;
 
 // Export all error types
