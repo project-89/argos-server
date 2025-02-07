@@ -2,7 +2,6 @@ export * from "./auth.middleware";
 export * from "./ownershipCheck.middleware";
 export * from "./validation.middleware";
 export * from "./chains.middleware";
-export * from "./compose.middleware";
 export * from "./config.middleware";
 export * from "./error.middleware";
 export * from "./fingerprintRateLimit.middleware";

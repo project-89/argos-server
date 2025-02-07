@@ -1,17 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError, sendError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
-import { Profile } from "../types";
 import { profileService } from "../services";
-
-// Extend the Request type to include profile
-declare global {
-  namespace Express {
-    interface Request {
-      profile?: Profile;
-    }
-  }
-}
 
 const LOG_PREFIX = "[Profile Access Check]";
 

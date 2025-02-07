@@ -53,6 +53,10 @@ export const OPERATION_ERRORS = {
   FAILED_TO_CLEANUP_RATE_LIMITS: "Failed to cleanup rate limits",
   FAILED_TO_CLEANUP_DATA: "Failed to cleanup data",
   FAILED_TO_ANALYZE_VISIT_PATTERNS: "Failed to analyze visit patterns",
+  FAILED_TO_FIND_SIMILAR_SKILLS: "Failed to find similar skills",
+  FAILED_TO_GET_AVAILABLE_ROLES: "Failed to get available roles",
+  FAILED_TO_GET_STATS: "Failed to get stats",
+  FAILED_TO_UPDATE_STATS: "Failed to update stats",
 } as const;
 
 // Validation errors
@@ -69,6 +73,7 @@ export const VALIDATION_ERRORS = {
   MISSING_STATUS: "Status is required",
   INVALID_STATUS: "Status must be either 'online', 'offline', or 'away'",
   MISSING_FINGERPRINT: "Fingerprint is required",
+  INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
 } as const;
 
 // System errors
@@ -117,6 +122,10 @@ export const FEATURE_ERRORS = {
   SKILL_NAME_REQUIRED: "Skill name is required",
   SKILL_NAME_TOO_LONG: "Skill name is too long",
   SKILL_DESCRIPTION_TOO_LONG: "Skill description is too long",
+  FAILED_TO_CREATE_CAPABILITY: "Failed to create capability",
+  FAILED_TO_GET_CAPABILITIES: "Failed to get capabilities",
+  FAILED_TO_UPDATE_CAPABILITY: "Failed to update capability",
+  FAILED_TO_DELETE_CAPABILITY: "Failed to delete capability",
 
   // Price
   PRICE_DATA_NOT_FOUND: "Price data not found",
