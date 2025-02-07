@@ -1,16 +1,8 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import {
-  Account,
-  CreateAccountRequest,
-  UpdateAccountRequest,
-  LinkFingerprintRequest,
-  AccountResponse,
-} from "../schemas";
+import { Account, CreateAccountRequest, UpdateAccountRequest, AccountResponse } from "../schemas";
 import { TransitoryFingerprint } from "../types";
 import { ApiError } from "../utils/error";
-
-import { verifySignature } from "../utils";
 import { getFingerprintById } from "./";
 
 export const createAccount = async (request: CreateAccountRequest): Promise<AccountResponse> => {
@@ -18,7 +10,11 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
     const db = getFirestore();
     const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
 
-    const { walletAddress, fingerprintIds = [], transitoryFingerprintId } = request.body;
+    const {
+      walletAddress,
+      fingerprintId: requestedFingerprintId,
+      transitoryFingerprintId,
+    } = request.body;
 
     // Check if account with wallet address already exists
     const existingAccount = await getAccountByWalletAddress(walletAddress);
@@ -26,17 +22,7 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
       throw new ApiError(400, ERROR_MESSAGES.ACCOUNT_ALREADY_EXISTS);
     }
 
-    // Verify all fingerprints exist
-    if (fingerprintIds.length > 0) {
-      await Promise.all(
-        fingerprintIds.map(async (fingerprintId) => {
-          const fingerprint = await getFingerprintById(fingerprintId);
-          if (!fingerprint) {
-            throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-          }
-        }),
-      );
-    }
+    let finalFingerprintId = requestedFingerprintId;
 
     // If transitoryFingerprintId is provided, verify and link it
     if (transitoryFingerprintId) {
@@ -51,12 +37,9 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
 
       const transitoryData = transitoryDoc.data() as TransitoryFingerprint;
 
-      // If the transitory fingerprint has a linked fingerprint, add it to fingerprintIds
-      if (
-        transitoryData.linkedFingerprintId &&
-        !fingerprintIds.includes(transitoryData.linkedFingerprintId)
-      ) {
-        fingerprintIds.push(transitoryData.linkedFingerprintId);
+      // If the transitory fingerprint has a linked fingerprint, use that
+      if (transitoryData.linkedFingerprintId) {
+        finalFingerprintId = transitoryData.linkedFingerprintId;
       }
 
       // Update transitory fingerprint status
@@ -67,10 +50,30 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
       });
     }
 
+    // Verify fingerprint exists
+    if (!finalFingerprintId) {
+      throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
+    }
+
+    const fingerprint = await getFingerprintById(finalFingerprintId);
+    if (!fingerprint) {
+      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+    }
+
+    // Check if fingerprint is already linked to another account
+    const existingAccountWithFingerprint = await accountsRef
+      .where("fingerprintId", "==", finalFingerprintId)
+      .limit(1)
+      .get();
+
+    if (!existingAccountWithFingerprint.empty) {
+      throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_ALREADY_LINKED);
+    }
+
     const now = Timestamp.now();
     const account: Omit<Account, "id"> = {
       walletAddress,
-      fingerprintIds,
+      fingerprintId: finalFingerprintId,
       createdAt: now,
       lastLogin: now,
       status: "active",
@@ -79,15 +82,11 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
 
     const docRef = await accountsRef.add(account);
 
-    // Update all linked fingerprints with the account ID
-    await Promise.all(
-      fingerprintIds.map((fingerprintId) =>
-        db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).update({
-          accountId: docRef.id,
-          walletAddress,
-        }),
-      ),
-    );
+    // Update the fingerprint with the account ID
+    await db.collection(COLLECTIONS.FINGERPRINTS).doc(finalFingerprintId).update({
+      accountId: docRef.id,
+      walletAddress,
+    });
 
     return formatAccountResponse({ id: docRef.id, ...account });
   } catch (error) {
@@ -100,17 +99,25 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
   }
 };
 
-export const getAccountById = async (id: string): Promise<Account | null> => {
+export const getAccountById = async (accountId: string): Promise<Account | null> => {
   try {
     const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-    const doc = await accountsRef.doc(id).get();
-    return doc.exists ? ({ id: doc.id, ...doc.data() } as Account) : null;
+    const accountRef = db.collection(COLLECTIONS.ACCOUNTS).doc(accountId);
+    const accountDoc = await accountRef.get();
+
+    if (!accountDoc.exists) {
+      return null;
+    }
+
+    return {
+      id: accountDoc.id,
+      ...accountDoc.data(),
+    } as Account;
   } catch (error) {
-    console.error("[Get Account By Id] Error:", {
+    console.error("[Get Account] Error:", {
       error,
       stack: error instanceof Error ? error.stack : undefined,
-      id,
+      accountId,
     });
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_ACCOUNT);
   }
@@ -120,12 +127,20 @@ export const getAccountByWalletAddress = async (walletAddress: string): Promise<
   try {
     const db = getFirestore();
     const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-    const snapshot = await accountsRef.where("walletAddress", "==", walletAddress).limit(1).get();
-    if (snapshot.empty) return null;
-    const doc = snapshot.docs[0];
-    return { id: doc.id, ...doc.data() } as Account;
+    const query = accountsRef.where("walletAddress", "==", walletAddress).limit(1);
+    const querySnapshot = await query.get();
+
+    if (querySnapshot.empty) {
+      return null;
+    }
+
+    const accountDoc = querySnapshot.docs[0];
+    return {
+      id: accountDoc.id,
+      ...accountDoc.data(),
+    } as Account;
   } catch (error) {
-    console.error("[Get Account By Wallet Address] Error:", {
+    console.error("[Get Account By Wallet] Error:", {
       error,
       stack: error instanceof Error ? error.stack : undefined,
       walletAddress,
@@ -166,115 +181,6 @@ export const updateAccount = async ({
   }
 };
 
-export const linkFingerprint = async ({
-  accountId,
-  request,
-}: {
-  accountId: string;
-  request: LinkFingerprintRequest;
-}): Promise<AccountResponse> => {
-  try {
-    const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-    const { fingerprintId } = request.params;
-    const { signature } = request.body;
-    const account = await getAccountById(accountId);
-
-    if (!account) {
-      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
-    }
-
-    // Verify fingerprint exists
-    const fingerprint = await getFingerprintById(fingerprintId);
-    if (!fingerprint) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
-    }
-
-    // Verify signature
-    const isValid = await verifySignature(signature, account.walletAddress, fingerprintId);
-    if (!isValid) {
-      throw new ApiError(401, ERROR_MESSAGES.INVALID_SIGNATURE);
-    }
-
-    // Check if fingerprint is already linked to another account
-    const existingAccount = await accountsRef
-      .where("fingerprintIds", "array-contains", fingerprintId)
-      .limit(1)
-      .get();
-
-    if (!existingAccount.empty) {
-      const doc = existingAccount.docs[0];
-      if (doc.id !== accountId) {
-        throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_ALREADY_LINKED);
-      }
-    }
-
-    // Add fingerprint to account if not already present
-    if (!account.fingerprintIds.includes(fingerprintId)) {
-      const updatedFingerprintIds = [...account.fingerprintIds, fingerprintId];
-      const now = Timestamp.now();
-      await accountsRef.doc(accountId).update({
-        fingerprintIds: updatedFingerprintIds,
-        "metadata.lastSignature": signature,
-        "metadata.lastSignatureTimestamp": now,
-      });
-      return formatAccountResponse({
-        ...account,
-        fingerprintIds: updatedFingerprintIds,
-        metadata: {
-          ...account.metadata,
-          lastSignature: signature,
-          lastSignatureTimestamp: now,
-        },
-      });
-    }
-
-    return formatAccountResponse(account);
-  } catch (error) {
-    console.error("[Link Fingerprint] Error:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-      accountId,
-      request,
-    });
-    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_LINK_FINGERPRINT);
-  }
-};
-
-export const unlinkFingerprint = async ({
-  accountId,
-  fingerprintId,
-}: {
-  accountId: string;
-  fingerprintId: string;
-}): Promise<AccountResponse> => {
-  try {
-    const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-    const account = await getAccountById(accountId);
-    if (!account) {
-      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
-    }
-
-    if (!account.fingerprintIds.includes(fingerprintId)) {
-      throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_NOT_LINKED);
-    }
-
-    const updatedFingerprintIds = account.fingerprintIds.filter((id) => id !== fingerprintId);
-    await accountsRef.doc(accountId).update({ fingerprintIds: updatedFingerprintIds });
-
-    return formatAccountResponse({ ...account, fingerprintIds: updatedFingerprintIds });
-  } catch (error) {
-    console.error("[Unlink Fingerprint] Error:", {
-      error,
-      stack: error instanceof Error ? error.stack : undefined,
-      accountId,
-      fingerprintId,
-    });
-    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_UNLINK_FINGERPRINT);
-  }
-};
-
 export const verifyAccountOwnership = async (
   accountId: string,
   walletAddress: string,
@@ -293,16 +199,14 @@ export const verifyAccountOwnership = async (
   }
 };
 
-// Helper function to format account response
-const formatAccountResponse = (account: Account): AccountResponse => ({
-  id: account.id,
-  walletAddress: account.walletAddress,
-  fingerprintIds: account.fingerprintIds,
-  status: account.status,
-  createdAt: account.createdAt.toMillis(),
-  lastLogin: account.lastLogin.toMillis(),
-  metadata: {
-    lastSignature: account.metadata.lastSignature,
-    lastSignatureTimestamp: account.metadata.lastSignatureTimestamp?.toMillis(),
-  },
-});
+const formatAccountResponse = (account: Account): AccountResponse => {
+  return {
+    id: account.id,
+    walletAddress: account.walletAddress,
+    fingerprintId: account.fingerprintId,
+    createdAt: account.createdAt,
+    lastLogin: account.lastLogin,
+    status: account.status,
+    metadata: account.metadata,
+  };
+};
