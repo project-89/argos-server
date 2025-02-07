@@ -1,7 +1,7 @@
-export * from "./skills.hivemind.types";
-export * from "./capability.hivemind.types";
-export * from "./profile.hivemind.types";
-export * from "./stats.hivemind.types";
+export * from "./skills.types";
+export * from "./capability.types";
+export * from "./profile.types";
+export * from "./stats.types";
 
 export * from "./api-core.types";
 export * from "./fingerprint.types";

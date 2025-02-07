@@ -1,5 +1,5 @@
 import { Timestamp } from "firebase-admin/firestore";
-import { Stats } from "./stats.hivemind.types";
+import { Stats } from "./stats.types";
 
 export interface ContactInfo {
   email?: string;
