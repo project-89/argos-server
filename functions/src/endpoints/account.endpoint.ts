@@ -6,8 +6,6 @@ import {
   getAccountById,
   getAccountByWalletAddress,
   updateAccount,
-  linkFingerprint,
-  unlinkFingerprint,
 } from "../services";
 
 export const handleCreateAccount = async (req: Request, res: Response) => {
@@ -53,26 +51,6 @@ export const handleUpdateAccount = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const account = await updateAccount({ accountId: id, request: req.body });
-    res.json(account);
-  } catch (error) {
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
-
-export const handleLinkFingerprint = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const account = await linkFingerprint({ accountId: id, request: req.body });
-    res.json(account);
-  } catch (error) {
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-  }
-};
-
-export const handleUnlinkFingerprint = async (req: Request, res: Response) => {
-  try {
-    const { id, fingerprintId } = req.params;
-    const account = await unlinkFingerprint({ accountId: id, fingerprintId });
     res.json(account);
   } catch (error) {
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
