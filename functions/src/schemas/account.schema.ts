@@ -6,14 +6,11 @@ import { walletAddressSchema, accountIdSchema, fingerprintIdSchema } from "./com
 export const AccountSchema = z.object({
   id: accountIdSchema,
   walletAddress: walletAddressSchema,
-  fingerprintIds: z.array(fingerprintIdSchema),
+  fingerprintId: fingerprintIdSchema,
   createdAt: z.instanceof(Timestamp),
   lastLogin: z.instanceof(Timestamp),
   status: z.enum(["active", "suspended"]),
-  metadata: z.object({
-    lastSignature: z.string().optional(),
-    lastSignatureTimestamp: z.instanceof(Timestamp).optional(),
-  }),
+  metadata: z.record(z.any()),
 });
 
 // Request validation schemas
@@ -22,7 +19,7 @@ export const CreateAccountRequestSchema = z.object({
     walletAddress: walletAddressSchema,
     signature: z.string().min(1, "Signature is required"),
     message: z.string().min(1, "Message is required"),
-    fingerprintIds: z.array(fingerprintIdSchema).optional(),
+    fingerprintId: fingerprintIdSchema.optional(),
     transitoryFingerprintId: fingerprintIdSchema.optional(),
   }),
   query: z.object({}).optional(),
@@ -62,27 +59,15 @@ export const LinkFingerprintRequestSchema = z.object({
   query: z.object({}).optional(),
 });
 
-export const UnlinkFingerprintRequestSchema = z.object({
-  params: z.object({
-    accountId: accountIdSchema,
-    fingerprintId: fingerprintIdSchema,
-  }),
-  body: z.object({}).optional(),
-  query: z.object({}).optional(),
-});
-
 // Response schema
 export const AccountResponseSchema = z.object({
   id: accountIdSchema,
   walletAddress: walletAddressSchema,
-  fingerprintIds: z.array(fingerprintIdSchema),
+  fingerprintId: fingerprintIdSchema,
   status: z.enum(["active", "suspended"]),
-  createdAt: z.number(), // Unix timestamp
-  lastLogin: z.number(), // Unix timestamp
-  metadata: z.object({
-    lastSignature: z.string().optional(),
-    lastSignatureTimestamp: z.number().optional(), // Unix timestamp
-  }),
+  createdAt: z.instanceof(Timestamp),
+  lastLogin: z.instanceof(Timestamp),
+  metadata: z.record(z.any()),
 });
 
 // Export types inferred from schemas
@@ -92,4 +77,3 @@ export type CreateAccountRequest = z.infer<typeof CreateAccountRequestSchema>;
 export type GetAccountRequest = z.infer<typeof GetAccountRequestSchema>;
 export type UpdateAccountRequest = z.infer<typeof UpdateAccountRequestSchema>;
 export type LinkFingerprintRequest = z.infer<typeof LinkFingerprintRequestSchema>;
-export type UnlinkFingerprintRequest = z.infer<typeof UnlinkFingerprintRequestSchema>;
