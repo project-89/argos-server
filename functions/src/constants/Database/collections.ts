@@ -21,3 +21,5 @@ export const COLLECTIONS = {
   ACCOUNTS: "accounts",
   TRANSITORY_FINGERPRINTS: "transitory-fingerprints",
 } as const;
+
+export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

@@ -22,7 +22,7 @@ export const ROLE_HIERARCHY: Record<ROLE, number> = {
   [ROLE.AGENT_SENIOR]: 3,
   [ROLE.AGENT_MASTER]: 4,
   [ROLE.ADMIN]: 5,
-};
+} as const;
 
 export const ROLE_PERMISSIONS: Record<ROLE, Permission[]> = {
   [ROLE.USER]: [],
@@ -38,4 +38,4 @@ export const ROLE_PERMISSIONS: Record<ROLE, Permission[]> = {
     "oversee_agents",
     "special_access",
   ],
-};
+} as const;

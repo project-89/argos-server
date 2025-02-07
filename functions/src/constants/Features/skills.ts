@@ -1,4 +1,4 @@
-import { SkillAnalysis } from "../types/services/skills.hivemind.types";
+import { SkillAnalysis } from "../../types/services/skills.hivemind.types";
 
 /**
  * Default values for when skill analysis fails
@@ -8,4 +8,4 @@ export const DEFAULT_SKILL_ANALYSIS: SkillAnalysis = {
   category: "General",
   keywords: [],
   aliases: [],
-};
+} as const;
