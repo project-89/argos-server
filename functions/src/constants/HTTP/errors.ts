@@ -23,6 +23,7 @@ export const PROFILE_ERRORS = {
   PROFILE_NOT_FOUND: "Profile not found",
   PROFILE_EXISTS: "Profile already exists for this wallet address",
   PROFILE_NOT_FOUND_FOR_WALLET: "Profile not found for wallet address",
+  USERNAME_TAKEN: "Username already taken",
 } as const;
 
 // Authentication and Authorization errors

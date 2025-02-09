@@ -1,6 +1,66 @@
 import { z } from "zod";
-import { ERROR_MESSAGES } from "../constants/api.constants";
+import { TimestampSchema } from "./common.schemas";
+import { ERROR_MESSAGES } from "../constants";
+import { TagDataSchema } from "./tag.schema";
 
+// Domain Models
+export const IpMetadataSchema = z.object({
+  primaryIp: z.string().optional(),
+  ipFrequency: z.record(z.number()),
+  lastSeenAt: z.record(TimestampSchema),
+  suspiciousIps: z.array(z.string()),
+});
+
+export const TagLimitsSchema = z.object({
+  firstTaggedAt: TimestampSchema,
+  remainingDailyTags: z.number(),
+  lastTagResetAt: TimestampSchema,
+});
+
+export const FingerprintSchema = z.object({
+  id: z.string(),
+  fingerprint: z.string(),
+  roles: z.array(z.string()),
+  tags: z.array(TagDataSchema).optional(),
+  tagLimits: TagLimitsSchema.optional(),
+  metadata: z.record(z.any()),
+  ipAddresses: z.array(z.string()),
+  createdAt: TimestampSchema,
+  lastVisited: TimestampSchema,
+  ipMetadata: IpMetadataSchema,
+});
+
+export const SocialIdentifierSchema = z.object({
+  platform: z.enum(["x", "discord"]),
+  username: z.string(),
+  profileUrl: z.string().optional(),
+  discoveredFrom: z.array(
+    z.object({
+      action: z.enum(["tagging", "being_tagged", "mentioned"]),
+      relatedUsername: z.string(),
+      timestamp: TimestampSchema,
+    }),
+  ),
+});
+
+export const TransitoryTagLimitsSchema = z.object({
+  firstTaggedAt: TimestampSchema,
+  remainingDailyTags: z.number(),
+  lastTagResetAt: TimestampSchema,
+});
+
+export const TransitoryFingerprintSchema = z.object({
+  id: z.string(),
+  socialIdentifier: SocialIdentifierSchema,
+  status: z.enum(["pending", "claimed"]),
+  tags: z.array(TagDataSchema),
+  createdAt: TimestampSchema,
+  claimedAt: TimestampSchema.optional(),
+  linkedFingerprintId: z.string().optional(),
+  tagLimits: TransitoryTagLimitsSchema.optional(),
+});
+
+// Request/Response Validation Schemas
 export const FingerprintRegisterSchema = z.object({
   body: z.object({
     fingerprint: z.string({
@@ -47,3 +107,13 @@ export const FingerprintParamsSchema = z.object({
     }),
   }),
 });
+
+// Type Exports
+export type Fingerprint = z.infer<typeof FingerprintSchema>;
+export type IpMetadata = z.infer<typeof IpMetadataSchema>;
+export type SocialIdentifier = z.infer<typeof SocialIdentifierSchema>;
+export type TransitoryTagLimits = z.infer<typeof TransitoryTagLimitsSchema>;
+export type TransitoryFingerprint = z.infer<typeof TransitoryFingerprintSchema>;
+export type FingerprintRegisterRequest = z.infer<typeof FingerprintRegisterSchema>;
+export type FingerprintUpdateRequest = z.infer<typeof FingerprintUpdateSchema>;
+export type FingerprintParamsRequest = z.infer<typeof FingerprintParamsSchema>;

@@ -1,4 +1,10 @@
 import { z } from "zod";
+import { Timestamp } from "firebase-admin/firestore";
+
+// Custom Zod schema for Firestore Timestamp
+export const TimestampSchema = z.custom<Timestamp>((val) => {
+  return val instanceof Timestamp;
+}, "Must be a Firestore Timestamp");
 
 export const ContactInfoSchema = z.object({
   email: z.string().email().optional(),

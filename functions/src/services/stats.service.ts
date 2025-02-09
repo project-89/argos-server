@@ -1,7 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils";
-import { StatsModel, StatsResponse } from "../types";
+import { Stats, StatsResponse } from "../schemas";
 
 export const getStats = async (profileId: string): Promise<StatsResponse> => {
   try {
@@ -12,7 +12,7 @@ export const getStats = async (profileId: string): Promise<StatsResponse> => {
       throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
     }
 
-    const data = doc.data() as StatsModel;
+    const data = doc.data() as Stats;
     return {
       ...data,
       joinedAt: data.joinedAt.toMillis(),
@@ -27,7 +27,7 @@ export const getStats = async (profileId: string): Promise<StatsResponse> => {
 
 export const updateStats = async (
   profileId: string,
-  updates: Partial<StatsModel>,
+  updates: Partial<Stats>,
 ): Promise<StatsResponse> => {
   try {
     const db = getFirestore();

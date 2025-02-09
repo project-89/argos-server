@@ -1,18 +1,18 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { ApiError, toUnixMillis } from "../utils";
+import { ApiError } from "../utils";
 import {
   AnalyzeSkillInput,
   AnalyzeSkillResponse,
   SearchCapabilitiesInput,
   SkillMatch,
   Skill,
-  SkillModel,
-} from "../types/services";
+  SkillAnalysisSchema,
+  SkillSimilaritySchema,
+  SkillAnalysis,
+} from "../schemas";
 import { generateObject } from "ai";
 import { google } from "@ai-sdk/google";
-import { SkillAnalysisSchema, SkillSimilaritySchema } from "../schemas";
 import { DEFAULT_SKILL_ANALYSIS, ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { SkillAnalysis } from "../types";
 
 // Initialize Gemini model with the Google provider
 const geminiModel = google("gemini-pro");
@@ -104,7 +104,7 @@ Provide structured data with:
 
       // Process direct type matches
       for (const doc of typeSnapshot.docs) {
-        const skill = doc.data() as SkillModel;
+        const skill = doc.data() as Skill;
         try {
           const confidence = await this.calculateSimilarity(description, skill);
 
@@ -129,7 +129,7 @@ Provide structured data with:
       // Process parent type matches if any
       if (parentSnapshot) {
         for (const doc of parentSnapshot.docs) {
-          const skill = doc.data() as SkillModel;
+          const skill = doc.data() as Skill;
           try {
             const confidence = await this.calculateSimilarity(description, skill);
 
@@ -162,7 +162,7 @@ Provide structured data with:
   /**
    * Calculate similarity between description and skill using structured data generation
    */
-  async calculateSimilarity(description: string, skill: SkillModel): Promise<number> {
+  async calculateSimilarity(description: string, skill: Skill): Promise<number> {
     const prompt = `Compare these two skill descriptions and rate their similarity:
 
 Skill 1: "${description}"
@@ -204,12 +204,12 @@ Provide a similarity score between 0 and 1, and list the reasons for your score.
   /**
    * Map SkillModel to Skill interface
    */
-  mapToSkill(model: SkillModel): Skill {
+  mapToSkill(model: Skill): Skill {
     try {
       return {
         ...model,
-        createdAt: toUnixMillis(model.createdAt),
-        updatedAt: toUnixMillis(model.updatedAt),
+        createdAt: model.createdAt,
+        updatedAt: model.updatedAt,
       };
     } catch (error) {
       console.error("[mapToSkill] Error:", error);
@@ -289,7 +289,7 @@ Provide a similarity score between 0 and 1, and list the reasons for your score.
 
       // Filter results client-side based on query
       const results = snapshot.docs
-        .map((doc) => this.mapToSkill(doc.data() as SkillModel))
+        .map((doc) => this.mapToSkill(doc.data() as Skill))
         .filter((skill) => {
           const searchTerms = input.query.toLowerCase().split(" ");
           const searchableText = [

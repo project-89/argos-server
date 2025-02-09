@@ -1,4 +1,8 @@
 import { z } from "zod";
+import { Timestamp } from "firebase-admin/firestore";
+
+// Firestore specific schemas
+export const TimestampSchema = z.custom<Timestamp>((val) => val instanceof Timestamp);
 
 // Common ID schemas
 export const accountIdSchema = z.string().min(1, "Account ID is required");

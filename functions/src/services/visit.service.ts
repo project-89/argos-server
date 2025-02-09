@@ -9,7 +9,7 @@ import {
   VisitHistoryResponse,
   Visit,
   Site,
-} from "../types";
+} from "../schemas";
 
 /**
  * Logs a visit and updates site information

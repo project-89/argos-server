@@ -3,15 +3,15 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError, toUnixMillis } from "../utils";
 import {
   Profile,
-  ProfileModel,
-  CreateProfileInput,
-  UpdateProfileInput,
-  ProfileWithStats,
-  StatsModel,
-} from "../types";
+  ProfileCreateRequest,
+  ProfileUpdateRequest,
+  ProfileResponse,
+  ProfileWithStatsResponse,
+  Stats,
+} from "../schemas";
 
 export const profileService = {
-  async createProfile(input: CreateProfileInput): Promise<Profile> {
+  async createProfile(input: ProfileCreateRequest["body"]): Promise<ProfileResponse> {
     try {
       console.log("[createProfile] Starting with input:", input);
       const db = getFirestore();
@@ -45,7 +45,7 @@ export const profileService = {
       const docRef = collection.doc();
 
       // Create profile with explicit defaults
-      const profile: ProfileModel = {
+      const profile: Profile = {
         id: docRef.id,
         walletAddress: input.walletAddress,
         username: input.username,
@@ -67,9 +67,10 @@ export const profileService = {
 
         // Initialize stats with explicit values
         const statsCollection = db.collection(COLLECTIONS.STATS);
-        const stats: StatsModel = {
+        const stats: Stats = {
           id: profile.id,
           missionsCompleted: 0,
+          profileId: profile.id,
           successRate: 0,
           totalRewards: 0,
           reputation: 0,
@@ -100,7 +101,7 @@ export const profileService = {
     }
   },
 
-  async getProfile(id: string): Promise<ProfileWithStats> {
+  async getProfile(id: string): Promise<ProfileWithStatsResponse> {
     try {
       console.log("[getProfile] Starting with id:", id);
       const db = getFirestore();
@@ -122,8 +123,8 @@ export const profileService = {
         throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
       }
 
-      const profileData = profileDoc.data() as ProfileModel;
-      const statsData = statsDoc.data() as StatsModel;
+      const profileData = profileDoc.data() as Profile;
+      const statsData = statsDoc.data() as Stats;
 
       return {
         ...profileData,
@@ -149,7 +150,7 @@ export const profileService = {
     }
   },
 
-  async getProfileByWallet(walletAddress: string): Promise<ProfileWithStats> {
+  async getProfileByWallet(walletAddress: string): Promise<ProfileWithStatsResponse> {
     try {
       console.log("[getProfileByWallet] Starting with walletAddress:", walletAddress);
       const db = getFirestore();
@@ -165,10 +166,10 @@ export const profileService = {
         throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND_FOR_WALLET);
       }
 
-      const profileData = snapshot.docs[0].data() as ProfileModel;
+      const profileData = snapshot.docs[0].data() as Profile;
       const statsDoc = await db.collection(COLLECTIONS.STATS).doc(profileData.id).get();
 
-      const statsData = statsDoc.data() as StatsModel;
+      const statsData = statsDoc.data() as Stats;
 
       return {
         ...profileData,
@@ -194,7 +195,7 @@ export const profileService = {
     }
   },
 
-  async updateProfile(id: string, input: UpdateProfileInput): Promise<Profile> {
+  async updateProfile(id: string, input: ProfileUpdateRequest["body"]): Promise<ProfileResponse> {
     try {
       console.log("[updateProfile] Starting with:", { id, input });
       const db = getFirestore();
@@ -227,7 +228,7 @@ export const profileService = {
       const now = Timestamp.now();
 
       // Only include fields that are actually present in the input
-      const updates: Partial<ProfileModel> = {
+      const updates: Partial<Profile> = {
         updatedAt: now,
       };
 
@@ -251,7 +252,7 @@ export const profileService = {
       await doc.ref.update(updates);
 
       const updatedDoc = await doc.ref.get();
-      const data = updatedDoc.data() as ProfileModel;
+      const data = updatedDoc.data() as Profile;
       return {
         ...data,
         createdAt: toUnixMillis(data.createdAt),
@@ -278,12 +279,12 @@ export const profileService = {
     isVerified?: boolean;
     limit?: number;
     offset?: number;
-  }): Promise<{ profiles: ProfileModel[]; total: number }> {
+  }): Promise<{ profiles: Profile[]; total: number }> {
     try {
       const { query, skillType, minSkillLevel, isVerified, limit = 10, offset = 0 } = options;
       const db = getFirestore();
-      const profilesRef = db.collection(COLLECTIONS.PROFILES) as CollectionReference<ProfileModel>;
-      let finalQuery: Query<ProfileModel> = profilesRef;
+      const profilesRef = db.collection(COLLECTIONS.PROFILES) as CollectionReference<Profile>;
+      let finalQuery: Query<Profile> = profilesRef;
 
       // Handle capability filtering
       if (skillType || minSkillLevel !== undefined || isVerified !== undefined) {

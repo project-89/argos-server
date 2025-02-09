@@ -1,6 +1,9 @@
 import { z } from "zod";
+import { TimestampSchema } from "./common.schema";
 import { ContactInfoSchema, PreferencesSchema } from "./common.schema";
+import { StatsResponseSchema } from "./stats.schema";
 
+// Request Validation Schemas
 export const ProfileCreateSchema = z.object({
   body: z.object({
     walletAddress: z.string(),
@@ -54,3 +57,41 @@ export const ProfileSearchSchema = z.object({
     offset: z.number().optional(),
   }),
 });
+
+// Database Model Schema
+export const ProfileSchema = z.object({
+  id: z.string(),
+  walletAddress: z.string(),
+  fingerprintId: z.string(),
+  username: z.string(),
+  bio: z.string(),
+  avatarUrl: z.string(),
+  contactInfo: ContactInfoSchema,
+  preferences: PreferencesSchema,
+  createdAt: TimestampSchema,
+  updatedAt: TimestampSchema,
+});
+
+// API Response Schema
+export const ProfileResponseSchema = ProfileSchema.extend({
+  createdAt: z.number(),
+  updatedAt: z.number(),
+});
+
+export const ProfileWithStatsResponseSchema = ProfileResponseSchema.extend({
+  stats: StatsResponseSchema.nullable(),
+});
+
+// Export inferred types
+export type ProfileCreateRequest = z.infer<typeof ProfileCreateSchema>;
+export type ProfileGetRequest = z.infer<typeof ProfileGetSchema>;
+export type ProfileGetByWalletRequest = z.infer<typeof ProfileGetByWalletSchema>;
+export type ProfileUpdateRequest = z.infer<typeof ProfileUpdateSchema>;
+export type ProfileSearchRequest = z.infer<typeof ProfileSearchSchema>;
+
+// Database Model Types
+export type Profile = z.infer<typeof ProfileSchema>;
+
+// API Response Types
+export type ProfileResponse = z.infer<typeof ProfileResponseSchema>;
+export type ProfileWithStatsResponse = z.infer<typeof ProfileWithStatsResponseSchema>;

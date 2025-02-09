@@ -1,7 +1,12 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { getCurrentUnixMillis, ApiError } from "../utils";
-import { SiteEngagement, VisitPattern, Visit } from "../types";
+import {
+  Visit,
+  VisitPattern,
+  SiteEngagement,
+  VisitPatternAnalysisResponse,
+} from "../schemas/visit.schema";
 
 interface CleanupResult {
   cleanupTime: number;
@@ -113,10 +118,7 @@ export const cleanupRateLimits = async (identifier: string): Promise<void> => {
 
 export const analyzeVisitPatterns = async (
   fingerprintId: string,
-): Promise<{
-  patterns: VisitPattern[];
-  engagement: SiteEngagement[];
-}> => {
+): Promise<VisitPatternAnalysisResponse> => {
   try {
     const db = getFirestore();
 

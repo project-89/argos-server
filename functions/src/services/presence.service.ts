@@ -1,12 +1,12 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ApiError, getCurrentUnixMillis, toUnixMillis } from "../utils";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { PresenceData, VisitPresence } from "../types";
+import { PresenceData, PresenceResponse } from "../schemas";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
 
-type PresenceStatus = VisitPresence["status"];
+type PresenceStatus = PresenceData["status"];
 
 /**
  * Check if user should be marked as away based on last activity
@@ -25,7 +25,7 @@ export const updatePresence = async ({
 }: {
   fingerprintId: string;
   status: PresenceStatus;
-}): Promise<VisitPresence> => {
+}): Promise<PresenceResponse> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -64,7 +64,7 @@ export const getPresence = async ({
   fingerprintId,
 }: {
   fingerprintId: string;
-}): Promise<VisitPresence> => {
+}): Promise<PresenceResponse> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
@@ -111,7 +111,7 @@ export const updateActivity = async ({
   fingerprintId,
 }: {
   fingerprintId: string;
-}): Promise<VisitPresence> => {
+}): Promise<PresenceResponse> => {
   try {
     const db = getFirestore();
     const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);

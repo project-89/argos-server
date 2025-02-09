@@ -1,6 +1,6 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES, ROLE } from "../constants";
-import { Fingerprint } from "../types";
+import { Fingerprint } from "../schemas";
 import { ApiError, deepMerge } from "../utils";
 
 /**

@@ -6,9 +6,9 @@ import {
   TagLeaderboardResponse,
   TagType,
   TagStats,
-  FingerprintData,
+  Fingerprint,
   TransitoryFingerprint,
-} from "../types";
+} from "../schemas";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = 3;
@@ -23,7 +23,7 @@ const checkAndUpdateTagLimits = async ({
   targetIsIt,
 }: {
   taggerRef: FirebaseFirestore.DocumentReference;
-  taggerData: FingerprintData;
+  taggerData: Fingerprint;
   targetIsIt: boolean;
 }): Promise<void> => {
   try {
@@ -110,8 +110,8 @@ export const tagUser = async ({
     }
 
     // Check if tagger has the tag they're trying to pass
-    const taggerData = taggerDoc.data() as FingerprintData;
-    if (!taggerData.tags?.[tagType]) {
+    const taggerData = taggerDoc.data() as Fingerprint;
+    if (!taggerData.tags?.some((tag) => tag.type === tagType)) {
       throw new ApiError(403, ERROR_MESSAGES.NOT_IT);
     }
 
@@ -123,10 +123,10 @@ export const tagUser = async ({
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const targetData = targetDoc.data() as FingerprintData;
+    const targetData = targetDoc.data() as Fingerprint;
 
     // Check if target already has this tag type
-    if (targetData.tags?.[tagType]) {
+    if (targetData.tags?.some((tag) => tag.type === tagType)) {
       // Check and update tag limits before returning error
       await checkAndUpdateTagLimits({ taggerRef, taggerData, targetIsIt: true });
       throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
@@ -144,7 +144,7 @@ export const tagUser = async ({
 
     // Update target's tags - tagger keeps their tag
     await targetRef.update({
-      [`tags.${tagType}`]: newTag,
+      tags: [...(targetData.tags || []), newTag],
     });
 
     // Update tag stats with target info
@@ -176,7 +176,7 @@ export const getRemainingTags = async (fingerprintId: string): Promise<number> =
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data() as FingerprintData;
+    const data = fingerprintDoc.data() as Fingerprint;
     const tagLimits = data.tagLimits;
 
     if (!tagLimits) {
@@ -219,8 +219,8 @@ export const hasTag = async ({
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data() as FingerprintData;
-    return !!data.tags?.[tagType];
+    const data = fingerprintDoc.data() as Fingerprint;
+    return data.tags?.some((tag) => tag.type === tagType) || false;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in hasTag:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
