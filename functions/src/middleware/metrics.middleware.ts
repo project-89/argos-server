@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from "express";
-import { MetricsData, Middleware } from "../types";
+import { MetricsData, Middleware } from "../schemas";
 
 /**
  * Global metrics storage
@@ -74,17 +74,17 @@ export const withMetrics = (middleware: Middleware, name: string) => {
     };
 
     try {
-      await middleware(req, res, next);
+      const result = await middleware(req, res, next);
       metricsData.success = true;
+      return result;
     } catch (error) {
       metricsData.success = false;
       metricsData.error = error instanceof Error ? error.message : "Unknown error";
       throw error;
     } finally {
-      metricsData.endTime = process.hrtime();
-      metricsData.duration =
-        (metricsData.endTime[0] - startTime[0]) * 1000 +
-        (metricsData.endTime[1] - startTime[1]) / 1e6;
+      const endTime = process.hrtime();
+      metricsData.endTime = endTime;
+      metricsData.duration = (endTime[0] - startTime[0]) * 1000 + (endTime[1] - startTime[1]) / 1e6;
 
       metrics.addMetric(metricsData);
 

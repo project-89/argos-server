@@ -1,10 +1,10 @@
 import { Request, Response, NextFunction } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG } from "../constants";
-import { RateLimitConfig } from "../types";
+import { RateLimitConfig } from "../schemas";
 
 export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
-  const { windowMs } = { ...DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG, ...config };
+  const { windowMs } = { ...DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG, ...config } as RateLimitConfig;
   // Use environment variables or fallback to config/default
   const isDisabled =
     process.env.RATE_LIMIT_DISABLED === "true" ||

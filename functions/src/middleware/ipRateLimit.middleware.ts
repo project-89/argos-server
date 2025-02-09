@@ -2,13 +2,13 @@ import { Request, Response, NextFunction } from "express";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, DEFAULT_IP_RATE_LIMIT_CONFIG } from "../constants";
 import { sendWarning } from "../utils";
-import { Fingerprint, RateLimitConfig } from "../types";
+import { Fingerprint, RateLimitConfig } from "../schemas";
 
 const SUSPICIOUS_IP_THRESHOLD = 10; // Number of requests needed to establish an IP as trusted
 const SUSPICIOUS_TIME_WINDOW = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
 
 export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
-  const { windowMs } = { ...DEFAULT_IP_RATE_LIMIT_CONFIG, ...config };
+  const { windowMs } = { ...DEFAULT_IP_RATE_LIMIT_CONFIG, ...config } as RateLimitConfig;
 
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     // Check environment variables on each request

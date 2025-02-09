@@ -1,7 +1,12 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import { Account, CreateAccountRequest, UpdateAccountRequest, AccountResponse } from "../schemas";
-import { TransitoryFingerprint } from "../types";
+import {
+  Account,
+  CreateAccountRequest,
+  UpdateAccountRequest,
+  AccountResponse,
+  TransitoryFingerprint,
+} from "../schemas";
 import { ApiError } from "../utils/error";
 import { getFingerprintById } from "./";
 
