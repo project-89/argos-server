@@ -1,4 +1,4 @@
-import { SkillAnalysis } from "../../types/services/skills.types";
+import { SkillAnalysis } from "../../schemas";
 
 /**
  * Default values for when skill analysis fails

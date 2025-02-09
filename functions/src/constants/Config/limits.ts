@@ -1,4 +1,4 @@
-import { RateLimitConfig } from "../../types";
+import { RateLimitConfig } from "../../schemas";
 
 export const DEFAULT_FINGERPRINT_RATE_LIMIT_CONFIG: RateLimitConfig = {
   windowMs: 60 * 60 * 1000, // 1 hour window
