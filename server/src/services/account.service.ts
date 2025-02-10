@@ -8,7 +8,7 @@ import {
   TransitoryFingerprint,
 } from "../schemas";
 import { ApiError } from "../utils/error";
-import { getFingerprintById } from "./";
+import { getFingerprintById } from ".";
 
 export const createAccount = async (request: CreateAccountRequest): Promise<AccountResponse> => {
   try {

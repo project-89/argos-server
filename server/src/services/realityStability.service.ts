@@ -1,4 +1,4 @@
-import { getCurrentPrices } from "./";
+import { getCurrentPrices } from ".";
 import { ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 

@@ -1,6 +1,6 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ApiError, extractDomain, toUnixMillis } from "../utils";
-import { updatePresence } from "./";
+import { updatePresence } from ".";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import {
   SiteResponse,

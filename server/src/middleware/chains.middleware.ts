@@ -7,7 +7,7 @@ import {
   verifyAccountOwnership,
   validateAuthToken,
   withMetrics,
-} from "./";
+} from ".";
 
 /**
  * Middleware chain factory functions for different endpoint types

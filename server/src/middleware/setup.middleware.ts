@@ -3,7 +3,7 @@ import cors from "cors";
 import express from "express";
 import { CORS_CONFIG } from "../constants";
 import { MiddlewareConfig } from "./config.middleware";
-import { withMetrics, ipRateLimit } from "./";
+import { withMetrics, ipRateLimit } from ".";
 import { ApiError, sendError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 import path from "path";
