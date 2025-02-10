@@ -3,17 +3,17 @@
     "module": "commonjs",
     "noImplicitReturns": true,
     "noUnusedLocals": true,
-    "outDir": "lib",
+    "outDir": "../../lib",
     "sourceMap": true,
     "strict": true,
     "target": "es2017",
-    "baseUrl": ".",
+    "baseUrl": "../..",
     "paths": {
       "@/*": ["./src/*"]
     },
     "typeRoots": [
-      "node_modules/@types",
-      "src/types"
+      "../../node_modules/@types",
+      "../../src/types"
     ],
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -23,18 +23,18 @@
     "allowJs": true,
     "declaration": true,
     "types": ["node", "express", "jest"],
-    "rootDir": "src"
+    "rootDir": "../../src"
   },
   "compileOnSave": true,
   "include": [
-    "src"
+    "../../src"
   ],
   "exclude": [
-    "node_modules",
-    "lib",
-    "coverage",
-    "**/*.test.ts",
-    "**/__tests__/**",
-    "jest.config.js"
+    "../../node_modules",
+    "../../lib",
+    "../../coverage",
+    "../../**/*.test.ts",
+    "../../**/__tests__/**",
+    "../../jest.config.js"
   ]
 } 

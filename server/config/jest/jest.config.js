@@ -11,4 +11,5 @@ module.exports = {
   verbose: true,
   detectOpenHandles: true,
   forceExit: true,
+  rootDir: "../../",
 };
