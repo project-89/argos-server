@@ -27,6 +27,7 @@ export const getPriceHistorySchema = z.object({
 
 // Response schemas for TypeScript types
 export const PriceResponseSchema = z.object({
+  symbol: z.string(),
   usd: z.number(),
   usd_24h_change: z.number(),
 });

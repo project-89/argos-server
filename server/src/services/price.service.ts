@@ -52,6 +52,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
             now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION.PRICE
           ) {
             results.prices[symbol] = {
+              symbol,
               usd: cacheData.usd,
               usd_24h_change: cacheData.usd_24h_change,
             };
@@ -87,6 +88,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
         }
 
         const priceData: PriceResponse = {
+          symbol,
           usd: data.usd,
           usd_24h_change: data.usd_24h_change,
         };

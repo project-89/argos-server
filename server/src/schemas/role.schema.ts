@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLE } from "../constants/roles.constants";
+import { ROLE } from "../constants";
 
 export const RoleBodySchema = z.object({
   fingerprintId: z
