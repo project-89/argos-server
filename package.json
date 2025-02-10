@@ -1,63 +1,36 @@
 {
-  "name": "@oneirocom/argos-sdk",
-  "version": "0.1.0",
-  "description": "SDK for interacting with the Argos fingerprinting and tracking system",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "name": "argos-server",
+  "version": "1.0.0",
+  "description": "Argos Server - API and Infrastructure",
+  "private": true,
+  "workspaces": [
+    "server"
+  ],
   "scripts": {
-    "build": "tsc",
-    "test": "jest",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "prepare": "npm run build",
-    "prepublishOnly": "npm test && npm run lint"
+    "prepare": "cd server && npm install",
+    "build": "cd server && npm run build",
+    "test": "cd server && npm run test",
+    "deploy": "cd server && npm run deploy",
+    "serve": "cd server && npm run serve",
+    "terraform:init": "cd terraform && terraform init",
+    "terraform:plan": "cd terraform && terraform plan",
+    "terraform:apply": "cd terraform && terraform apply",
+    "firebase:deploy": "firebase deploy"
   },
   "dependencies": {
-    "cross-fetch": "^4.0.0",
-    "firebase-functions": "^6.2.0"
-  },
-  "peerDependencies": {
-    "react": "^18.0.0"
+    "firebase-tools": "^13.0.0"
   },
   "devDependencies": {
-    "@types/jest": "^29.5.14",
-    "@types/node": "^20.10.6",
-    "@types/react": "^18.2.0",
-    "@typescript-eslint/eslint-plugin": "^6.16.0",
-    "@typescript-eslint/parser": "^6.16.0",
-    "abort-controller": "^3.0.0",
-    "dotenv": "^16.4.7",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.2",
-    "firebase-admin": "^13.0.1",
-    "jest": "^29.7.0",
-    "prettier": "^3.1.1",
-    "react": "^18.2.0",
-    "ts-jest": "^29.2.5",
-    "typescript": "^5.3.3"
+    "dotenv-cli": "^7.4.4",
+    "rimraf": "^5.0.5"
   },
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "keywords": [
-    "argos",
-    "fingerprinting",
-    "tracking",
-    "analytics"
-  ],
-  "author": "Oneiro",
+  "engines": {
+    "node": ">=18"
+  },
+  "author": "Project89",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/oneirocom/argos-sdk.git"
-  },
-  "bugs": {
-    "url": "https://github.com/oneirocom/argos-sdk/issues"
-  },
-  "homepage": "https://github.com/oneirocom/argos-sdk#readme"
+    "url": "git+https://github.com/project89/argos-server.git"
+  }
 }
