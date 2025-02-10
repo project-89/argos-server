@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { ApiError } from "./error";
 import { v4 as uuidv4 } from "uuid";
-import { ApiSuccessResponse, ApiErrorResponse } from "@/types";
+import { ApiSuccessResponse, ApiErrorResponse } from "../schemas";
 import { getCurrentUnixMillis } from "./timestamp";
 
 /**
