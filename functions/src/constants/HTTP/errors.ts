@@ -106,6 +106,19 @@ export const SYSTEM_ERRORS = {
 
 // Feature specific errors
 export const FEATURE_ERRORS = {
+  // Mission
+  FAILED_TO_CREATE_MISSION: "Failed to create mission",
+  FAILED_TO_GET_MISSION: "Failed to get mission",
+  FAILED_TO_UPDATE_MISSION: "Failed to update mission",
+  FAILED_TO_DELETE_MISSION: "Failed to delete mission",
+  MISSION_NOT_FOUND: "Mission not found",
+  FAILED_TO_GET_AVAILABLE_MISSIONS: "Failed to get available missions",
+  FAILED_TO_GET_ACTIVE_MISSIONS: "Failed to get active missions",
+  FAILED_TO_UPDATE_MISSION_STATUS: "Failed to update mission status",
+  FAILED_TO_UPDATE_MISSION_OBJECTIVES: "Failed to update mission objectives",
+  FAILED_TO_ADD_FAILURE_RECORD: "Failed to add failure record",
+  FINGERPRINT_REQUIRED: "Fingerprint ID is required",
+
   // Fingerprint
   FINGERPRINT_NOT_FOUND: "Fingerprint not found",
   INVALID_FINGERPRINT: "Invalid fingerprint",

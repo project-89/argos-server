@@ -20,6 +20,7 @@ export const COLLECTIONS = {
   PROFILE_CAPABILITIES: "profile-capabilities",
   ACCOUNTS: "accounts",
   TRANSITORY_FINGERPRINTS: "transitory-fingerprints",
+  MISSIONS: "missions",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

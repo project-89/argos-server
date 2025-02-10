@@ -5,6 +5,12 @@ export const SUCCESS_MESSAGES = {
   PROFILE_CREATED: "Profile created successfully",
   PROFILE_UPDATED: "Profile updated successfully",
   PROFILE_DELETED: "Profile deleted successfully",
+  MISSION_CREATED: "Mission created successfully",
+  MISSION_UPDATED: "Mission updated successfully",
+  MISSION_DELETED: "Mission deleted successfully",
+  MISSION_STATUS_UPDATED: "Mission status updated successfully",
+  MISSION_OBJECTIVES_UPDATED: "Mission objectives updated successfully",
+  FAILURE_RECORD_ADDED: "Failure record added successfully",
 } as const;
 
 export type SuccessMessage = (typeof SUCCESS_MESSAGES)[keyof typeof SUCCESS_MESSAGES];
