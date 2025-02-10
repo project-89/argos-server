@@ -14,17 +14,13 @@ console.log("Environment loaded:", {
 import { onRequest } from "firebase-functions/v2/https";
 import * as admin from "firebase-admin";
 import express from "express";
-import cors from "cors";
-import { ipRateLimit } from "./middleware/ipRateLimit.middleware";
 
-import { CORS_CONFIG } from "./constants/config.constants";
-import { composeMiddleware } from "./middleware/compose.middleware";
-import { MiddlewareConfig } from "./middleware/config.middleware";
-import { withMetrics } from "./middleware/metrics.middleware";
-import { errorHandler } from "./middleware/error.middleware";
-import { ApiError } from "./utils/error";
-import { ERROR_MESSAGES } from "./constants/api.constants";
-import { sendError } from "./utils/response";
+import { errorHandler } from "./middleware";
+import { configureCORS, corsErrorHandler } from "./middleware/global.middleware";
+import { configureAPI } from "./constants/config/api";
+import { withMetrics, ipRateLimit } from "./middleware";
+import { HEALTH_RATE_LIMIT_CONFIG, initializeRateLimits } from "./constants/config/limits";
+import routes from "./routes";
 
 // Initialize Firebase Admin
 admin.initializeApp();
@@ -32,156 +28,33 @@ admin.initializeApp();
 // Create Express app
 const app = express();
 
-// Debug log CORS configuration
-const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-console.log("[CORS] Allowed origins:", allowedOrigins);
-console.log("[CORS] Options:", CORS_CONFIG.options);
+// Configure CORS
+configureCORS(app);
 
-// Add explicit OPTIONS handler for preflight requests FIRST
-app.options(
-  "*",
-  cors({
-    origin: (origin, callback) => {
-      console.log("[CORS] Preflight request from origin:", origin);
-      const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, origin || "*");
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: [...CORS_CONFIG.options.methods],
-    allowedHeaders: [...CORS_CONFIG.options.allowedHeaders],
-    exposedHeaders: [...CORS_CONFIG.options.exposedHeaders],
-    maxAge: CORS_CONFIG.options.maxAge,
-  }),
-);
+// Initialize rate limits
+initializeRateLimits();
 
-// Apply CORS middleware for all other requests
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      console.log("[CORS] Request from origin:", origin);
-
-      // For requests without an origin, allow with "*" if not using credentials
-      if (!origin) {
-        console.log("[CORS] Request without origin - allowing for non-credentialed requests");
-        callback(null, "*");
-        return;
-      }
-
-      const allowedOrigins = CORS_CONFIG.getAllowedOrigins();
-      console.log("[CORS] Checking origin against allowed list:", { origin, allowedOrigins });
-
-      if (allowedOrigins.includes(origin)) {
-        // For credentialed requests, must return the specific origin
-        console.log("[CORS] Origin allowed:", origin);
-        callback(null, origin);
-      } else {
-        console.error(`[CORS] Blocked request from unauthorized origin: ${origin}`);
-        // Return error to trigger CORS failure
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-    methods: [...CORS_CONFIG.options.methods],
-    allowedHeaders: [...CORS_CONFIG.options.allowedHeaders],
-    exposedHeaders: [...CORS_CONFIG.options.exposedHeaders],
-    maxAge: CORS_CONFIG.options.maxAge,
-    preflightContinue: false,
-    optionsSuccessStatus: 204,
-  }),
-);
-
-app.use(express.json());
-
-// Helper to check if request is from a browser
-const isBrowserRequest = (req: express.Request): boolean => {
-  const accept = req.headers.accept || "";
-  return accept.includes("text/html") || accept.includes("*/*");
-};
-
-// Initialize middleware configuration
-const middlewareConfig = MiddlewareConfig.getInstance();
-
-// Configure rate limits (can be changed at runtime)
-middlewareConfig.set("rateLimit.ip", {
-  windowMs: 60 * 60 * 1000,
-  max: process.env.IP_RATE_LIMIT_MAX ? parseInt(process.env.IP_RATE_LIMIT_MAX) : 300,
-});
-
-middlewareConfig.set("rateLimit.fingerprint", {
-  windowMs: 60 * 60 * 1000,
-  max: process.env.FINGERPRINT_RATE_LIMIT_MAX
-    ? parseInt(process.env.FINGERPRINT_RATE_LIMIT_MAX)
-    : 1000,
-});
-
-middlewareConfig.set("rateLimit.health", {
-  windowMs: 60 * 1000, // 1 minute window
-  max: 60, // 1 request per second on average
-});
-
-// Health check rate limiting (lenient but protected)
-const healthMiddleware = composeMiddleware(
-  withMetrics(ipRateLimit(middlewareConfig.get("rateLimit.health")), "healthIpRateLimit"),
-);
+// Configure health endpoint rate limiting
+const healthMiddleware = withMetrics(ipRateLimit(HEALTH_RATE_LIMIT_CONFIG), "healthIpRateLimit");
 
 // Apply health check rate limiting
 app.use("/health", healthMiddleware);
 app.use("/metrics", healthMiddleware);
 
-// Serve landing page only for browser requests to root
-app.get("/", (req, res) => {
-  if (isBrowserRequest(req)) {
-    res.sendFile(path.join(__dirname, "public", "index.html"));
-  } else {
-    res.json({
-      name: "Argos API",
-      version: "1.0.0",
-      status: "operational",
-      documentation: "Visit https://argos.project89.org in a browser for documentation",
-    });
-  }
-});
+// Configure API basics (body parser, static files, etc)
+configureAPI(app);
 
-// CORS error handler
-app.use(
-  (
-    err: Error,
-    req: express.Request,
-    res: express.Response,
-    next: express.NextFunction,
-  ): express.Response | void => {
-    if (err.message === "Not allowed by CORS") {
-      console.error("[CORS Error]", err.message);
-      return res.status(403).json({
-        success: false,
-        error: "Forbidden",
-        message: "Not allowed by CORS",
-      });
-    }
-    next(err);
-  },
-);
+// Mount all routes
+app.use("/api", routes);
 
-// Register error handler middleware
+// Register error handlers
+app.use(corsErrorHandler);
 app.use(errorHandler);
-
-// 404 handler for any remaining routes
-app.use((req, res) => {
-  if (isBrowserRequest(req)) {
-    res.status(404).sendFile(path.join(__dirname, "public", "404.html"));
-  } else {
-    sendError(res, new ApiError(404, ERROR_MESSAGES.NOT_FOUND));
-  }
-});
 
 // Export the Express app as a Firebase Cloud Function
 export const api = onRequest(
   {
-    cors: false, // Disable Firebase's CORS handling
+    cors: false, // Disable Firebase's CORS handling (we handle it ourselves)
     memory: "256MiB",
     timeoutSeconds: 60,
     minInstances: 0,
