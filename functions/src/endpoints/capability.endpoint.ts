@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
-import { skillMatchingService, capabilityService } from "../services";
+import {
+  skillMatchingService,
+  createCapability,
+  getCapabilities,
+  updateCapability,
+  deleteCapability,
+} from "../services";
 import { sendError, sendSuccess, ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 
@@ -12,7 +18,10 @@ export const handleCreateCapability = async (req: Request, res: Response): Promi
       params: req.params,
       body: req.body,
     });
-    const capability = await capabilityService.createCapability(req.params.profileId, req.body);
+    const capability = await createCapability({
+      profileId: req.params.profileId,
+      input: req.body,
+    });
     console.log("[Create Capability] Successfully created capability:", { id: capability.id });
     return sendSuccess(res, capability, "Capability created successfully");
   } catch (error) {
@@ -32,7 +41,7 @@ export const handleCreateCapability = async (req: Request, res: Response): Promi
 export const handleGetCapabilities = async (req: Request, res: Response): Promise<Response> => {
   try {
     console.log("[Get Capabilities] Starting with params:", req.params);
-    const capabilities = await capabilityService.getCapabilities(req.params.profileId);
+    const capabilities = await getCapabilities({ profileId: req.params.profileId });
     console.log("[Get Capabilities] Successfully retrieved capabilities for profile:", {
       profileId: req.params.profileId,
       count: capabilities.length,
@@ -57,11 +66,11 @@ export const handleUpdateCapability = async (req: Request, res: Response): Promi
       params: req.params,
       body: req.body,
     });
-    const capability = await capabilityService.updateCapability(
-      req.params.profileId,
-      req.params.capabilityId,
-      req.body,
-    );
+    const capability = await updateCapability({
+      profileId: req.params.profileId,
+      capabilityId: req.params.capabilityId,
+      input: req.body,
+    });
     console.log("[Update Capability] Successfully updated capability:", { id: capability.id });
     return sendSuccess(res, capability, "Capability updated successfully");
   } catch (error) {
@@ -81,7 +90,10 @@ export const handleUpdateCapability = async (req: Request, res: Response): Promi
 export const handleDeleteCapability = async (req: Request, res: Response): Promise<Response> => {
   try {
     console.log("[Delete Capability] Starting with params:", req.params);
-    await capabilityService.deleteCapability(req.params.profileId, req.params.capabilityId);
+    await deleteCapability({
+      profileId: req.params.profileId,
+      capabilityId: req.params.capabilityId,
+    });
     console.log("[Delete Capability] Successfully deleted capability:", {
       profileId: req.params.profileId,
       capabilityId: req.params.capabilityId,

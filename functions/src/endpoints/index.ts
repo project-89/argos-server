@@ -10,4 +10,4 @@ export * from "./realityStability.endpoint";
 export * from "./role.endpoint";
 export * from "./stats.endpoint";
 export * from "./tag.endpoint";
-export * from "./visit.endpoint";
+export * from "./mission.endpoint";

@@ -13,3 +13,4 @@ export * from "./skillMatching.service";
 export * from "./stats.service";
 export * from "./tag.service";
 export * from "./visit.service";
+export * from "./mission.service";

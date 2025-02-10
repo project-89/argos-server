@@ -19,3 +19,4 @@ export * from "./role.schema";
 export * from "./capability.schema";
 export * from "./api.schema";
 export * from "./middleware.schema";
+export * from "./mission.schema";
