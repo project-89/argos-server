@@ -78,8 +78,6 @@ resource "google_cloudfunctions2_function" "main_api" {
     environment_variables = {
       FIRESTORE_PROJECT_ID = var.project_id
       NODE_ENV = "production"
-      API_KEY_ENCRYPTION_KEY = var.api_key_encryption_key
-      API_KEY_ENCRYPTION_IV = var.api_key_encryption_iv
     }
   }
 
@@ -117,8 +115,6 @@ resource "google_cloudfunctions2_function" "scheduledCleanup" {
     environment_variables = {
       FIRESTORE_PROJECT_ID = var.project_id
       NODE_ENV = "production"
-      API_KEY_ENCRYPTION_KEY = var.api_key_encryption_key
-      API_KEY_ENCRYPTION_IV = var.api_key_encryption_iv
     }
   }
 
