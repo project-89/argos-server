@@ -5,6 +5,8 @@ export const ACCOUNT_ERRORS = {
   INVALID_SIGNATURE: "Invalid wallet signature",
   FINGERPRINT_ALREADY_LINKED: "Fingerprint is already linked to another account",
   FINGERPRINT_NOT_LINKED: "Fingerprint is not linked to this account",
+  FINGERPRINT_MISMATCH: "Fingerprint ID does not match onboarding record",
+  SOCIAL_IDENTITY_REQUIRED: "Verified social identity is required to create account",
   FAILED_TO_CREATE_ACCOUNT: "Failed to create account",
   FAILED_TO_GET_ACCOUNT: "Failed to get account",
   FAILED_TO_UPDATE_ACCOUNT: "Failed to update account",
@@ -106,6 +108,9 @@ export const SYSTEM_ERRORS = {
 
 // Feature specific errors
 export const FEATURE_ERRORS = {
+  // User
+  USER_NOT_FOUND: "User not found",
+
   // Mission
   FAILED_TO_CREATE_MISSION: "Failed to create mission",
   FAILED_TO_GET_MISSION: "Failed to get mission",
@@ -193,6 +198,18 @@ export const FEATURE_ERRORS = {
   FAILED_TO_GET_STATS: "Failed to get stats",
   FAILED_TO_UPDATE_STATS: "Failed to update stats",
   FAILED_CALCULATE_STABILITY: "Failed to calculate reality stability index",
+
+  // Onboarding
+  FAILED_TO_START_ONBOARDING: "Failed to start onboarding process",
+  FAILED_TO_GET_ONBOARDING: "Failed to get onboarding progress",
+  FAILED_TO_UPDATE_ONBOARDING: "Failed to update onboarding progress",
+  FAILED_TO_COMPLETE_ONBOARDING: "Failed to complete onboarding",
+  FAILED_TO_VERIFY_MISSION: "Failed to verify mission completion",
+  ONBOARDING_NOT_FOUND: "Onboarding process not found",
+  ONBOARDING_ALREADY_COMPLETED: "Onboarding process already completed",
+  MISSION_ALREADY_COMPLETED: "Mission already completed",
+  INVALID_MISSION_PROOF: "Invalid mission completion proof",
+  INVALID_MISSION_ORDER: "Invalid mission completion order",
 } as const;
 
 // Export all error types
