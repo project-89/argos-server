@@ -1,7 +1,6 @@
 import { z } from "zod";
-import { TimestampSchema } from "./common.schema";
-import { ContactInfoSchema, PreferencesSchema } from "./common.schema";
-import { StatsResponseSchema } from "./stats.schema";
+
+import { StatsResponseSchema, ContactInfoSchema, PreferencesSchema, TimestampSchema } from ".";
 
 // Request Validation Schemas
 export const ProfileCreateSchema = z.object({

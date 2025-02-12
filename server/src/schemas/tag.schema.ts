@@ -1,8 +1,10 @@
 import { z } from "zod";
-import { TimestampSchema } from "./common.schemas";
-import { ALLOWED_TAG_TYPES } from "../constants";
 
-export const TagPlatformSchema = z.enum(["x", "discord"]);
+import { ALLOWED_TAG_TYPES } from "../constants";
+import { AnonSocialUser, TimestampSchema } from ".";
+
+// Base schemas
+export const TagPlatformSchema = z.enum(["x"]);
 export const TagTimeFrameSchema = z.enum(["daily", "weekly", "monthly", "allTime"]);
 
 // Domain Models
@@ -10,7 +12,7 @@ export const TagDataSchema = z.object({
   type: z.string(),
   taggedBy: z.string(),
   taggedAt: TimestampSchema,
-  platform: TagPlatformSchema.optional(),
+  platform: TagPlatformSchema,
 });
 
 export const TagLimitDataSchema = z.object({
@@ -63,17 +65,38 @@ export const TagStatsSchema = z.object({
   tagHistory: z.array(TagDataSchema).optional(),
 });
 
-// Request/Response Validation Schemas
-export const TagUserSchema = z.object({
+// Internal function parameter schemas
+export const AddTagParamsSchema = z.object({
+  anonUserId: z.string(),
+  tag: TagDataSchema,
+});
+
+export const CheckTagLimitsParamsSchema = z.object({
+  taggerRecord: z.custom<AnonSocialUser>(),
+  targetHasTag: z.boolean(),
+});
+
+export const TagUserParamsSchema = z.object({
+  taggerUsername: z.string(),
+  targetUsername: z.string(),
+  platform: TagPlatformSchema.default("x"),
+  tagType: z.string(),
+});
+
+// Request/Response schemas
+export const TagUserRequestSchema = z.object({
   body: z.object({
     taggerUsername: z.string(),
-    username: z.string(),
-    platform: TagPlatformSchema,
-  }),
-  params: z.object({
+    targetUsername: z.string(),
+    platform: TagPlatformSchema.default("x"),
     tagType: z.string(),
   }),
-  query: z.object({}).optional(),
+});
+
+export const TagResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  remainingTags: z.number(),
 });
 
 export const GetUserTagsSchema = z.object({
@@ -103,8 +126,14 @@ export type TagLeaderboardEntry = z.infer<typeof TagLeaderboardEntrySchema>;
 export type TagLeaderboardResponse = z.infer<typeof TagLeaderboardResponseSchema>;
 export type TagStats = z.infer<typeof TagStatsSchema>;
 export type TagType = (typeof ALLOWED_TAG_TYPES)[keyof typeof ALLOWED_TAG_TYPES];
-
+export type TagPlatform = z.infer<typeof TagPlatformSchema>;
 // Request Types
-export type TagUserRequest = z.infer<typeof TagUserSchema>;
+export type TagUserRequest = z.infer<typeof TagUserRequestSchema>;
 export type GetUserTagsRequest = z.infer<typeof GetUserTagsSchema>;
 export type GetTagLeaderboardRequest = z.infer<typeof GetTagLeaderboardSchema>;
+export type TagResponse = z.infer<typeof TagResponseSchema>;
+
+// Internal function parameter types
+export type AddTagParams = z.infer<typeof AddTagParamsSchema>;
+export type CheckTagLimitsParams = z.infer<typeof CheckTagLimitsParamsSchema>;
+export type TagUserParams = z.infer<typeof TagUserParamsSchema>;

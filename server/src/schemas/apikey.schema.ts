@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { TimestampSchema } from "./common.schemas";
+import { TimestampSchema } from "./common.schema";
 
 // Domain Models
 export const ApiKeySchema = z.object({

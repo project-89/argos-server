@@ -1,26 +1,36 @@
 import { z } from "zod";
 import { Timestamp } from "firebase-admin/firestore";
-import { walletAddressSchema, accountIdSchema, fingerprintIdSchema } from "./common.schemas";
+import { WalletAddressSchema, AccountIdSchema, FingerprintIdSchema } from ".";
 
 // Base schema for Account in Firestore
 export const AccountSchema = z.object({
-  id: accountIdSchema,
-  walletAddress: walletAddressSchema,
-  fingerprintId: fingerprintIdSchema,
+  id: AccountIdSchema,
+  walletAddress: WalletAddressSchema,
+  fingerprintId: FingerprintIdSchema,
   createdAt: z.instanceof(Timestamp),
   lastLogin: z.instanceof(Timestamp),
   status: z.enum(["active", "suspended"]),
+  linkedAnonUser: z
+    .array(
+      z.object({
+        id: z.string(),
+        platform: z.enum(["x", "discord"]),
+        verifiedAt: z.instanceof(Timestamp),
+        claimedAt: z.instanceof(Timestamp),
+      }),
+    )
+    .optional(),
   metadata: z.record(z.any()),
 });
 
 // Request validation schemas
 export const CreateAccountRequestSchema = z.object({
   body: z.object({
-    walletAddress: walletAddressSchema,
+    walletAddress: WalletAddressSchema,
     signature: z.string().min(1, "Signature is required"),
     message: z.string().min(1, "Message is required"),
-    fingerprintId: fingerprintIdSchema.optional(),
-    transitoryFingerprintId: fingerprintIdSchema.optional(),
+    fingerprintId: FingerprintIdSchema,
+    onboardingId: z.string(), // Required to link with onboarding process
   }),
   query: z.object({}).optional(),
   params: z.object({}).optional(),
@@ -30,13 +40,13 @@ export const GetAccountRequestSchema = z.object({
   body: z.object({}).optional(),
   query: z.object({}).optional(),
   params: z.object({
-    accountId: accountIdSchema,
+    accountId: AccountIdSchema,
   }),
 });
 
 export const UpdateAccountRequestSchema = z.object({
   params: z.object({
-    accountId: accountIdSchema,
+    accountId: AccountIdSchema,
   }),
   body: z
     .object({
@@ -50,8 +60,8 @@ export const UpdateAccountRequestSchema = z.object({
 
 export const LinkFingerprintRequestSchema = z.object({
   params: z.object({
-    accountId: accountIdSchema,
-    fingerprintId: fingerprintIdSchema,
+    accountId: AccountIdSchema,
+    fingerprintId: FingerprintIdSchema,
   }),
   body: z.object({
     signature: z.string().min(1, "Signature is required"),
@@ -61,9 +71,9 @@ export const LinkFingerprintRequestSchema = z.object({
 
 // Response schema
 export const AccountResponseSchema = z.object({
-  id: accountIdSchema,
-  walletAddress: walletAddressSchema,
-  fingerprintId: fingerprintIdSchema,
+  id: AccountIdSchema,
+  walletAddress: WalletAddressSchema,
+  fingerprintId: FingerprintIdSchema,
   status: z.enum(["active", "suspended"]),
   createdAt: z.instanceof(Timestamp),
   lastLogin: z.instanceof(Timestamp),

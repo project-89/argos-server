@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../constants";
-import { TimestampSchema } from ".";
-import { SiteSettingsSchema } from "./site.schema";
+import { TimestampSchema, SiteSettingsSchema } from ".";
 
 // Domain Models
 export const VisitSchema = z.object({

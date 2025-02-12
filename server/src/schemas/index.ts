@@ -1,5 +1,5 @@
 // Export common schemas first
-export * from "./common.schemas";
+export * from "./common.schema";
 
 // Export base schemas
 export * from "./site.schema";
@@ -20,3 +20,5 @@ export * from "./capability.schema";
 export * from "./api.schema";
 export * from "./middleware.schema";
 export * from "./mission.schema";
+export * from "./onboarding.schema";
+export * from "./social.schema";

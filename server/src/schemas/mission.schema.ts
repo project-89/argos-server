@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLE } from "../constants/auth/roles";
+import { ROLE } from "../constants";
 
 // Enums
 export const MissionTypeEnum = z.enum(["single", "multi"]);

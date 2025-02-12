@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../constants";
-import { TimestampSchema } from "./common.schema";
+import { TimestampSchema } from ".";
 
 export const ImpressionSchema = z.object({
   id: z.string(),

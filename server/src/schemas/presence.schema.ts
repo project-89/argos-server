@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../constants";
-import { TimestampSchema } from "./common.schema";
+import { TimestampSchema } from ".";
 
 // Domain Models
 export const PresenceDataSchema = z.object({
