@@ -5,4 +5,4 @@ export * from "./response";
 export * from "./object";
 export * from "./timestamp";
 export * from "./wallet";
-export * from "./link";
+export * from "./hash";
