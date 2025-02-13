@@ -1,18 +1,30 @@
 import { z } from "zod";
 import { TimestampSchema, AccountIdSchema } from ".";
+import { SocialPlatformSchema } from "./social.schema";
 
 // Social verification proof schemas
-export const TwitterVerificationProofSchema = z.object({
-  type: z.literal("X"),
-  tweetId: z.string(),
-  tweetUrl: z.string().url(),
+export const SocialVerificationProofSchema = z.object({
+  type: z.literal("social"),
+  platform: SocialPlatformSchema,
+  postId: z.string(),
+  postUrl: z.string().url(),
   username: z.string(),
   content: z.string(),
-  timestamp: z.number(),
+  createdAt: z.number(),
 });
 
-export const SocialVerificationProofSchema = z.discriminatedUnion("type", [
-  TwitterVerificationProofSchema,
+export const WalletVerificationProofSchema = z.object({
+  type: z.literal("wallet"),
+  walletAddress: z.string(),
+  signature: z.string(),
+  message: z.string(),
+  createdAt: z.number(),
+});
+
+export const VerificationProofSchema = z.discriminatedUnion("type", [
+  SocialVerificationProofSchema,
+  WalletVerificationProofSchema,
+  // Future verification types would go here
 ]);
 
 export const OnboardingStageSchema = z.enum([
@@ -25,49 +37,105 @@ export const OnboardingStageSchema = z.enum([
 export const OnboardingMissionSchema = z.object({
   id: z.string(),
   type: z.enum(["social_creation", "wallet_creation"]),
-  status: z.enum(["pending", "completed"]),
+  status: z.enum(["pending", "completed", "failed"]),
   completedAt: TimestampSchema.optional(),
-  proof: z.record(z.any()).optional(),
+  attempts: z.number().default(0),
+  lastAttempt: TimestampSchema.optional(),
+  proof: VerificationProofSchema.optional(),
+  verificationMetadata: z
+    .object({
+      platform: z.enum(["x", "wallet"]),
+      verificationMethod: z.enum(["social_proof", "signature"]),
+      verifiedAt: TimestampSchema.optional(),
+    })
+    .optional(),
 });
 
 export const OnboardingProgressSchema = z.object({
   id: z.string(),
   fingerprintId: z.string(),
   accountId: AccountIdSchema.optional(),
-  stage: z.enum(["initial", "social_created", "wallet_created", "hivemind_connected"]),
-  missions: z.array(
-    z.object({
-      id: z.string(),
-      type: z.enum(["social_creation", "wallet_creation"]),
-      status: z.enum(["pending", "completed"]),
-      completedAt: TimestampSchema.optional(),
-      proof: z.record(z.any()).optional(),
-    }),
-  ),
+  stage: OnboardingStageSchema,
+  missions: z.array(OnboardingMissionSchema),
   createdAt: TimestampSchema,
   updatedAt: TimestampSchema,
-  metadata: z.record(z.any()).optional(),
+  metadata: z
+    .object({
+      verifiedSocialIdentity: z
+        .object({
+          platform: SocialPlatformSchema,
+          hashedUsername: z.string(),
+          usernameSalt: z.string(),
+          anonSocialUserId: z.string(),
+          previouslyExisted: z.boolean(),
+          verifiedAt: TimestampSchema,
+        })
+        .optional(),
+      verifiedWallet: z
+        .object({
+          address: z.string(),
+          verifiedAt: TimestampSchema,
+          signatureProof: z.string(),
+        })
+        .optional(),
+      failureReasons: z
+        .array(
+          z.object({
+            missionId: z.string(),
+            reason: z.string(),
+            timestamp: TimestampSchema,
+          }),
+        )
+        .optional(),
+    })
+    .optional(),
 });
 
 export const StartOnboardingRequestSchema = z.object({
   fingerprintId: z.string(),
+  platform: SocialPlatformSchema.optional(),
 });
 
 export const VerifyMissionRequestSchema = z.object({
   onboardingId: z.string(),
   missionId: z.string(),
-  proof: SocialVerificationProofSchema,
+  proof: VerificationProofSchema,
+  metadata: z.record(z.any()).optional(),
 });
 
 export const CompleteOnboardingRequestSchema = z.object({
   onboardingId: z.string(),
   walletAddress: z.string(),
   signature: z.string(),
+  message: z.string(),
+  timestamp: z.number(),
 });
 
 export const GetOnboardingProgressSchema = z.object({
   params: z.object({
     onboardingId: z.string(),
+  }),
+});
+
+export const OnboardingStatusResponseSchema = z.object({
+  id: z.string(),
+  stage: OnboardingStageSchema,
+  currentMission: OnboardingMissionSchema.optional(),
+  nextMission: OnboardingMissionSchema.optional(),
+  progress: z.number(),
+  remainingMissions: z.number(),
+  timeElapsed: z.number(),
+  canProceed: z.boolean(),
+});
+
+export const VerificationResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  nextStage: OnboardingStageSchema,
+  verificationDetails: z.object({
+    method: z.string(),
+    timestamp: TimestampSchema,
+    platform: SocialPlatformSchema,
   }),
 });
 
@@ -79,3 +147,7 @@ export type StartOnboardingRequest = z.infer<typeof StartOnboardingRequestSchema
 export type VerifyMissionRequest = z.infer<typeof VerifyMissionRequestSchema>;
 export type CompleteOnboardingRequest = z.infer<typeof CompleteOnboardingRequestSchema>;
 export type GetOnboardingProgressRequest = z.infer<typeof GetOnboardingProgressSchema>;
+export type OnboardingStatusResponse = z.infer<typeof OnboardingStatusResponseSchema>;
+export type VerificationResponse = z.infer<typeof VerificationResponseSchema>;
+export type SocialVerificationProof = z.infer<typeof SocialVerificationProofSchema>;
+export type WalletVerificationProof = z.infer<typeof WalletVerificationProofSchema>;

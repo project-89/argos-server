@@ -2,6 +2,8 @@ import { z } from "zod";
 import { Timestamp } from "firebase-admin/firestore";
 import { WalletAddressSchema, AccountIdSchema, FingerprintIdSchema } from ".";
 
+export const StatusSchema = z.enum(["active", "suspended"]);
+
 // Base schema for Account in Firestore
 export const AccountSchema = z.object({
   id: AccountIdSchema,
@@ -9,17 +11,8 @@ export const AccountSchema = z.object({
   fingerprintId: FingerprintIdSchema,
   createdAt: z.instanceof(Timestamp),
   lastLogin: z.instanceof(Timestamp),
-  status: z.enum(["active", "suspended"]),
-  linkedAnonUser: z
-    .array(
-      z.object({
-        id: z.string(),
-        platform: z.enum(["x", "discord"]),
-        verifiedAt: z.instanceof(Timestamp),
-        claimedAt: z.instanceof(Timestamp),
-      }),
-    )
-    .optional(),
+  status: StatusSchema,
+  anonUserId: z.string().optional(),
   metadata: z.record(z.any()),
 });
 

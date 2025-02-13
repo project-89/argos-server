@@ -14,13 +14,12 @@ export const FingerprintSchema = z.object({
   id: z.string(),
   fingerprint: z.string(),
   roles: z.array(z.string()),
-  metadata: z.record(z.any()),
+  metadata: z.record(z.any()).optional(),
   ipAddresses: z.array(z.string()),
   createdAt: TimestampSchema,
   lastVisited: TimestampSchema,
   ipMetadata: IpMetadataSchema,
   accountId: z.string().optional(), // Link to account when claimed
-  walletAddress: z.string().optional(), // Added during account creation
   anonUserId: z.string().optional(), // Single anon user link
 });
 

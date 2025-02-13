@@ -1,10 +1,10 @@
 import { z } from "zod";
 
 import { ALLOWED_TAG_TYPES } from "../constants";
-import { AnonSocialUser, TimestampSchema } from ".";
+import { AnonUser, SocialPlatformSchema, TimestampSchema } from ".";
 
 // Base schemas
-export const TagPlatformSchema = z.enum(["x"]);
+
 export const TagTimeFrameSchema = z.enum(["daily", "weekly", "monthly", "allTime"]);
 
 // Domain Models
@@ -12,7 +12,7 @@ export const TagDataSchema = z.object({
   type: z.string(),
   taggedBy: z.string(),
   taggedAt: TimestampSchema,
-  platform: TagPlatformSchema,
+  platform: SocialPlatformSchema,
 });
 
 export const TagLimitDataSchema = z.object({
@@ -72,14 +72,14 @@ export const AddTagParamsSchema = z.object({
 });
 
 export const CheckTagLimitsParamsSchema = z.object({
-  taggerRecord: z.custom<AnonSocialUser>(),
+  taggerRecord: z.custom<AnonUser>(),
   targetHasTag: z.boolean(),
 });
 
 export const TagUserParamsSchema = z.object({
   taggerUsername: z.string(),
   targetUsername: z.string(),
-  platform: TagPlatformSchema.default("x"),
+  platform: SocialPlatformSchema.default("x"),
   tagType: z.string(),
 });
 
@@ -88,7 +88,7 @@ export const TagUserRequestSchema = z.object({
   body: z.object({
     taggerUsername: z.string(),
     targetUsername: z.string(),
-    platform: TagPlatformSchema.default("x"),
+    platform: SocialPlatformSchema.default("x"),
     tagType: z.string(),
   }),
 });
@@ -104,7 +104,7 @@ export const GetUserTagsSchema = z.object({
     username: z.string(),
   }),
   query: z.object({
-    platform: TagPlatformSchema.optional(),
+    platform: SocialPlatformSchema.optional(),
   }),
   body: z.object({}).optional(),
 });
@@ -126,7 +126,7 @@ export type TagLeaderboardEntry = z.infer<typeof TagLeaderboardEntrySchema>;
 export type TagLeaderboardResponse = z.infer<typeof TagLeaderboardResponseSchema>;
 export type TagStats = z.infer<typeof TagStatsSchema>;
 export type TagType = (typeof ALLOWED_TAG_TYPES)[keyof typeof ALLOWED_TAG_TYPES];
-export type TagPlatform = z.infer<typeof TagPlatformSchema>;
+export type TagPlatform = z.infer<typeof SocialPlatformSchema>;
 // Request Types
 export type TagUserRequest = z.infer<typeof TagUserRequestSchema>;
 export type GetUserTagsRequest = z.infer<typeof GetUserTagsSchema>;
