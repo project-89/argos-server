@@ -1,7 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ApiError, toUnixMillis } from "../utils";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
-import { skillMatchingService } from "./skillMatching.service";
+import { skillMatchingService } from ".";
 import {
   Skill,
   ProfileCapability,

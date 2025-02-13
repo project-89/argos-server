@@ -1,13 +1,7 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import {
-  Account,
-  CreateAccountRequest,
-  UpdateAccountRequest,
-  AccountResponse,
-  TransitoryFingerprint,
-} from "../schemas";
-import { ApiError } from "../utils/error";
+import { Account, CreateAccountRequest, UpdateAccountRequest, AccountResponse } from "../schemas";
+import { ApiError, verifySignature } from "../utils";
 import { getFingerprintById } from ".";
 
 export const createAccount = async (request: CreateAccountRequest): Promise<AccountResponse> => {
@@ -15,11 +9,13 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
     const db = getFirestore();
     const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
 
-    const {
-      walletAddress,
-      fingerprintId: requestedFingerprintId,
-      transitoryFingerprintId,
-    } = request.body;
+    const { walletAddress, fingerprintId, signature, message, onboardingId } = request.body;
+
+    // Verify wallet signature
+    const isValidSignature = await verifySignature(signature, walletAddress, message);
+    if (!isValidSignature) {
+      throw new ApiError(400, ERROR_MESSAGES.INVALID_SIGNATURE);
+    }
 
     // Check if account with wallet address already exists
     const existingAccount = await getAccountByWalletAddress(walletAddress);
@@ -27,47 +23,36 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
       throw new ApiError(400, ERROR_MESSAGES.ACCOUNT_ALREADY_EXISTS);
     }
 
-    let finalFingerprintId = requestedFingerprintId;
+    // Get onboarding progress to verify social identity
+    const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
+    const onboardingDoc = await onboardingRef.get();
 
-    // If transitoryFingerprintId is provided, verify and link it
-    if (transitoryFingerprintId) {
-      const transitoryRef = db
-        .collection(COLLECTIONS.TRANSITORY_FINGERPRINTS)
-        .doc(transitoryFingerprintId);
-      const transitoryDoc = await transitoryRef.get();
+    if (!onboardingDoc.exists) {
+      throw new ApiError(404, ERROR_MESSAGES.ONBOARDING_NOT_FOUND);
+    }
 
-      if (!transitoryDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.TRANSITORY_FINGERPRINT_NOT_FOUND);
-      }
+    const onboarding = onboardingDoc.data();
+    if (!onboarding) {
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
 
-      const transitoryData = transitoryDoc.data() as TransitoryFingerprint;
+    if (onboarding.stage !== "wallet_created") {
+      throw new ApiError(400, ERROR_MESSAGES.INVALID_MISSION_ORDER);
+    }
 
-      // If the transitory fingerprint has a linked fingerprint, use that
-      if (transitoryData.linkedFingerprintId) {
-        finalFingerprintId = transitoryData.linkedFingerprintId;
-      }
-
-      // Update transitory fingerprint status
-      await transitoryRef.update({
-        status: "claimed",
-        claimedAt: Timestamp.now(),
-        walletAddress,
-      });
+    if (onboarding.fingerprintId !== fingerprintId) {
+      throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_MISMATCH);
     }
 
     // Verify fingerprint exists
-    if (!finalFingerprintId) {
-      throw new ApiError(400, ERROR_MESSAGES.MISSING_FINGERPRINT);
-    }
-
-    const fingerprint = await getFingerprintById(finalFingerprintId);
+    const fingerprint = await getFingerprintById(fingerprintId);
     if (!fingerprint) {
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
     // Check if fingerprint is already linked to another account
     const existingAccountWithFingerprint = await accountsRef
-      .where("fingerprintId", "==", finalFingerprintId)
+      .where("fingerprintId", "==", fingerprintId)
       .limit(1)
       .get();
 
@@ -76,21 +61,45 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
     }
 
     const now = Timestamp.now();
+
+    // Get the verified social identity from onboarding
+    const verifiedIdentity = onboarding.metadata?.verifiedSocialIdentity;
+    if (!verifiedIdentity) {
+      throw new ApiError(400, ERROR_MESSAGES.SOCIAL_IDENTITY_REQUIRED);
+    }
+
+    // Create the account with verified social identity
     const account: Omit<Account, "id"> = {
       walletAddress,
-      fingerprintId: finalFingerprintId,
+      fingerprintId,
       createdAt: now,
       lastLogin: now,
       status: "active",
+      anonUserId: verifiedIdentity.anonUserId,
       metadata: {},
     };
 
     const docRef = await accountsRef.add(account);
 
     // Update the fingerprint with the account ID
-    await db.collection(COLLECTIONS.FINGERPRINTS).doc(finalFingerprintId).update({
+    await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).update({
       accountId: docRef.id,
       walletAddress,
+    });
+
+    // Update the anon social user record
+    await db.collection(COLLECTIONS.ANON_USERS).doc(verifiedIdentity.anonUserId).update({
+      status: "claimed",
+      linkedAccountId: docRef.id,
+      claimedAt: now,
+      updatedAt: now,
+    });
+
+    // Update onboarding status
+    await onboardingRef.update({
+      stage: "hivemind_connected",
+      accountId: docRef.id,
+      updatedAt: now,
     });
 
     return formatAccountResponse({ id: docRef.id, ...account });
@@ -186,10 +195,13 @@ export const updateAccount = async ({
   }
 };
 
-export const verifyAccountOwnership = async (
-  accountId: string,
-  walletAddress: string,
-): Promise<boolean> => {
+export const verifyAccountOwnership = async ({
+  accountId,
+  walletAddress,
+}: {
+  accountId: string;
+  walletAddress: string;
+}): Promise<boolean> => {
   try {
     const account = await getAccountById(accountId);
     return account?.walletAddress === walletAddress;
