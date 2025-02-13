@@ -11,3 +11,4 @@ export * from "./role.endpoint";
 export * from "./stats.endpoint";
 export * from "./tag.endpoint";
 export * from "./mission.endpoint";
+export * from "./onboarding.endpoint";
