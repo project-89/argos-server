@@ -7,6 +7,8 @@ export const COLLECTIONS = {
   RATE_LIMIT_STATS: "rate-limit-stats",
   TAG_RULES: "tag-rules",
   TAG_STATS: "tag-stats",
+  TAG_EVENTS: "tag-events",
+  TAG_EVENT_VISITS: "tag-event-visits",
   PRICE_CACHE: "price-cache",
   SITES: "sites",
   IMPRESSIONS: "impressions",
@@ -19,8 +21,9 @@ export const COLLECTIONS = {
   SKILLS: "skills",
   PROFILE_CAPABILITIES: "profile-capabilities",
   ACCOUNTS: "accounts",
-  TRANSITORY_FINGERPRINTS: "transitory-fingerprints",
+  ANON_USERS: "anon-users",
   MISSIONS: "missions",
+  ONBOARDING: "onboarding",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
