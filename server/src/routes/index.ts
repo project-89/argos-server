@@ -12,6 +12,7 @@ import impressionRoutes from "./impression.routes";
 import capabilityRoutes from "./capability.routes";
 import profileRoutes from "./profile.routes";
 import statsRoutes from "./stats.routes";
+import onboardingRoutes from "./onboarding.routes";
 
 const router = Router();
 
@@ -36,5 +37,6 @@ router.use(impressionRoutes); // /impressions/*
 router.use(capabilityRoutes); // /capabilities/*
 router.use(profileRoutes); // /profiles/*
 router.use(statsRoutes); // /stats/*
+router.use(onboardingRoutes); // /onboarding/*
 
 export default router;

@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { protectedEndpoint } from "../middleware/chains.middleware";
+import { protectedEndpoint } from "../middleware";
 import {
   CapabilityCreateSchema,
   CapabilityGetSchema,
