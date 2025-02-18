@@ -1,0 +1,84 @@
+{
+  "projectRoot": "/Users/jakobgrant/Workspaces/Oneirocom/argos-server",
+  "sourceRoot": "server/src",
+  "structure": {
+    "server": {
+      "src": {
+        "config": "Firebase and other configuration",
+        "constants": {
+          "database": "Collection names and database constants",
+          "features": "Feature-specific constants",
+          "http": "Error messages and HTTP-related constants"
+        },
+        "endpoints": "Express endpoint handlers, pure request/response logic",
+        "middleware": "Express middleware (auth, validation, etc)",
+        "routes": "Express route definitions and middleware chains",
+        "schemas": {
+          "patterns": [
+            "Zod schemas for validation",
+            "Each schema file exports both schema and inferred TypeScript types",
+            "Common schemas are reused via imports",
+            "Follows pattern: EntitySchema, EntityRequestSchema, EntityResponseSchema"
+          ]
+        },
+        "services": {
+          "patterns": [
+            "Business logic layer",
+            "Firestore interactions",
+            "Error handling with ApiError",
+            "Logging with consistent prefixes",
+            "Transaction management"
+          ]
+        },
+        "types": "TypeScript type definitions",
+        "utils": "Shared utility functions"
+      },
+      "config": {
+        "eslint": "ESLint configuration",
+        "jest": "Jest test configuration",
+        "typescript": "TypeScript configuration"
+      },
+      "docs": "Documentation files",
+      "env": "Environment configuration files"
+    }
+  },
+  "patterns": {
+    "validation": {
+      "schema": "Zod schemas in schema/ define types and validation",
+      "middleware": "validateRequest middleware uses schemas",
+      "errors": "Consistent error messages from constants/http/errors.ts"
+    },
+    "authentication": {
+      "middleware": "protectedEndpoint and fingerprintWriteEndpoint chains",
+      "firestore": "Rules in firestore.rules match middleware security"
+    },
+    "database": {
+      "collections": "Defined in constants/database/collections.ts",
+      "transactions": "Used for multi-document updates",
+      "timestamps": "Firestore Timestamps used consistently"
+    },
+    "error_handling": {
+      "class": "ApiError extends Error",
+      "format": "ERROR_MESSAGES constants used",
+      "wrapping": "ApiError.from() wraps unknown errors"
+    },
+    "logging": {
+      "format": "[Service Name] Action: details",
+      "errors": "console.error with full error context"
+    }
+  },
+  "conventions": {
+    "files": {
+      "naming": "lowercase with dots for type (service.ts, schema.ts, etc)",
+      "exports": "Both types and values exported when applicable"
+    },
+    "functions": {
+      "async": "All Firebase interactions are async/await",
+      "errors": "Always wrapped in try/catch with ApiError"
+    },
+    "types": {
+      "schemas": "Zod schemas with inferred TypeScript types",
+      "requests": "Include body, query, and params objects"
+    }
+  }
+}

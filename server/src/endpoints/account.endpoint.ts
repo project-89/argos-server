@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { ApiError } from "../utils";
+import { ApiError, sendSuccess, sendError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 import {
   createAccount,
@@ -8,51 +8,65 @@ import {
   updateAccount,
 } from "../services";
 
+const LOG_PREFIX = "[Account Endpoint]";
+
 export const handleCreateAccount = async (req: Request, res: Response) => {
   try {
+    console.log(`${LOG_PREFIX} Starting account creation`);
     const account = await createAccount(req.body);
-    res.status(201).json(account);
+    console.log(`${LOG_PREFIX} Successfully created account:`, { id: account.id });
+    return sendSuccess(res, account, "Account created successfully", 201);
   } catch (error) {
-    throw ApiError.from(error, 400, ERROR_MESSAGES.INVALID_INPUT);
+    console.error(`${LOG_PREFIX} Error creating account:`, error);
+    return sendError(res, ApiError.from(error, 400, ERROR_MESSAGES.INVALID_INPUT));
   }
 };
 
 export const handleGetAccount = async (req: Request, res: Response) => {
   try {
+    console.log(`${LOG_PREFIX} Starting account retrieval`);
     const { id } = req.params;
     const account = await getAccountById(id);
 
     if (!account) {
-      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
+      return sendError(res, new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND));
     }
 
-    res.json(account);
+    console.log(`${LOG_PREFIX} Successfully retrieved account:`, { id });
+    return sendSuccess(res, account);
   } catch (error) {
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    console.error(`${LOG_PREFIX} Error retrieving account:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
   }
 };
 
 export const handleGetAccountByWallet = async (req: Request, res: Response) => {
   try {
+    console.log(`${LOG_PREFIX} Starting account retrieval by wallet`);
     const { walletAddress } = req.params;
     const account = await getAccountByWalletAddress(walletAddress);
 
     if (!account) {
-      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
+      return sendError(res, new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND));
     }
 
-    res.json(account);
+    console.log(`${LOG_PREFIX} Successfully retrieved account by wallet:`, { walletAddress });
+    return sendSuccess(res, account);
   } catch (error) {
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    console.error(`${LOG_PREFIX} Error retrieving account by wallet:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
   }
 };
 
 export const handleUpdateAccount = async (req: Request, res: Response) => {
   try {
+    console.log(`${LOG_PREFIX} Starting account update`);
     const { id } = req.params;
     const account = await updateAccount({ accountId: id, request: req.body });
-    res.json(account);
+    console.log(`${LOG_PREFIX} Successfully updated account:`, { id });
+    return sendSuccess(res, account, "Account updated successfully");
   } catch (error) {
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    console.error(`${LOG_PREFIX} Error updating account:`, error);
+    return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR));
   }
 };

@@ -46,7 +46,7 @@ export const startOnboarding = async (
   try {
     const db = getFirestore();
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING);
-    const { fingerprintId } = request;
+    const { fingerprintId, platform } = request.body;
 
     // Verify fingerprint exists
     const fingerprint = await getFingerprintById(fingerprintId);
@@ -54,19 +54,9 @@ export const startOnboarding = async (
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    // Check if onboarding already exists for this fingerprint
-    const existingOnboarding = await onboardingRef
-      .where("fingerprintId", "==", fingerprintId)
-      .where("stage", "!=", "hivemind_connected")
-      .limit(1)
-      .get();
-
-    if (!existingOnboarding.empty) {
-      const doc = existingOnboarding.docs[0];
-      return { id: doc.id, ...doc.data() } as OnboardingProgress;
-    }
-
     const now = Timestamp.now();
+
+    // Create initial onboarding progress
     const onboarding: Omit<OnboardingProgress, "id"> = {
       fingerprintId,
       stage: "initial",
@@ -99,7 +89,8 @@ export const startOnboarding = async (
 export const verifyMission = async (request: VerifyMissionRequest): Promise<OnboardingProgress> => {
   try {
     const db = getFirestore();
-    const { onboardingId, missionId, proof } = request;
+    const { onboardingId } = request.params;
+    const { missionId, proof, metadata } = request.body;
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
 
     const doc = await onboardingRef.get();
@@ -289,7 +280,8 @@ export const completeOnboarding = async (
 ): Promise<OnboardingProgress> => {
   try {
     const db = getFirestore();
-    const { onboardingId, walletAddress, signature } = request;
+    const { onboardingId } = request.params;
+    const { walletAddress, signature, message, timestamp } = request.body;
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
 
     const doc = await onboardingRef.get();

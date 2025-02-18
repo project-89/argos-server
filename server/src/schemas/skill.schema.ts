@@ -40,7 +40,7 @@ export const SkillMatchSchema = z.object({
 });
 
 // Request/Response Validation Schemas
-export const SkillSearchSchema = z.object({
+export const SkillSearchRequestSchema = z.object({
   params: z.object({}).optional(),
   body: z.object({}).optional(),
   query: z.object({
@@ -49,8 +49,50 @@ export const SkillSearchSchema = z.object({
   }),
 });
 
-export const AnalyzeSkillInputSchema = z.object({
-  description: z.string(),
+export const AnalyzeSkillRequestSchema = z.object({
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+  body: z.object({
+    description: z.string(),
+  }),
+});
+
+export const CreateSkillRequestSchema = z.object({
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+  body: z.object({
+    name: z.string(),
+    description: z.string().optional(),
+    type: z.string(),
+    category: z.string(),
+    parentType: z.string().optional(),
+    keywords: z.array(z.string()),
+    aliases: z.array(z.string()),
+  }),
+});
+
+export const UpdateSkillRequestSchema = z.object({
+  params: z.object({
+    skillId: z.string(),
+  }),
+  query: z.object({}).optional(),
+  body: z.object({
+    name: z.string().optional(),
+    description: z.string().optional(),
+    type: z.string().optional(),
+    category: z.string().optional(),
+    parentType: z.string().optional(),
+    keywords: z.array(z.string()).optional(),
+    aliases: z.array(z.string()).optional(),
+  }),
+});
+
+export const DeleteSkillRequestSchema = z.object({
+  params: z.object({
+    skillId: z.string(),
+  }),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
 });
 
 export const AnalyzeSkillResponseSchema = z.object({
@@ -65,5 +107,9 @@ export const AnalyzeSkillResponseSchema = z.object({
 export type Skill = z.infer<typeof SkillSchema>;
 export type SkillAnalysis = z.infer<typeof SkillAnalysisSchema>;
 export type SkillMatch = z.infer<typeof SkillMatchSchema>;
-export type AnalyzeSkillInput = z.infer<typeof AnalyzeSkillInputSchema>;
+export type SkillSearchRequest = z.infer<typeof SkillSearchRequestSchema>;
+export type AnalyzeSkillRequest = z.infer<typeof AnalyzeSkillRequestSchema>;
+export type CreateSkillRequest = z.infer<typeof CreateSkillRequestSchema>;
+export type UpdateSkillRequest = z.infer<typeof UpdateSkillRequestSchema>;
+export type DeleteSkillRequest = z.infer<typeof DeleteSkillRequestSchema>;
 export type AnalyzeSkillResponse = z.infer<typeof AnalyzeSkillResponseSchema>;

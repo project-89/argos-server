@@ -99,6 +99,78 @@ export const LinkParamsSchema = z.object({
   linkedId: z.string(),
 });
 
+// Request Validation Schemas
+export const FindAnonUserRequestSchema = z.object({
+  params: z.object({
+    hashedUsername: z.string(),
+  }),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
+});
+
+export const FindAnonUserByUsernameRequestSchema = z.object({
+  body: z.object({
+    hashedUsername: z.string(),
+    platform: SocialPlatformSchema,
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+});
+
+export const CreateAnonUserRequestSchema = z.object({
+  body: z.object({
+    hashedUsername: z.string(),
+    platform: SocialPlatformSchema,
+    discoveryInfo: DiscoveryInfoSchema,
+    initialTagLimits: z.boolean().optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+});
+
+export const UpdateAnonUserDiscoveryRequestSchema = z.object({
+  params: z.object({
+    userId: z.string(),
+  }),
+  body: z.object({
+    platform: SocialPlatformSchema,
+    discoveryInfo: DiscoveryInfoSchema,
+  }),
+  query: z.object({}).optional(),
+});
+
+export const HandleSocialUserRequestSchema = z.object({
+  body: z.object({
+    hashedUsername: z.string(),
+    platform: SocialPlatformSchema,
+    discoveryInfo: DiscoveryInfoSchema,
+    initialTagLimits: z.boolean().optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+});
+
+export const UpdateStatusRequestSchema = z.object({
+  params: z.object({
+    userId: z.string(),
+  }),
+  body: z.object({
+    status: StatusSchema,
+    metadata: z.record(z.any()).optional(),
+  }),
+  query: z.object({}).optional(),
+});
+
+export const LinkRequestSchema = z.object({
+  params: z.object({
+    userId: z.string(),
+  }),
+  body: z.object({
+    linkedId: z.string(),
+  }),
+  query: z.object({}).optional(),
+});
+
 // Export domain types
 export type SocialPlatform = z.infer<typeof SocialPlatformSchema>;
 export type Action = z.infer<typeof ActionSchema>;
@@ -120,3 +192,12 @@ export type UpdateAnonUserDiscovery = z.infer<typeof UpdateAnonUserDiscoverySche
 export type HandleSocialUser = z.infer<typeof HandleSocialUserSchema>;
 export type UpdateStatusParams = z.infer<typeof UpdateStatusParamsSchema>;
 export type LinkParams = z.infer<typeof LinkParamsSchema>;
+
+// Export request types
+export type FindAnonUserRequest = z.infer<typeof FindAnonUserRequestSchema>;
+export type FindAnonUserByUsernameRequest = z.infer<typeof FindAnonUserByUsernameRequestSchema>;
+export type CreateAnonUserRequest = z.infer<typeof CreateAnonUserRequestSchema>;
+export type UpdateAnonUserDiscoveryRequest = z.infer<typeof UpdateAnonUserDiscoveryRequestSchema>;
+export type HandleSocialUserRequest = z.infer<typeof HandleSocialUserRequestSchema>;
+export type UpdateStatusRequest = z.infer<typeof UpdateStatusRequestSchema>;
+export type LinkRequest = z.infer<typeof LinkRequestSchema>;

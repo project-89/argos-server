@@ -1,123 +1,94 @@
 # Argos Server
 
-A Firebase Functions-based API server for fingerprinting, visit tracking, and pricing operations.
+The Argos Server is an open-source API service designed to power and manage Alternate Reality Game (ARG) experiences. Built by Project89, it provides a robust backend for creating, managing, and orchestrating interactive narrative experiences that blur the line between fiction and reality.
 
-## Overview
+## 🎮 Overview
 
-Argos Server provides a secure and scalable API for:
-- Browser fingerprinting and tracking
-- Visit and presence monitoring
-- Price data aggregation
-- Role-based access control
-- Reality stability tracking
-- Analytics and impressions
+Argos enables ARG creators and players to:
+- Create and manage complex narrative experiences
+- Track player interactions and progress
+- Manage player fingerprinting and identity verification
+- Orchestrate real-time game events and triggers
+- Monitor and analyze player engagement
+- Scale experiences from small groups to massive audiences
 
-## System Architecture
+Built with Node.js, Express, and Firebase, and running on Google Cloud Platform, Argos provides the infrastructure needed to run sophisticated ARG experiences while maintaining player immersion and game integrity.
 
-### Core Components
-- Firebase Functions (Node.js 18)
-- Firestore Database
-- Cloud Scheduler
-- Cloud Pub/Sub
-- In-memory Caching
+## 🚀 Quick Start for Contributors
 
-### Request Flow
-1. All requests go through CORS and basic Express middleware
-2. Requests are routed to one of three routers:
-   - Public Router: No auth required, rate-limited
-   - Protected Router: Requires API key, ownership verification
-   - Admin Router: Requires API key and admin role
+Most contributors will want to focus on the API development in the `server` directory. Here's how to get started:
 
-### Security Features
-- API key authentication
-- Role-based access control
-- Resource ownership verification
-- IP-based rate limiting
-- Request validation
-- Data encryption
-
-## Infrastructure
-
-### Cloud Services
-- **Firebase Functions**: API endpoints and business logic
-- **Firestore**: Document database for all data
-- **Cloud Scheduler**: Automated maintenance tasks
-- **Cloud Pub/Sub**: Event handling and async operations
-- **Firebase Auth**: (Optional) User authentication
-
-### System Requirements
-- Node.js 18+
-- Firebase CLI
-- Google Cloud SDK
-- Terraform (optional, for infrastructure management)
-
-## Getting Started
-
-### Local Development Setup
-1. Clone the repository
+1. **Prerequisites**
    ```bash
-   git clone <repository-url>
+   # Install Node.js 18 or higher
+   node --version
+
+   # Install Firebase CLI
+   npm install -g firebase-tools
+
+   # Login to Firebase (needed for emulators)
+   firebase login
+   ```
+
+2. **Setup Project**
+   ```bash
+   # Clone the repository
+   git clone https://github.com/project89/argos-server.git
    cd argos-server
-   ```
 
-2. Install dependencies
-   ```bash
+   # Install dependencies
    npm install
-   cd functions
-   npm install
+
+   # Copy environment template
+   cp server/env/.env.development.template server/env/.env.development
    ```
 
-3. Set up environment variables
+3. **Run Development Environment**
    ```bash
-   cp .env.template .env
-   cp functions/.env.development .env.development
+   # Start Firebase emulators and API server
+   npm run serve
    ```
 
-4. Start development server
-   ```bash
-   firebase emulators:start
-   ```
+The API will be available at `http://localhost:5001` with Firebase emulators running locally.
 
-### Environment Configuration
-Required environment variables:
-- `FIREBASE_PROJECT_ID`: Your Firebase project ID
-- `FIREBASE_REGION`: Deployment region (default: us-central1)
-- `COINGECKO_API_KEY`: API key for price data
-- `ALLOWED_ORIGINS`: Comma-separated list of allowed CORS origins
-- `RATE_LIMIT_DISABLED`: Disable rate limiting (development only)
-- `IP_RATE_LIMIT_DISABLED`: Disable IP-based rate limiting (development only)
+## 🔧 Development Guides
 
-### Deployment
-1. Build the project
-   ```bash
-   cd functions
-   npm run build
-   ```
+The documentation is organized into two main locations:
 
-2. Deploy to Firebase
-   ```bash
-   firebase deploy --only functions
-   ```
+1. `/docs/` - Repository-level documentation:
+   - [System Architecture](docs/ARCHITECTURE.md) - Overview of core systems and data flows
+   - [Infrastructure Guide](docs/INFRASTRUCTURE.md) - Setting up GCP and Terraform
+   - [HiveMind Overview](docs/HIVEMIND.md) - High-level HiveMind concepts
 
-## Documentation
+2. `/server/docs/` - Server implementation documentation:
+   - [Server Development Guide](server/docs/DEVELOPMENT.md) - Detailed guide for API development
+   - [API Types Documentation](server/docs/HIVEMIND_TYPES.md) - API type definitions and schemas
+   - [Server README](server/docs/README.md) - Server-specific setup and guidelines
 
-- [API Documentation](functions/README.md): Detailed API endpoints and usage
-- [Development Guidelines](DEVELOPMENT.md): Development rules and best practices
-- [Contributing Guidelines](CONTRIBUTING.md): How to contribute to the project
+## 🏗️ Infrastructure Setup
 
-## Contributing
+For core developers who need to work with the infrastructure:
 
-1. Follow existing patterns
-2. Write tests for new features
-3. Update documentation
-4. Run full test suite before submitting
-5. Follow file naming conventions:
-   - Services: `*.service.ts`
-   - Middleware: `*.middleware.ts`
-   - Endpoints: `*.endpoint.ts`
+- [Infrastructure Guide](docs/INFRASTRUCTURE.md) - Setting up GCP and Terraform
+- [Deployment Guide](docs/DEPLOYMENT.md) - Deploying to production
+- [Security Guide](docs/SECURITY.md) - Security best practices and configuration
 
-## License
+## 📝 Contributing
 
-MIT License - see [LICENSE](LICENSE) for details.
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
-This is an open source project by Oneirocom.
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Support
+
+- Create an issue for bug reports or feature requests
+- Join our [Discord community](https://discord.gg/your-discord) for discussions
+- Check out our [Documentation](https://docs.your-domain.com) for more details

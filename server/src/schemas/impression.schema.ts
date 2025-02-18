@@ -22,6 +22,8 @@ export const CreateImpressionSchema = z.object({
     source: z.string().optional(),
     sessionId: z.string().optional(),
   }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
 export const GetImpressionsSchema = z.object({
@@ -35,6 +37,7 @@ export const GetImpressionsSchema = z.object({
     limit: z.coerce.number().int().positive().optional(),
     sessionId: z.string().optional(),
   }),
+  body: z.object({}).optional(),
 });
 
 export const DeleteImpressionsSchema = z.object({
@@ -47,6 +50,7 @@ export const DeleteImpressionsSchema = z.object({
     endTime: z.string().datetime().optional(),
     sessionId: z.string().optional(),
   }),
+  body: z.object({}).optional(),
 });
 
 export type Impression = z.infer<typeof ImpressionSchema>;

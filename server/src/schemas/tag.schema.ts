@@ -85,12 +85,15 @@ export const TagUserParamsSchema = z.object({
 
 // Request/Response schemas
 export const TagUserRequestSchema = z.object({
+  params: z.object({
+    tagType: z.string(),
+  }),
   body: z.object({
     taggerUsername: z.string(),
     targetUsername: z.string(),
     platform: SocialPlatformSchema.default("x"),
-    tagType: z.string(),
   }),
+  query: z.object({}).optional(),
 });
 
 export const TagResponseSchema = z.object({
@@ -110,13 +113,13 @@ export const GetUserTagsSchema = z.object({
 });
 
 export const GetTagLeaderboardSchema = z.object({
+  params: z.object({}).optional(),
   query: z.object({
     timeFrame: TagTimeFrameSchema.optional(),
     limit: z.number().min(1).max(100).optional(),
     offset: z.number().min(0).optional(),
   }),
   body: z.object({}).optional(),
-  params: z.object({}).optional(),
 });
 
 // Type Exports

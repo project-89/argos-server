@@ -92,29 +92,45 @@ export const OnboardingProgressSchema = z.object({
 });
 
 export const StartOnboardingRequestSchema = z.object({
-  fingerprintId: z.string(),
-  platform: SocialPlatformSchema.optional(),
+  body: z.object({
+    fingerprintId: z.string(),
+    platform: SocialPlatformSchema.optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
 });
 
 export const VerifyMissionRequestSchema = z.object({
-  onboardingId: z.string(),
-  missionId: z.string(),
-  proof: VerificationProofSchema,
-  metadata: z.record(z.any()).optional(),
+  params: z.object({
+    onboardingId: z.string(),
+  }),
+  body: z.object({
+    missionId: z.string(),
+    proof: VerificationProofSchema,
+    metadata: z.record(z.any()).optional(),
+  }),
+  query: z.object({}).optional(),
 });
 
 export const CompleteOnboardingRequestSchema = z.object({
-  onboardingId: z.string(),
-  walletAddress: z.string(),
-  signature: z.string(),
-  message: z.string(),
-  timestamp: z.number(),
+  params: z.object({
+    onboardingId: z.string(),
+  }),
+  body: z.object({
+    walletAddress: z.string(),
+    signature: z.string(),
+    message: z.string(),
+    timestamp: z.number(),
+  }),
+  query: z.object({}).optional(),
 });
 
 export const GetOnboardingProgressSchema = z.object({
   params: z.object({
     onboardingId: z.string(),
   }),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
 });
 
 export const OnboardingStatusResponseSchema = z.object({

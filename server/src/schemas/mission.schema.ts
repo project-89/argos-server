@@ -1,20 +1,11 @@
 import { z } from "zod";
 import { ROLE } from "../constants";
+import { TimestampSchema } from ".";
 
 // Enums
 export const MissionTypeEnum = z.enum(["single", "multi"]);
 
-export const MissionStatusEnum = z.enum([
-  "available",
-  "pending_stake",
-  "active",
-  "in_progress",
-  "pending_validation",
-  "in_validation",
-  "completed",
-  "failed",
-  "expired",
-]);
+export const MissionStatusEnum = z.enum(["available", "active", "completed", "failed", "archived"]);
 
 export const ParticipantTypeEnum = z.enum(["human", "agent", "any"]);
 
@@ -69,19 +60,9 @@ export const VerificationRequirementSchema = z.object({
 
 export const MissionObjectiveSchema = z.object({
   id: z.string(),
-  task: z.string(),
-  details: z.string(),
-  verification: VerificationRequirementSchema.optional(),
-  completed: z.boolean().optional(),
-  verifiedAt: z.number().optional(),
-  verificationData: z
-    .object({
-      type: VerificationTypeEnum,
-      data: z.any(),
-      verifiedBy: z.string().optional(),
-      verificationNotes: z.string().optional(),
-    })
-    .optional(),
+  description: z.string(),
+  completed: z.boolean(),
+  completedAt: TimestampSchema.optional(),
 });
 
 export const FailureConditionSchema = z.object({
@@ -134,7 +115,8 @@ export const BaseMissionSchema = z.object({
   title: z.string(),
   description: z.string(),
   status: MissionStatusEnum,
-  createdAt: z.number(),
+  createdAt: TimestampSchema,
+  updatedAt: TimestampSchema,
   expiryDate: z.number(),
   escrowAddress: z.string(),
   createdBy: z.string(),
@@ -164,8 +146,8 @@ export const MissionHistoryFieldsSchema = z.object({
   reward: z.number(),
   xpGained: z.number(),
   teamSize: z.number(),
-  startedAt: z.number(),
-  completedAt: z.number(),
+  startedAt: TimestampSchema,
+  completedAt: TimestampSchema,
   failedAt: z.number().optional(),
   objectives: z.array(MissionObjectiveSchema),
   failureRecords: z.array(FailureRecordSchema).optional(),
@@ -190,3 +172,99 @@ export type MissionObjective = z.infer<typeof MissionObjectiveSchema>;
 export type VerificationRequirement = z.infer<typeof VerificationRequirementSchema>;
 export type FailureCondition = z.infer<typeof FailureConditionSchema>;
 export type FailureRecord = z.infer<typeof FailureRecordSchema>;
+
+// Request validation schemas
+export const CreateMissionRequestSchema = z.object({
+  body: z.object({
+    title: z.string(),
+    description: z.string(),
+    status: MissionStatusEnum,
+    objectives: z.array(MissionObjectiveSchema),
+    startedAt: TimestampSchema.optional(),
+    completedAt: TimestampSchema.optional(),
+    metadata: z.record(z.any()).optional(),
+  }),
+  query: z.object({}).optional(),
+  params: z.object({}).optional(),
+});
+
+export const GetMissionRequestSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
+});
+
+export const GetAvailableMissionsRequestSchema = z.object({
+  params: z.object({}).optional(),
+  query: z.object({
+    limit: z.string().transform(Number).optional(),
+  }),
+  body: z.object({}).optional(),
+});
+
+export const UpdateMissionStatusRequestSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  body: z.object({
+    status: MissionStatusEnum,
+  }),
+  query: z.object({}).optional(),
+});
+
+export const UpdateMissionObjectivesRequestSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  body: z.object({
+    objectives: z.array(MissionObjectiveSchema),
+  }),
+  query: z.object({}).optional(),
+});
+
+export const GetActiveMissionsRequestSchema = z.object({
+  params: z.object({}).optional(),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
+});
+
+export const AddFailureRecordRequestSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  body: z.object({
+    condition: z.object({
+      id: z.string(),
+      description: z.string(),
+      type: z.enum(["Critical", "Standard", "Warning"]),
+      category: z.enum(["performance", "security", "compliance", "technical", "communication"]),
+      severity: z.enum(["Critical", "Standard", "Warning"]).optional(),
+    }),
+    occurredAt: z.number(),
+    details: z.string(),
+    disputed: z.boolean().optional(),
+    disputeDetails: z.string().optional(),
+    disputeStatus: z.enum(["pending", "accepted", "rejected"]).optional(),
+  }),
+  query: z.object({}).optional(),
+});
+
+export const DeleteMissionRequestSchema = z.object({
+  params: z.object({
+    id: z.string(),
+  }),
+  query: z.object({}).optional(),
+  body: z.object({}).optional(),
+});
+
+// Request types
+export type CreateMissionRequest = z.infer<typeof CreateMissionRequestSchema>;
+export type GetMissionRequest = z.infer<typeof GetMissionRequestSchema>;
+export type GetAvailableMissionsRequest = z.infer<typeof GetAvailableMissionsRequestSchema>;
+export type UpdateMissionStatusRequest = z.infer<typeof UpdateMissionStatusRequestSchema>;
+export type UpdateMissionObjectivesRequest = z.infer<typeof UpdateMissionObjectivesRequestSchema>;
+export type GetActiveMissionsRequest = z.infer<typeof GetActiveMissionsRequestSchema>;
+export type AddFailureRecordRequest = z.infer<typeof AddFailureRecordRequestSchema>;
+export type DeleteMissionRequest = z.infer<typeof DeleteMissionRequestSchema>;
