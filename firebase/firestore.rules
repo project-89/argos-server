@@ -130,6 +130,15 @@ service cloud.firestore {
       allow delete: if isInternalService();
     }
 
+    match /onboarding/{onboardingId} {
+      // Anyone can create onboarding with a valid fingerprint
+      allow create: if fingerprintExists(request.resource.data.fingerprintId);
+      // Only the owner of the linked fingerprint can read and update
+      allow read, update: if accountOwnsFingerprint(resource.data.fingerprintId) || isInternalService();
+      // Only internal services can delete
+      allow delete: if isInternalService();
+    }
+
     // Default deny
     match /{document=**} {
       allow read, write: if false;
