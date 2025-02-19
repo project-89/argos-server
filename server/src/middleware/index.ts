@@ -9,6 +9,5 @@ export * from "./fingerprintVerify.middleware";
 export * from "./ipRateLimit.middleware";
 export * from "./metrics.middleware";
 export * from "./profileOwnership.middleware";
-export * from "./roleCheck.middleware";
-export * from "./validation.middleware";
-export * from "./verifyAdmin.middleware";
+export * from "./role.middleware";
+export * from "./agent.middleware";

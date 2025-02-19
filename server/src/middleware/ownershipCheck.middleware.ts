@@ -1,7 +1,8 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils";
-import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
+import { ERROR_MESSAGES, COLLECTIONS, ROLE } from "../constants";
 import { getFirestore } from "firebase-admin/firestore";
+import { Account } from "../schemas";
 
 const LOG_PREFIX = "[Ownership Check]";
 
@@ -28,39 +29,37 @@ export const verifyAccountOwnership = async (req: Request, res: Response, next: 
       return next();
     }
 
-    const { accountId } = req;
-    if (!accountId) {
+    const { account } = req.auth!;
+    if (!account) {
       throw new ApiError(401, ERROR_MESSAGES.TOKEN_REQUIRED);
     }
 
     // Get the target resource IDs
     const targetAccountId = req.params.accountId || req.body.accountId;
     const targetFingerprintId =
-      req.params.fingerprintId ||
-      req.params.id ||
-      req.body.fingerprintId ||
-      req.query.fingerprintId;
+      req.params.fingerprintId || req.body.fingerprintId || req.query.fingerprintId;
 
     console.log(`${LOG_PREFIX} Checking ownership:`, {
       method: req.method,
       path: req.path,
-      accountId,
+      account,
       targetAccountId,
       targetFingerprintId,
     });
 
     // Get the account document
     const db = getFirestore();
-    const accountDoc = await db.collection(COLLECTIONS.ACCOUNTS).doc(accountId).get();
+    const accountDoc = await db.collection(COLLECTIONS.ACCOUNTS).doc(account.id).get();
 
     if (!accountDoc.exists) {
       throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    const accountData = accountDoc.data();
+    const accountData = accountDoc.data() as Account;
+    const isAdmin = req.auth!.fingerprint.roles.includes(ROLE.ADMIN);
 
     // Check if account has admin role - admins bypass all ownership checks
-    if (accountData?.roles?.includes("admin")) {
+    if (isAdmin) {
       console.log(`${LOG_PREFIX} Admin account bypassing ownership check`);
       return next();
     }
@@ -68,7 +67,7 @@ export const verifyAccountOwnership = async (req: Request, res: Response, next: 
     // Case 1: Account/Profile operations
     if (targetAccountId) {
       // For account operations, verify the authenticated user matches the target account
-      if (targetAccountId !== accountId) {
+      if (targetAccountId !== account.id) {
         throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
       }
       return next();
@@ -77,9 +76,9 @@ export const verifyAccountOwnership = async (req: Request, res: Response, next: 
     // Case 2: Fingerprint-based resource operations
     if (targetFingerprintId) {
       // Verify fingerprint exists and is linked to account
-      if (!accountData?.fingerprintIds?.includes(targetFingerprintId)) {
+      if (accountData?.fingerprintId !== targetFingerprintId) {
         console.log(`${LOG_PREFIX} Fingerprint not linked to account`, {
-          accountId,
+          account,
           targetFingerprintId,
         });
         throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);

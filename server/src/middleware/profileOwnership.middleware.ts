@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError, sendError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
-import { profileService } from "../services";
+import { getProfile } from "../services";
 
 const LOG_PREFIX = "[Profile Access Check]";
 
@@ -22,7 +22,7 @@ export const verifyProfileAccess = async (
       return next();
     }
 
-    const callerFingerprintId = req.fingerprintId;
+    const callerFingerprintId = req.auth?.fingerprint.id;
     const profileId = req.params.profileId || req.params.id;
 
     console.log(`${LOG_PREFIX} Checking profile access:`, {
@@ -40,7 +40,7 @@ export const verifyProfileAccess = async (
     }
 
     // Get the profile
-    const profile = await profileService.getProfile(profileId);
+    const profile = await getProfile(profileId);
 
     // Check if the profile belongs to the caller
     if (profile.fingerprintId !== callerFingerprintId) {
@@ -52,7 +52,6 @@ export const verifyProfileAccess = async (
     }
 
     // Add profile to request for downstream use
-    req.profile = profile;
     console.log(`${LOG_PREFIX} Profile access verified`);
 
     next();

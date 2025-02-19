@@ -26,8 +26,12 @@ export const validateAuthToken = async (req: Request, res: Response, next: NextF
       }
 
       // Set account info on request for ownership checks
-      req.accountId = accountId;
-      req.walletAddress = walletAddress;
+      req.auth = {
+        ...req.auth!,
+        account: {
+          id: accountId as string,
+        },
+      };
 
       next();
     } catch (error) {

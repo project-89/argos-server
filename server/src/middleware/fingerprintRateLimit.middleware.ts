@@ -26,7 +26,7 @@ export const fingerprintRateLimit = (config: Partial<RateLimitConfig> = {}) => {
     try {
       const db = getFirestore();
       // Only use the validated fingerprintId from auth middleware
-      const fingerprint = req.fingerprintId;
+      const fingerprint = req.auth?.fingerprint.id;
       const now = Timestamp.now();
       const nowUnix = now.toMillis();
 

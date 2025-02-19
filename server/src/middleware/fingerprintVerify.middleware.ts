@@ -35,7 +35,12 @@ export const verifyFingerprintExists = async (req: Request, res: Response, next:
     }
 
     // Set fingerprintId on request for use in route handlers
-    req.fingerprintId = fingerprintId;
+    req.auth = {
+      fingerprint: {
+        id: fingerprintId,
+        roles: fingerprintDoc.data()?.roles || [],
+      },
+    };
     next();
   } catch (error) {
     next(error);

@@ -48,7 +48,7 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
       console.log(`[IP Rate Limit] Processing request:`, {
         ip,
         path: req.path,
-        fingerprintId: req.fingerprintId,
+        fingerprintId: req.auth?.fingerprint.id,
         timestamp: nowUnix,
       });
 
@@ -94,7 +94,7 @@ export const ipRateLimit = (config: Partial<RateLimitConfig> = {}) => {
 
             // Check for suspicious IP activity
             console.log("[IP Rate Limit] Checking for suspicious IP activity...");
-            const isSuspicious = await checkSuspiciousIP(db, ip, req.fingerprintId, now);
+            const isSuspicious = await checkSuspiciousIP(db, ip, req.auth?.fingerprint.id, now);
             console.log(`[IP Rate Limit] Suspicious IP check result:`, isSuspicious);
 
             if (isSuspicious) {

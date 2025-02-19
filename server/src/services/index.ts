@@ -15,3 +15,4 @@ export * from "./tag.service";
 export * from "./visit.service";
 export * from "./mission.service";
 export * from "./onboarding.service";
+export * from "./agent.service";

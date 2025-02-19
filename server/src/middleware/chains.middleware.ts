@@ -2,11 +2,12 @@ import { RequestHandler } from "express";
 import { ZodSchema } from "zod";
 import {
   verifyFingerprintExists,
-  verifyAdminRole,
   validateRequest,
   verifyAccountOwnership,
   validateAuthToken,
   withMetrics,
+  verifyAdmin,
+  verifyAgent,
 } from ".";
 
 /**
@@ -42,8 +43,15 @@ export const adminEndpoint = (schema?: ZodSchema) => {
   const chain: RequestHandler[] = [
     withMetrics(validateAuthToken, "authValidation"),
     withMetrics(verifyAccountOwnership, "ownershipVerification"),
-    withMetrics(verifyAdminRole, "adminVerification"),
+    withMetrics(verifyAdmin, "adminVerification"),
   ];
+  if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
+  return chain;
+};
+
+// For agent-only endpoints
+export const agentEndpoint = (schema?: ZodSchema) => {
+  const chain: RequestHandler[] = [withMetrics(verifyAgent, "agentVerification")];
   if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
   return chain;
 };

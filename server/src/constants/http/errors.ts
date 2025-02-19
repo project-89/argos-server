@@ -230,6 +230,12 @@ export const ERROR_MESSAGES = {
   ...VALIDATION_ERRORS,
   ...SYSTEM_ERRORS,
   ...FEATURE_ERRORS,
+
+  // Agent errors
+  AGENT_NOT_FOUND: "Agent not found",
+  AGENT_NOT_ACTIVE: "Agent is not active",
+  INSUFFICIENT_CAPABILITIES: "Agent does not have required capabilities",
+  AGENT_AUTHENTICATION_REQUIRED: "Agent authentication required",
 } as const;
 
 export type ErrorMessage = (typeof ERROR_MESSAGES)[keyof typeof ERROR_MESSAGES];

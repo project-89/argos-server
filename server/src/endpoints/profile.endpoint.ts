@@ -1,5 +1,11 @@
 import { Request, Response } from "express";
-import { profileService } from "../services";
+import {
+  createProfile,
+  updateProfile,
+  getProfile,
+  searchProfiles,
+  getProfileByWallet,
+} from "../services";
 import { sendError, sendSuccess, ApiError } from "../utils";
 import { ERROR_MESSAGES, SUCCESS_MESSAGES } from "../constants";
 
@@ -9,7 +15,7 @@ import { ERROR_MESSAGES, SUCCESS_MESSAGES } from "../constants";
 export const handleCreateProfile = async (req: Request, res: Response) => {
   try {
     console.log("[Create Profile] Starting with body:", req.body);
-    const profile = await profileService.createProfile(req.body);
+    const profile = await createProfile(req.body);
     console.log("[Create Profile] Successfully created profile:", { id: profile.id });
     return sendSuccess(res, profile, SUCCESS_MESSAGES.PROFILE_CREATED);
   } catch (error) {
@@ -29,7 +35,7 @@ export const handleCreateProfile = async (req: Request, res: Response) => {
 export const handleGetProfile = async (req: Request, res: Response) => {
   try {
     console.log("[Get Profile] Starting with params:", req.params);
-    const profile = await profileService.getProfile(req.params.id);
+    const profile = await getProfile(req.params.id);
     console.log("[Get Profile] Successfully retrieved profile:", { id: profile.id });
     return sendSuccess(res, profile);
   } catch (error) {
@@ -48,7 +54,7 @@ export const handleGetProfile = async (req: Request, res: Response) => {
 export const handleGetProfileByWallet = async (req: Request, res: Response) => {
   try {
     console.log("[Get Profile By Wallet] Starting with params:", req.params);
-    const profile = await profileService.getProfileByWallet(req.params.walletAddress);
+    const profile = await getProfileByWallet(req.params.walletAddress);
     console.log("[Get Profile By Wallet] Successfully retrieved profile:", { id: profile.id });
     return sendSuccess(res, profile);
   } catch (error) {
@@ -71,7 +77,7 @@ export const handleUpdateProfile = async (req: Request, res: Response) => {
       params: req.params,
       body: req.body,
     });
-    const profile = await profileService.updateProfile(req.params.id, req.body);
+    const profile = await updateProfile(req.params.id, req.body);
     console.log("[Update Profile] Successfully updated profile:", { id: profile.id });
     return sendSuccess(res, profile, "Profile updated successfully");
   } catch (error) {
@@ -86,21 +92,20 @@ export const handleUpdateProfile = async (req: Request, res: Response) => {
 };
 
 /**
- * Search for profiles based on various criteria
+ * Search profiles
  */
 export const handleSearchProfiles = async (req: Request, res: Response) => {
   try {
     console.log("[Search Profiles] Starting with query:", req.query);
-    const { profiles, total } = await profileService.searchProfiles(req.query);
-    console.log("[Search Profiles] Found profiles:", { count: profiles.length, total });
-    return sendSuccess(res, { profiles, total });
+    const results = await searchProfiles(req.query);
+    console.log("[Search Profiles] Found profiles:", { total: results.total });
+    return sendSuccess(res, results);
   } catch (error) {
     console.error("[Search Profiles] Error:", {
       error,
       stack: error instanceof Error ? error.stack : undefined,
       query: req.query,
     });
-
     return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_SEARCH_PROFILES));
   }
 };

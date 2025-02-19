@@ -24,6 +24,7 @@ export const COLLECTIONS = {
   ANON_USERS: "anon-users",
   MISSIONS: "missions",
   ONBOARDING: "onboarding",
+  AGENTS: "agents",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];
