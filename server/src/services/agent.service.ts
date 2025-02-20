@@ -1,7 +1,8 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Agent, AgentState, RegisterAgentRequest } from "../schemas";
-import { ApiError } from "../utils";
+import { ApiError, verifySignature } from "../utils";
+import { validateInvite, useInvite } from "./agentInvite.service";
 
 import { createAccount, createProfile } from ".";
 
@@ -12,22 +13,24 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
   try {
     console.log(`${LOG_PREFIX} Registering new agent:`, request.name);
 
-    // Create base account for the agent
-    const accountId = generateId();
-    const now = Timestamp.now();
+    // Validate invite code first
+    await validateInvite(request.inviteCode);
 
-    // Create agent document
+    const now = Timestamp.now();
+    const agentRef = db.collection(COLLECTIONS.AGENTS).doc();
+
     const agent: Agent = {
-      id: accountId,
+      id: agentRef.id,
       name: request.name,
       description: request.description,
       version: request.version,
       source: request.source,
       capabilities: request.capabilities,
       state: {
-        isAvailable: true,
+        isAvailable: false,
         lastActiveAt: now,
-        status: "idle",
+        status: "pending",
+        runtime: "offline",
         performance: {
           successRate: 0,
           completedMissions: 0,
@@ -36,39 +39,106 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
           reputationScore: 0,
         },
       },
-      identity: request.identity,
-      integration: request.integration || {},
+      identity: {
+        isActivated: false,
+      },
+      connection: request.connection,
+      missionHistory: {
+        totalMissions: 0,
+        completedMissions: 0,
+        failedMissions: 0,
+        activeMissionIds: [],
+      },
       metadata: request.metadata || {},
       createdAt: now,
       updatedAt: now,
     };
 
-    // Create agent profile
-    await createProfile({
-      fingerprintId: accountId, // Using accountId as fingerprintId for agents
-      username: request.name,
-      bio: request.description,
-      avatarUrl: "",
-      contactInfo: {},
-      preferences: {},
-    });
-
-    // Create agent account
-    await createAccount({
-      signature: "", // Agents might use different auth mechanism
-      message: "",
-      fingerprintId: accountId,
-      onboardingId: accountId,
-    });
-
     // Store agent document
-    await db.collection(COLLECTIONS.AGENTS).doc(accountId).set(agent);
+    await agentRef.set(agent);
+
+    // Mark invite as used
+    await useInvite(request.inviteCode, agent.id);
 
     console.log(`${LOG_PREFIX} Successfully registered agent:`, agent.id);
     return agent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error registering agent:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CREATE_AGENT);
+  }
+}
+
+export async function activateAgent(
+  agentId: string,
+  walletAddress: string,
+  signature: string,
+  message: string,
+): Promise<Agent> {
+  try {
+    console.log(`${LOG_PREFIX} Activating agent:`, agentId);
+
+    // Verify wallet signature
+    const isValidSignature = await verifySignature(signature, walletAddress, message);
+    if (!isValidSignature) {
+      throw new ApiError(400, ERROR_MESSAGES.INVALID_SIGNATURE);
+    }
+
+    const agent = await getAgent(agentId);
+
+    // Check if already activated
+    if (agent.identity.isActivated) {
+      throw new ApiError(400, ERROR_MESSAGES.AGENT_ALREADY_ACTIVATED);
+    }
+
+    const now = Timestamp.now();
+
+    // Create agent profile and account after wallet verification
+    await createProfile({
+      fingerprintId: agentId,
+      walletAddress,
+      username: agent.name,
+      bio: agent.description,
+      avatarUrl: "",
+      contactInfo: {},
+      preferences: {},
+    });
+
+    await createAccount({
+      body: {
+        walletAddress,
+        fingerprintId: agentId,
+        message,
+        signature,
+        onboardingId: agentId,
+      },
+    });
+
+    // Update agent with activation details
+    const updatedAgent: Agent = {
+      ...agent,
+      identity: {
+        ...agent.identity,
+        walletAddress,
+        isActivated: true,
+        activatedAt: now,
+      },
+      state: {
+        ...agent.state,
+        status: "active",
+      },
+      updatedAt: now,
+    };
+
+    await db.collection(COLLECTIONS.AGENTS).doc(agentId).update({
+      identity: updatedAgent.identity,
+      state: updatedAgent.state,
+      updatedAt: now,
+    });
+
+    return updatedAgent;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error activating agent:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_ACTIVATE_AGENT);
   }
 }
 
@@ -85,7 +155,7 @@ export async function getAgent(agentId: string): Promise<Agent> {
     return agentDoc.data() as Agent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error fetching agent:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
   }
 }
 
@@ -109,7 +179,7 @@ export async function updateAgentState(agentId: string, state: AgentState): Prom
     return updatedAgent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating agent state:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
   }
 }
 
@@ -136,7 +206,7 @@ export async function updateAgent(agentId: string, updates: Partial<Agent>): Pro
     return updatedAgent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating agent:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
   }
 }
 
@@ -149,7 +219,7 @@ export async function listAgents(limit: number = 10): Promise<Agent[]> {
     return agentsSnapshot.docs.map((doc) => doc.data() as Agent);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error listing agents:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
   }
 }
 
@@ -165,6 +235,6 @@ export async function getAgentsByCapability(capability: string): Promise<Agent[]
     return agentsSnapshot.docs.map((doc) => doc.data() as Agent);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error finding agents by capability:`, error);
-    throw ApiError.from(error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
   }
 }

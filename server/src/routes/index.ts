@@ -14,6 +14,7 @@ import profileRoutes from "./profile.routes";
 import statsRoutes from "./stats.routes";
 import onboardingRoutes from "./onboarding.routes";
 import agentRoutes from "./agent.routes";
+import agentInviteRoutes from "./agentInvite.routes";
 
 const router = Router();
 
@@ -39,6 +40,7 @@ router.use(capabilityRoutes); // /capabilities/*
 router.use(profileRoutes); // /profiles/*
 router.use(statsRoutes); // /stats/*
 router.use(onboardingRoutes); // /onboarding/*
-router.use("/agents", agentRoutes);
+router.use(agentRoutes);
+router.use(agentInviteRoutes);
 
 export default router;

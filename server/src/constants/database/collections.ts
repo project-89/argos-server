@@ -25,6 +25,7 @@ export const COLLECTIONS = {
   MISSIONS: "missions",
   ONBOARDING: "onboarding",
   AGENTS: "agents",
+  AGENT_INVITES: "agent-invites",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

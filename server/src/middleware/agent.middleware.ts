@@ -23,7 +23,7 @@ export const verifyAgent = async (req: Request, res: Response, next: NextFunctio
     const agent = await getAgent(agentId);
 
     // Verify agent is active
-    if (agent.state.status === "offline" || agent.state.status === "maintenance") {
+    if (agent.state.status === "inactive" || agent.state.status === "suspended") {
       console.log(`${LOG_PREFIX} Agent is not active:`, { agentId, status: agent.state.status });
       throw new ApiError(403, ERROR_MESSAGES.AGENT_NOT_ACTIVE);
     }
@@ -31,7 +31,7 @@ export const verifyAgent = async (req: Request, res: Response, next: NextFunctio
     // Add agent to request for downstream use
     req.auth!.agent = {
       id: agentId,
-      isActive: agent.state.status === "idle",
+      isActive: agent.state.status === "active",
     };
     console.log(`${LOG_PREFIX} Agent verified:`, { agentId });
 

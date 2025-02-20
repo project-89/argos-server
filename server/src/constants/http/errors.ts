@@ -111,6 +111,22 @@ export const FEATURE_ERRORS = {
   // User
   USER_NOT_FOUND: "User not found",
 
+  // Agent
+  FAILED_TO_REGISTER_AGENT: "Failed to register agent",
+  FAILED_TO_GET_AGENT: "Failed to get agent",
+  FAILED_TO_UPDATE_AGENT: "Failed to update agent",
+  FAILED_TO_UPDATE_AGENT_STATE: "Failed to update agent state",
+  FAILED_TO_LIST_AGENTS: "Failed to list agents",
+  FAILED_TO_GET_AGENTS_BY_CAPABILITY: "Failed to get agents by capability",
+
+  // Agent Invite
+  FAILED_TO_CREATE_INVITE: "Failed to create agent invite",
+  INVITE_NOT_FOUND: "Invite code not found",
+  INVITE_REVOKED: "This invite has been revoked",
+  INVITE_EXHAUSTED: "This invite has reached its maximum uses",
+  INVITE_EXPIRED: "This invite has expired",
+  INVITE_INVALID: "This invite is no longer valid",
+
   // Mission
   FAILED_TO_CREATE_MISSION: "Failed to create mission",
   FAILED_TO_GET_MISSION: "Failed to get mission",
@@ -234,8 +250,19 @@ export const ERROR_MESSAGES = {
   // Agent errors
   AGENT_NOT_FOUND: "Agent not found",
   AGENT_NOT_ACTIVE: "Agent is not active",
+  AGENT_ALREADY_ACTIVATED: "Agent is already activated",
   INSUFFICIENT_CAPABILITIES: "Agent does not have required capabilities",
   AGENT_AUTHENTICATION_REQUIRED: "Agent authentication required",
+  FAILED_TO_CREATE_AGENT: "Failed to create agent",
+  FAILED_TO_ACTIVATE_AGENT: "Failed to activate agent",
+
+  // Invite errors
+  FAILED_TO_CREATE_INVITE: "Failed to create agent invite",
+  INVITE_NOT_FOUND: "Invite code not found",
+  INVITE_REVOKED: "This invite has been revoked",
+  INVITE_EXHAUSTED: "This invite has reached its maximum uses",
+  INVITE_EXPIRED: "This invite has expired",
+  INVITE_INVALID: "This invite is no longer valid",
 } as const;
 
 export type ErrorMessage = (typeof ERROR_MESSAGES)[keyof typeof ERROR_MESSAGES];

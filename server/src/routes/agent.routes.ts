@@ -1,13 +1,13 @@
 import { Router } from "express";
 
 import {
-  registerAgent,
-  getAgent,
-  updateAgent,
-  updateAgentState,
-  listAgents,
-  getAgentsByCapability,
-} from "../endpoints/agent.endpoints";
+  handleRegisterAgent,
+  handleGetAgent,
+  handleUpdateAgent,
+  handleUpdateAgentState,
+  handleListAgents,
+  handleGetAgentsByCapability,
+} from "../endpoints";
 
 import {
   RegisterAgentRequestSchema,
@@ -31,25 +31,29 @@ const router = Router();
  * Phase 2: Will allow verified users to register agents
  * Phase 3: Will allow open registration with verification
  */
-router.post("/register", adminEndpoint(RegisterAgentRequestSchema), registerAgent);
+router.post("/agents/register", adminEndpoint(RegisterAgentRequestSchema), handleRegisterAgent);
 
 /**
  * Public read access to agent directory
  * - Basic info available to all
  * - Detailed info available to authenticated users
  */
-router.get("/:agentId", publicEndpoint(GetAgentRequestSchema), getAgent);
+router.get("/agents/:agentId", agentEndpoint(GetAgentRequestSchema), handleGetAgent);
 
-router.get("/", publicEndpoint(), listAgents);
+router.get("/agents", agentEndpoint(), handleListAgents);
 
-router.get("/capability/:capability", publicEndpoint(), getAgentsByCapability);
+router.get("/agents/capability/:capability", agentEndpoint(), handleGetAgentsByCapability);
 
 /**
  * Agent self-management endpoints
  * Only the agent itself can update its state/info
  */
-router.patch("/:agentId", agentEndpoint(UpdateAgentRequestSchema), updateAgent);
+router.patch("/agents/:agentId", agentEndpoint(UpdateAgentRequestSchema), handleUpdateAgent);
 
-router.patch("/:agentId/state", agentEndpoint(UpdateAgentStateRequestSchema), updateAgentState);
+router.patch(
+  "/agents/:agentId/state",
+  agentEndpoint(UpdateAgentStateRequestSchema),
+  handleUpdateAgentState,
+);
 
 export default router;

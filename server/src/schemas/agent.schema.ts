@@ -15,6 +15,13 @@ export const AgentSourceSchema = z.object({
   metadata: z.record(z.any()).optional(),
 });
 
+export const AgentConnectionSchema = z.object({
+  type: z.enum(["api", "webhook", "rpc"]),
+  endpoint: z.string().url(),
+  authType: z.enum(["none", "apiKey", "oauth", "jwt"]),
+  authData: z.record(z.any()).optional(),
+});
+
 export const AgentNFTSchema = z.object({
   contractAddress: z.string(),
   tokenId: z.string(),
@@ -24,9 +31,11 @@ export const AgentNFTSchema = z.object({
 });
 
 export const AgentIdentitySchema = z.object({
-  walletAddress: WalletAddressSchema,
+  walletAddress: WalletAddressSchema.optional(), // Optional until activated
   nfts: z.array(AgentNFTSchema).optional(),
   publicKey: z.string().optional(),
+  isActivated: z.boolean().default(false),
+  activatedAt: TimestampSchema.optional(),
 });
 
 export const AgentIntegrationSchema = z.object({
@@ -54,7 +63,8 @@ export const AgentStateSchema = z.object({
   isAvailable: z.boolean(),
   currentMissionId: z.string().optional(),
   lastActiveAt: TimestampSchema,
-  status: z.enum(["idle", "busy", "offline", "maintenance"]),
+  status: z.enum(["pending", "active", "inactive", "suspended"]), // Added pending and suspended
+  runtime: z.enum(["idle", "busy", "offline", "maintenance"]),
   performance: z
     .object({
       successRate: z.number(),
@@ -93,7 +103,7 @@ export const AgentSchema = z.object({
   source: AgentSourceSchema,
   capabilities: z.array(AgentCapabilitySchema),
   state: AgentStateSchema,
-  integration: AgentIntegrationSchema,
+  connection: AgentConnectionSchema,
   missionHistory: AgentMissionHistorySchema,
   metadata: z.record(z.any()),
   createdAt: TimestampSchema,
@@ -103,17 +113,29 @@ export const AgentSchema = z.object({
 // Request validation schemas
 export const RegisterAgentRequestSchema = z.object({
   body: z.object({
+    inviteCode: z.string(), // Required invite code
     name: z.string().min(3),
     description: z.string(),
     version: z.string(),
     source: AgentSourceSchema,
     capabilities: z.array(AgentCapabilitySchema),
-    identity: AgentIdentitySchema,
-    integration: AgentIntegrationSchema.optional(),
+    connection: AgentConnectionSchema,
     metadata: z.record(z.any()).optional(),
   }),
   query: z.object({}).optional(),
   params: z.object({}).optional(),
+});
+
+export const ActivateAgentRequestSchema = z.object({
+  params: z.object({
+    agentId: AccountIdSchema,
+  }),
+  body: z.object({
+    walletAddress: WalletAddressSchema,
+    signature: z.string(),
+    message: z.string(),
+  }),
+  query: z.object({}).optional(),
 });
 
 export const UpdateAgentRequestSchema = z.object({
@@ -125,7 +147,7 @@ export const UpdateAgentRequestSchema = z.object({
     description: z.string().optional(),
     version: z.string().optional(),
     capabilities: z.array(AgentCapabilitySchema).optional(),
-    integration: AgentIntegrationSchema.optional(),
+    connection: AgentConnectionSchema.optional(),
     metadata: z.record(z.any()).optional(),
   }),
   query: z.object({}).optional(),
