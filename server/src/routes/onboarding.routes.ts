@@ -1,5 +1,4 @@
 import { Router } from "express";
-import { z } from "zod";
 import { fingerprintWriteEndpoint, protectedEndpoint } from "../middleware/chains.middleware";
 import {
   StartOnboardingRequestSchema,
@@ -20,28 +19,28 @@ const router = Router();
 router.post(
   "/onboarding/start",
   ...fingerprintWriteEndpoint(StartOnboardingRequestSchema),
-  handleStartOnboarding
+  handleStartOnboarding,
 );
 
 // Verify mission completion (protected - requires account ownership)
 router.post(
   "/onboarding/:onboardingId/verify",
   ...protectedEndpoint(VerifyMissionRequestSchema),
-  handleVerifyMission
+  handleVerifyMission,
 );
 
 // Get onboarding progress (protected - requires account ownership)
 router.get(
   "/onboarding/:onboardingId/progress",
   ...protectedEndpoint(GetOnboardingProgressSchema),
-  handleGetProgress
+  handleGetProgress,
 );
 
 // Complete onboarding (protected - requires account ownership)
 router.post(
   "/onboarding/:onboardingId/complete",
   ...protectedEndpoint(CompleteOnboardingRequestSchema),
-  handleCompleteOnboarding
+  handleCompleteOnboarding,
 );
 
 export default router;

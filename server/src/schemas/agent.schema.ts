@@ -1,12 +1,6 @@
 import { z } from "zod";
-import { Timestamp } from "firebase-admin/firestore";
-import {
-  AccountIdSchema,
-  WalletAddressSchema,
-  ContactInfoSchema,
-  PreferencesSchema,
-  TimestampSchema,
-} from ".";
+
+import { AccountIdSchema, WalletAddressSchema, TimestampSchema } from ".";
 
 // Agent-specific schemas
 export const AgentSourceSchema = z.object({

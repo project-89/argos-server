@@ -93,6 +93,7 @@ export const VALIDATION_ERRORS = {
   MISSING_TITLE: "Title is required",
   MISSING_STATUS: "Status is required",
   INVALID_STATUS: "Status must be either 'online', 'offline', or 'away'",
+  FAILED_TO_VALIDATE_INVITE: "Failed to validate invite",
 };
 
 // System errors
@@ -118,7 +119,7 @@ export const FEATURE_ERRORS = {
   FAILED_TO_UPDATE_AGENT_STATE: "Failed to update agent state",
   FAILED_TO_LIST_AGENTS: "Failed to list agents",
   FAILED_TO_GET_AGENTS_BY_CAPABILITY: "Failed to get agents by capability",
-
+  FAILED_TO_REVOKE_INVITE: "Failed to revoke invite",
   // Agent Invite
   FAILED_TO_CREATE_INVITE: "Failed to create agent invite",
   INVITE_NOT_FOUND: "Invite code not found",

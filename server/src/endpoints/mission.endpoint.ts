@@ -54,21 +54,21 @@ export const handleGetMission = async (req: Request, res: Response) => {
 export const handleGetAvailableMissions = async (req: Request, res: Response) => {
   try {
     console.log("[Get Available Missions] Starting with:", {
-      fingerprintId: req.fingerprintId,
+      fingerprintId: req.auth?.fingerprint.id,
       query: req.query,
     });
-    if (!req.fingerprintId) {
+    if (!req.auth?.fingerprint.id) {
       return sendError(res, new ApiError(401, ERROR_MESSAGES.FINGERPRINT_REQUIRED));
     }
     const limit = req.query.limit ? Number(req.query.limit) : 10;
-    const missions = await missionService.getAvailableMissions(req.fingerprintId, limit);
+    const missions = await missionService.getAvailableMissions(req.auth.fingerprint.id, limit);
     console.log("[Get Available Missions] Found missions:", { count: missions.length });
     return sendSuccess(res, missions);
   } catch (error) {
     console.error("[Get Available Missions] Error:", {
       error,
       stack: error instanceof Error ? error.stack : undefined,
-      fingerprintId: req.fingerprintId,
+      fingerprintId: req.auth?.fingerprint.id,
       query: req.query,
     });
     return sendError(
@@ -138,18 +138,18 @@ export const handleUpdateMissionObjectives = async (req: Request, res: Response)
  */
 export const handleGetActiveMissions = async (req: Request, res: Response) => {
   try {
-    console.log("[Get Active Missions] Starting with fingerprintId:", req.fingerprintId);
-    if (!req.fingerprintId) {
+    console.log("[Get Active Missions] Starting with fingerprintId:", req.auth?.fingerprint.id);
+    if (!req.auth?.fingerprint.id) {
       return sendError(res, new ApiError(401, ERROR_MESSAGES.FINGERPRINT_REQUIRED));
     }
-    const missions = await missionService.getActiveMissions(req.fingerprintId);
+    const missions = await missionService.getActiveMissions(req.auth.fingerprint.id);
     console.log("[Get Active Missions] Found missions:", { count: missions.length });
     return sendSuccess(res, missions);
   } catch (error) {
     console.error("[Get Active Missions] Error:", {
       error,
       stack: error instanceof Error ? error.stack : undefined,
-      fingerprintId: req.fingerprintId,
+      fingerprintId: req.auth?.fingerprint.id,
     });
     return sendError(res, ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_ACTIVE_MISSIONS));
   }

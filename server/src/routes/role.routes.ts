@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { publicEndpoint, adminEndpoint } from "../middleware/chains.middleware";
-import { AssignRoleSchema, RemoveRoleSchema } from "../schemas/roles.schema";
+import { AssignRoleSchema, RemoveRoleSchema } from "../schemas";
 import { handleGetAvailableRoles, handleAssignRole, handleRemoveRole } from "../endpoints";
 
 const router = Router();

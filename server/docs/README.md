@@ -1,3 +1,15 @@
+# Server Documentation
+
+This directory contains documentation specific to the server implementation. For repository-level documentation, please see the `/docs` directory in the root.
+
+## Documentation Structure
+
+- `DEVELOPMENT.md` - Detailed guide for server development, including setup, workflow, and best practices
+- `HIVEMIND_TYPES.md` - Comprehensive documentation of API types, schemas, and data models
+- `README.md` (this file) - Overview and server-specific guidelines
+
+For high-level system architecture, infrastructure setup, and HiveMind concepts, please refer to the repository-level documentation in `/docs/`.
+
 # Argos Server API Documentation
 
 ## Overview

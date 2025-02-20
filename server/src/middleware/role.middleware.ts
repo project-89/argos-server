@@ -1,8 +1,7 @@
 import { Request, Response, NextFunction } from "express";
-import { Permission, ERROR_MESSAGES, ROLE } from "../constants";
+import { Permission, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils";
-import { roleService } from "../services/role.service";
-
+import { isAdmin as checkIsAdmin, hasPermission as checkHasPermission } from "../services";
 const LOG_PREFIX = "[Role Middleware]";
 
 /**
@@ -17,8 +16,8 @@ export const verifyAdmin = async (req: Request, res: Response, next: NextFunctio
 
     console.log(`${LOG_PREFIX} Verifying admin role:`, { fingerprintId });
 
-    const isAdmin = await roleService.isAdmin(fingerprintId);
-    if (!isAdmin) {
+    const adminStatus = await checkIsAdmin(fingerprintId);
+    if (!adminStatus) {
       console.log(`${LOG_PREFIX} Admin verification failed:`, { fingerprintId });
       throw new ApiError(403, ERROR_MESSAGES.ADMIN_REQUIRED);
     }
@@ -48,8 +47,8 @@ export const requirePermission = (permission: Permission) => {
 
       console.log(`${LOG_PREFIX} Checking permission:`, { fingerprintId, permission });
 
-      const hasPermission = await roleService.hasPermission(fingerprintId, permission);
-      if (!hasPermission) {
+      const permissionGranted = await checkHasPermission(fingerprintId, permission);
+      if (!permissionGranted) {
         console.log(`${LOG_PREFIX} Permission check failed:`, { fingerprintId, permission });
         throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
       }

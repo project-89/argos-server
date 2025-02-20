@@ -3,7 +3,10 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils";
 import { Stats, StatsResponse } from "../schemas";
 
+const LOG_PREFIX = "[Stats Service]";
+
 export const getStats = async (profileId: string): Promise<StatsResponse> => {
+  console.log(`${LOG_PREFIX} Getting stats for profile: ${profileId}`);
   try {
     const db = getFirestore();
     const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
@@ -29,6 +32,7 @@ export const updateStats = async (
   profileId: string,
   updates: Partial<Stats>,
 ): Promise<StatsResponse> => {
+  console.log(`${LOG_PREFIX} Updating stats for profile: ${profileId}`);
   try {
     const db = getFirestore();
     const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
@@ -53,6 +57,7 @@ export const updateStats = async (
 
 export const recordHistory = async (profileId: string, stats: StatsResponse): Promise<void> => {
   try {
+    console.log(`${LOG_PREFIX} Recording history for profile: ${profileId}`);
     const db = getFirestore();
     const historyRef = db.collection(COLLECTIONS.STATS_HISTORY);
     await historyRef.add({
@@ -73,6 +78,7 @@ export const recordHistory = async (profileId: string, stats: StatsResponse): Pr
 
 export const updateLastActive = async (profileId: string): Promise<void> => {
   try {
+    console.log(`${LOG_PREFIX} Updating last active for profile: ${profileId}`);
     const db = getFirestore();
     const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
 
@@ -92,6 +98,7 @@ export const updateLastActive = async (profileId: string): Promise<void> => {
 
 export const calculateSuccessRate = async (profileId: string): Promise<number> => {
   try {
+    console.log(`${LOG_PREFIX} Calculating success rate for profile: ${profileId}`);
     const db = getFirestore();
     const doc = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
 
@@ -111,6 +118,7 @@ export const updateReputation = async (
   change: number,
 ): Promise<StatsResponse> => {
   try {
+    console.log(`${LOG_PREFIX} Updating reputation for profile: ${profileId}`);
     const db = getFirestore();
     const stats = await db.collection(COLLECTIONS.STATS).doc(profileId).get();
     const newReputation = Math.max(0, stats.data()?.reputation + change);

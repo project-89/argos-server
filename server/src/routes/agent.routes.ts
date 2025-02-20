@@ -16,13 +16,7 @@ import {
   UpdateAgentStateRequestSchema,
 } from "../schemas";
 
-import {
-  protectedEndpoint,
-  validateRequest,
-  agentEndpoint,
-  adminEndpoint,
-  publicEndpoint,
-} from "../middleware";
+import { agentEndpoint, adminEndpoint } from "../middleware";
 
 const router = Router();
 

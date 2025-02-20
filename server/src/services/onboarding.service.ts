@@ -6,18 +6,14 @@ import {
   StartOnboardingRequest,
   VerifyMissionRequest,
   CompleteOnboardingRequest,
-  OnboardingMission,
-  OnboardingStage,
   SocialVerificationProofSchema,
-  VerificationProofSchema,
 } from "../schemas";
 import { getFingerprintById } from "./fingerprint.service";
-import { hashSocialIdentity, generateAnonDisplayName } from "../utils/hash";
+import { hashSocialIdentity } from "../utils/hash";
 
 // Constants for social verification
 const REQUIRED_MENTION = "@index89";
 const POST_AGE_LIMIT = 5 * 60 * 1000; // 5 minutes in milliseconds
-const MIN_ACCOUNT_AGE_DAYS = 30; // Minimum account age requirement
 
 const findExistingAnonUser = async ({
   db,
@@ -46,7 +42,7 @@ export const startOnboarding = async (
   try {
     const db = getFirestore();
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING);
-    const { fingerprintId, platform } = request.body;
+    const { fingerprintId } = request.body;
 
     // Verify fingerprint exists
     const fingerprint = await getFingerprintById(fingerprintId);
@@ -90,7 +86,7 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
   try {
     const db = getFirestore();
     const { onboardingId } = request.params;
-    const { missionId, proof, metadata } = request.body;
+    const { missionId, proof } = request.body;
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
 
     const doc = await onboardingRef.get();
@@ -281,7 +277,7 @@ export const completeOnboarding = async (
   try {
     const db = getFirestore();
     const { onboardingId } = request.params;
-    const { walletAddress, signature, message, timestamp } = request.body;
+    const { walletAddress } = request.body;
     const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
 
     const doc = await onboardingRef.get();

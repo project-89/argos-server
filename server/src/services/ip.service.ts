@@ -1,8 +1,6 @@
 import { Timestamp } from "firebase-admin/firestore";
 import { IpMetadata } from "../schemas";
 
-const LOG_PREFIX = "[IP Service]";
-
 /**
  * Creates initial IP metadata for a new record
  */

@@ -5,7 +5,7 @@ import {
   DeleteInviteRequestSchema,
   ValidateInviteRequestSchema,
 } from "../schemas";
-import { adminEndpoint, protectedEndpoint, publicEndpoint } from "../middleware";
+import { adminEndpoint, publicEndpoint } from "../middleware";
 
 const router = Router();
 

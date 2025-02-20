@@ -1,7 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { ApiError } from "../utils";
 import {
-  AnalyzeSkillRequest,
   AnalyzeSkillResponse,
   SearchCapabilitiesInput,
   SkillMatch,
@@ -21,22 +20,20 @@ export const skillMatchingService = {
   /**
    * Analyze a natural language skill description and find matching capabilities
    */
-  async analyzeSkill(input: AnalyzeSkillRequest): Promise<AnalyzeSkillResponse> {
-    console.log("[analyzeSkill] Starting with input:", input);
+  async analyzeSkill({ description }: { description: string }): Promise<AnalyzeSkillResponse> {
+    console.log("[analyzeSkill] Starting with input:", description);
 
     try {
       // First, use structured data generation to analyze the skill description
-      const analysis = await this.analyzeWithStructuredData(input.body.description).catch(
-        (error) => {
-          console.error("[analyzeSkill] Structured analysis failed:", error);
-          return DEFAULT_SKILL_ANALYSIS;
-        },
-      );
+      const analysis = await this.analyzeWithStructuredData(description).catch((error) => {
+        console.error("[analyzeSkill] Structured analysis failed:", error);
+        return DEFAULT_SKILL_ANALYSIS;
+      });
 
       // Search for matching capabilities
       let matches: SkillMatch[] = [];
       try {
-        matches = await this.findMatches(input.body.description, analysis);
+        matches = await this.findMatches(description, analysis);
       } catch (error) {
         console.error("[analyzeSkill] Finding matches failed:", error);
         // Continue with empty matches if matching fails

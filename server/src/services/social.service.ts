@@ -1,13 +1,6 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES, TAG_LIMITS } from "../constants";
-import {
-  AnonUser,
-  UpdateStatusParams,
-  LinkParams,
-  FindAnonUserParams,
-  DiscoveryInfo,
-  SocialPlatform,
-} from "../schemas";
+import { AnonUser, FindAnonUserParams, DiscoveryInfo, SocialPlatform } from "../schemas";
 
 import { hashSocialIdentity, ApiError } from "../utils";
 
@@ -102,6 +95,7 @@ export const findAnonUser = async ({
   data: AnonUser;
 } | null> => {
   try {
+    console.log(`${LOG_PREFIX} Finding anonymous user with hashed username: ${hashedUsername}`);
     const db = getFirestore();
     const query = db
       .collection(COLLECTIONS.ANON_USERS)
@@ -134,6 +128,7 @@ export const findAnonUserByUsername = async ({
   platform: SocialPlatform;
 }): Promise<{ doc: FirebaseFirestore.QueryDocumentSnapshot; data: AnonUser } | null> => {
   try {
+    console.log(`${LOG_PREFIX} Finding anonymous user by username: ${username}`);
     const { hashedUsername } = hashSocialIdentity(platform, username);
     return findAnonUser({ hashedUsername });
   } catch (error) {
@@ -157,6 +152,7 @@ export const createAnonUser = async ({
   initialTagLimits: boolean;
 }): Promise<AnonUser> => {
   try {
+    console.log(`${LOG_PREFIX} Creating new anonymous user with username: ${username}`);
     const db = getFirestore();
     const now = Timestamp.now();
     const { hashedUsername, usernameSalt } = hashSocialIdentity(platform, username);
@@ -197,6 +193,7 @@ export const updateAnonUserDiscovery = async ({
   discoveryInfo: DiscoveryInfo;
 }): Promise<void> => {
   try {
+    console.log(`${LOG_PREFIX} Updating anonymous user discovery`);
     const now = Timestamp.now();
     const update = createDiscoveryUpdate({ platform, discoveryInfo, now });
     await docRef.update(update);
@@ -221,6 +218,7 @@ export const handleSocialUser = async ({
   initialTagLimits: boolean;
 }): Promise<AnonUser> => {
   try {
+    console.log(`${LOG_PREFIX} Handling social user with username: ${username}`);
     // First try to find
     const existingUser = await findAnonUserByUsername({ username, platform });
 

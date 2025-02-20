@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { tagUserBySocialIdentity, getTagLeaderboard, getUserTags } from "../services";
 import { sendError, sendSuccess, ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
+import { hashSocialIdentity } from "../utils/hash";
 
 const LOG_PREFIX = "[Tag Endpoint]";
 
@@ -10,12 +11,15 @@ const LOG_PREFIX = "[Tag Endpoint]";
  */
 export const handleTagUser = async (req: Request, res: Response) => {
   try {
-    const { taggerUsername, username: targetUsername, platform } = req.body;
+    const { taggerUsername, username: targetUsername, platform = "x" } = req.body;
     const { tagType } = req.params;
 
+    const taggerIdentity = hashSocialIdentity(platform, taggerUsername);
+    const targetIdentity = hashSocialIdentity(platform, targetUsername);
+
     const result = await tagUserBySocialIdentity({
-      taggerUsername,
-      targetUsername,
+      taggerUsername: taggerIdentity.hashedUsername,
+      targetUsername: targetIdentity.hashedUsername,
       platform,
       tagType,
     });
@@ -34,7 +38,8 @@ export const handleGetUserTags = async (req: Request, res: Response) => {
   try {
     const { username } = req.params;
     const { platform = "x" } = req.query;
-    const result = await getUserTags(username, platform as "x");
+    const identity = hashSocialIdentity(platform as "x", username);
+    const result = await getUserTags(identity.hashedUsername, platform as "x");
     return sendSuccess(res, result);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in handleGetUserTags:`, error);

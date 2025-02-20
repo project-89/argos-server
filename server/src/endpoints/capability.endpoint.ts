@@ -119,9 +119,7 @@ export const handleFindSimilarSkills = async (req: Request, res: Response): Prom
     const { name, description } = req.query;
     const searchText = `${name}${description ? ` - ${description}` : ""}`;
 
-    const analysis = await skillMatchingService.analyzeSkill({
-      description: searchText,
-    });
+    const analysis = await skillMatchingService.analyzeSkill({ description: searchText });
 
     console.log("[Find Similar Skills] Analysis complete:", {
       matches: analysis.matches.length,
