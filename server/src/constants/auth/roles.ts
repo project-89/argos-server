@@ -1,30 +1,26 @@
-export enum ROLE {
-  USER = "user",
-  AGENT_INITIATE = "agent-initiate",
-  AGENT_FIELD = "agent-field",
-  AGENT_SENIOR = "agent-senior",
-  AGENT_MASTER = "agent-master",
-}
+import {
+  AccountRoleSchema,
+  AgentRankSchema,
+  PermissionSchema,
+  DEFAULT_ACCOUNT_ROLE_HIERARCHY,
+  DEFAULT_AGENT_RANK_HIERARCHY,
+  DEFAULT_ACCOUNT_ROLE_PERMISSIONS,
+  DEFAULT_AGENT_RANK_CAPABILITIES,
+  type AccountRole,
+  type AgentRank,
+  type Permission,
+} from "../../schemas/role.schema";
 
-export type Permission =
-  | "manage_roles"
-  | "view_classified" // Access to sensitive data
-  | "manage_operations" // Can manage field operations
-  | "oversee_agents" // Can monitor and guide other agents
-  | "special_access"; // Special clearance for certain operations
+// Export the enums from the schemas
+export const ACCOUNT_ROLE = AccountRoleSchema.enum;
+export const AGENT_RANK = AgentRankSchema.enum;
+export const PERMISSION = PermissionSchema.enum;
 
-export const ROLE_HIERARCHY: Record<ROLE, number> = {
-  [ROLE.USER]: 0,
-  [ROLE.AGENT_INITIATE]: 1,
-  [ROLE.AGENT_FIELD]: 2,
-  [ROLE.AGENT_SENIOR]: 3,
-  [ROLE.AGENT_MASTER]: 4,
-} as const;
+// Export the hierarchies and mappings
+export const ACCOUNT_ROLE_HIERARCHY = DEFAULT_ACCOUNT_ROLE_HIERARCHY;
+export const AGENT_RANK_HIERARCHY = DEFAULT_AGENT_RANK_HIERARCHY;
+export const ACCOUNT_ROLE_PERMISSIONS = DEFAULT_ACCOUNT_ROLE_PERMISSIONS;
+export const AGENT_RANK_CAPABILITIES = DEFAULT_AGENT_RANK_CAPABILITIES;
 
-export const ROLE_PERMISSIONS: Record<ROLE, Permission[]> = {
-  [ROLE.USER]: [],
-  [ROLE.AGENT_INITIATE]: [],
-  [ROLE.AGENT_FIELD]: ["view_classified"],
-  [ROLE.AGENT_SENIOR]: ["view_classified", "manage_operations", "oversee_agents"],
-  [ROLE.AGENT_MASTER]: ["view_classified", "manage_operations", "oversee_agents", "special_access"],
-} as const;
+// Export types
+export type { AccountRole, AgentRank, Permission };
