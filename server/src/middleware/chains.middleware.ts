@@ -6,9 +6,10 @@ import {
   verifyAccountOwnership,
   validateAuthToken,
   withMetrics,
-  verifyAdmin,
   verifyAgent,
+  requireRole,
 } from ".";
+import { ACCOUNT_ROLE } from "../constants";
 
 /**
  * Middleware chain factory functions for different endpoint types
@@ -38,20 +39,20 @@ export const protectedEndpoint = (schema?: ZodSchema) => {
   return chain;
 };
 
-// For admin-only endpoints
-export const adminEndpoint = (schema?: ZodSchema) => {
-  const chain: RequestHandler[] = [
-    withMetrics(validateAuthToken, "authValidation"),
-    withMetrics(verifyAccountOwnership, "ownershipVerification"),
-    withMetrics(verifyAdmin, "adminVerification"),
-  ];
+// For agent-only endpoints
+export const agentEndpoint = (schema?: ZodSchema) => {
+  const chain: RequestHandler[] = [withMetrics(verifyAgent, "agentVerification")];
   if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
   return chain;
 };
 
-// For agent-only endpoints
-export const agentEndpoint = (schema?: ZodSchema) => {
-  const chain: RequestHandler[] = [withMetrics(verifyAgent, "agentVerification")];
+// For special access endpoints (requires agent_creator role)
+export const specialAccessEndpoint = (schema?: ZodSchema) => {
+  const chain: RequestHandler[] = [
+    withMetrics(validateAuthToken, "authValidation"),
+    withMetrics(verifyAccountOwnership, "ownershipVerification"),
+    withMetrics(requireRole(ACCOUNT_ROLE.agent_creator), "roleVerification"),
+  ];
   if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
   return chain;
 };
