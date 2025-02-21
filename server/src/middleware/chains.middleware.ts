@@ -56,3 +56,11 @@ export const specialAccessEndpoint = (schema?: ZodSchema) => {
   if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
   return chain;
 };
+
+export const adminEndpoint = (schema?: ZodSchema) => {
+  const chain: RequestHandler[] = [
+    withMetrics(requireRole(ACCOUNT_ROLE.admin), "roleVerification"),
+  ];
+  if (schema) chain.push(withMetrics(validateRequest(schema), "schemaValidation"));
+  return chain;
+};
