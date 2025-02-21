@@ -56,13 +56,6 @@ export const verifyAccountOwnership = async (req: Request, res: Response, next: 
     }
 
     const accountData = accountDoc.data() as Account;
-    const isAdmin = req.auth!.fingerprint.roles.includes(ROLE.ADMIN);
-
-    // Check if account has admin role - admins bypass all ownership checks
-    if (isAdmin) {
-      console.log(`${LOG_PREFIX} Admin account bypassing ownership check`);
-      return next();
-    }
 
     // Case 1: Account/Profile operations
     if (targetAccountId) {

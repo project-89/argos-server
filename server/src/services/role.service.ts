@@ -30,21 +30,12 @@ export const getAvailableRoles = (): ROLE[] => {
 /**
  * All role-based checks
  */
-export const isAdmin = async (fingerprintId: string): Promise<boolean> => {
-  const roles = await getUserRoles(fingerprintId);
-  return roles.includes(ROLE.ADMIN);
-};
 
 export const hasPermission = async (
   fingerprintId: string,
   permission: Permission,
 ): Promise<boolean> => {
   const roles = await getUserRoles(fingerprintId);
-
-  // Admin has all permissions
-  if (roles.includes(ROLE.ADMIN)) {
-    return true;
-  }
 
   return roles.some((role) => {
     const permissions = ROLE_PERMISSIONS[role];
@@ -57,10 +48,6 @@ export const canManageRole = async (
   targetRole: ROLE,
 ): Promise<boolean> => {
   const roles = await getUserRoles(callerFingerprintId);
-
-  if (roles.includes(ROLE.ADMIN)) {
-    return true;
-  }
 
   const callerLevel = Math.max(...roles.map((role) => ROLE_HIERARCHY[role] || 0));
   const targetLevel = ROLE_HIERARCHY[targetRole];
@@ -78,7 +65,7 @@ export const assignRole = async (
 ): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
   try {
     // Only prevent self-role modification for non-admins
-    if (fingerprintId === callerFingerprintId && !(await isAdmin(callerFingerprintId))) {
+    if (fingerprintId === callerFingerprintId) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
@@ -129,7 +116,7 @@ export const removeRole = async (
     }
 
     // Only prevent self-role modification for non-admins
-    if (fingerprintId === callerFingerprintId && !(await isAdmin(callerFingerprintId))) {
+    if (fingerprintId === callerFingerprintId) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
