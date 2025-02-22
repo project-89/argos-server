@@ -1,5 +1,5 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS, ERROR_MESSAGES, ROLE } from "../constants";
+import { COLLECTIONS, ERROR_MESSAGES, ACCOUNT_ROLE } from "../constants";
 import { Fingerprint } from "../schemas";
 import { ApiError, deepMerge } from "../utils";
 import {
@@ -23,7 +23,7 @@ const createFingerprintData = ({
   timestamp: Timestamp;
 }): Omit<Fingerprint, "id"> => ({
   fingerprint,
-  roles: [ROLE.USER],
+  roles: [ACCOUNT_ROLE.user],
   createdAt: timestamp,
   lastVisited: timestamp,
   metadata,

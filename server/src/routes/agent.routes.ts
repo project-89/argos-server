@@ -18,7 +18,7 @@ import {
   GetAgentsByCapabilityRequestSchema,
 } from "../schemas";
 
-import { agentEndpoint, publicEndpoint, specialAccessEndpoint } from "../middleware";
+import { agentEndpoint, specialAccessEndpoint } from "../middleware";
 
 const router = Router();
 

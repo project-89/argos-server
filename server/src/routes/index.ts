@@ -5,7 +5,6 @@ import accountRoutes from "./account.routes";
 import fingerprintRoutes from "./fingerprint.routes";
 import visitRoutes from "./visit.routes";
 import tagRoutes from "./tag.routes";
-import roleRoutes from "./role.routes";
 import priceRoutes from "./price.routes";
 import presenceRoutes from "./presence.routes";
 import impressionRoutes from "./impression.routes";
@@ -32,7 +31,6 @@ router.use(accountRoutes); // /accounts/*
 router.use(fingerprintRoutes); // /fingerprints/*
 router.use(visitRoutes); // /visits/*
 router.use(tagRoutes); // /tags/*
-router.use(roleRoutes); // /roles/*
 router.use(priceRoutes); // /prices/*
 router.use(presenceRoutes); // /presence/*
 router.use(impressionRoutes); // /impressions/*

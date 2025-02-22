@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import { ApiError } from "../utils";
-import { ERROR_MESSAGES, COLLECTIONS, ROLE } from "../constants";
+import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import { getFirestore } from "firebase-admin/firestore";
 import { Account } from "../schemas";
 

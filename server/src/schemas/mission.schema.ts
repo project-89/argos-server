@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ROLE } from "../constants";
+import { ACCOUNT_ROLE } from "../constants";
 import { TimestampSchema } from ".";
 
 // Enums
@@ -85,8 +85,8 @@ export const FailureRecordSchema = z.object({
 // Mission Requirements Schemas
 export const SingleParticipantRequirementsSchema = z.object({
   objectives: z.array(MissionObjectiveSchema),
-  minimumRank: z.nativeEnum(ROLE),
-  categorySpecificRanks: z.record(z.nativeEnum(ROLE)).optional(),
+  minimumRank: z.nativeEnum(ACCOUNT_ROLE),
+  categorySpecificRanks: z.record(z.nativeEnum(ACCOUNT_ROLE)).optional(),
   preferredAgent: z.string().optional(),
   specialRequirements: z.array(z.string()).optional(),
   capabilities: z.array(z.string()).optional(),

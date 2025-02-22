@@ -2,55 +2,55 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
   COLLECTIONS,
   ERROR_MESSAGES,
-  ROLE,
-  ROLE_HIERARCHY,
-  ROLE_PERMISSIONS,
+  ACCOUNT_ROLE,
+  ACCOUNT_ROLE_HIERARCHY,
+  ACCOUNT_ROLE_PERMISSIONS,
   Permission,
 } from "../constants";
 import { ApiError } from "../utils";
+import { getAccountById } from "./account.service";
+
+type AccountRole = (typeof ACCOUNT_ROLE)[keyof typeof ACCOUNT_ROLE];
 
 /**
  * Core role checking logic
  */
-export const getUserRoles = async (fingerprintId: string): Promise<ROLE[]> => {
-  const doc = await getFirestore().collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).get();
-
-  if (!doc.exists) {
-    return [ROLE.USER];
+export const getAccountRoles = async (accountId: string): Promise<AccountRole[]> => {
+  const account = await getAccountById(accountId);
+  if (!account) {
+    return [ACCOUNT_ROLE.user];
   }
 
-  const data = doc.data() as { roles?: ROLE[] };
-  return data?.roles || [ROLE.USER];
+  return account.roles || [ACCOUNT_ROLE.user];
 };
 
-export const getAvailableRoles = (): ROLE[] => {
-  return [...Object.values(ROLE)];
+export const getAvailableRoles = (): AccountRole[] => {
+  return Object.values(ACCOUNT_ROLE);
 };
 
 /**
  * All role-based checks
  */
-
 export const hasPermission = async (
-  fingerprintId: string,
+  accountId: string,
   permission: Permission,
 ): Promise<boolean> => {
-  const roles = await getUserRoles(fingerprintId);
+  const roles = await getAccountRoles(accountId);
 
   return roles.some((role) => {
-    const permissions = ROLE_PERMISSIONS[role];
+    const permissions = ACCOUNT_ROLE_PERMISSIONS[role];
     return Array.isArray(permissions) && permissions.includes(permission);
   });
 };
 
 export const canManageRole = async (
-  callerFingerprintId: string,
-  targetRole: ROLE,
+  callerAccountId: string,
+  targetRole: AccountRole,
 ): Promise<boolean> => {
-  const roles = await getUserRoles(callerFingerprintId);
+  const roles = await getAccountRoles(callerAccountId);
 
-  const callerLevel = Math.max(...roles.map((role) => ROLE_HIERARCHY[role] || 0));
-  const targetLevel = ROLE_HIERARCHY[targetRole];
+  const callerLevel = Math.max(...roles.map((role) => ACCOUNT_ROLE_HIERARCHY[role] || 0));
+  const targetLevel = ACCOUNT_ROLE_HIERARCHY[targetRole];
 
   return callerLevel > targetLevel;
 };
@@ -59,41 +59,38 @@ export const canManageRole = async (
  * Role modification methods
  */
 export const assignRole = async (
-  fingerprintId: string,
-  callerFingerprintId: string,
-  role: ROLE,
-): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
+  targetAccountId: string,
+  callerAccountId: string,
+  role: AccountRole,
+): Promise<{ accountId: string; roles: AccountRole[] }> => {
   try {
     // Only prevent self-role modification for non-admins
-    if (fingerprintId === callerFingerprintId) {
+    if (targetAccountId === callerAccountId) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Check if caller has sufficient privileges
-    const hasPermission = await canManageRole(callerFingerprintId, role);
+    const hasPermission = await canManageRole(callerAccountId, role);
     if (!hasPermission) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
-    const fingerprintRef = getFirestore().collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-
-    if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+    const account = await getAccountById(targetAccountId);
+    if (!account) {
+      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data() as { roles?: ROLE[] };
-    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
+    const currentRoles = new Set<AccountRole>(account.roles || [ACCOUNT_ROLE.user]);
     currentRoles.add(role);
-    currentRoles.add(ROLE.USER); // Ensure user role is always present
+    currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
-    await fingerprintRef.update({
+    await getFirestore().collection(COLLECTIONS.ACCOUNTS).doc(targetAccountId).update({
       roles: updatedRoles,
     });
 
     return {
-      fingerprintId,
+      accountId: targetAccountId,
       roles: updatedRoles,
     };
   } catch (error) {
@@ -106,45 +103,42 @@ export const assignRole = async (
 };
 
 export const removeRole = async (
-  fingerprintId: string,
-  callerFingerprintId: string,
-  role: ROLE,
-): Promise<{ fingerprintId: string; roles: ROLE[] }> => {
+  targetAccountId: string,
+  callerAccountId: string,
+  role: AccountRole,
+): Promise<{ accountId: string; roles: AccountRole[] }> => {
   try {
-    if (role === ROLE.USER) {
+    if (role === ACCOUNT_ROLE.user) {
       throw new ApiError(400, ERROR_MESSAGES.CANNOT_REMOVE_USER_ROLE);
     }
 
     // Only prevent self-role modification for non-admins
-    if (fingerprintId === callerFingerprintId) {
+    if (targetAccountId === callerAccountId) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
     // Check if caller has sufficient privileges
-    const hasPermission = await canManageRole(callerFingerprintId, role);
+    const hasPermission = await canManageRole(callerAccountId, role);
     if (!hasPermission) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
-    const fingerprintRef = getFirestore().collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
-
-    if (!fingerprintDoc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
+    const account = await getAccountById(targetAccountId);
+    if (!account) {
+      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data() as { roles?: ROLE[] };
-    const currentRoles = new Set<ROLE>(data?.roles || [ROLE.USER]);
+    const currentRoles = new Set<AccountRole>(account.roles || [ACCOUNT_ROLE.user]);
     currentRoles.delete(role);
-    currentRoles.add(ROLE.USER); // Ensure user role is always present
+    currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
-    await fingerprintRef.update({
+    await getFirestore().collection(COLLECTIONS.ACCOUNTS).doc(targetAccountId).update({
       roles: updatedRoles,
     });
 
     return {
-      fingerprintId,
+      accountId: targetAccountId,
       roles: updatedRoles,
     };
   } catch (error) {

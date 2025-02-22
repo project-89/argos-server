@@ -1,5 +1,5 @@
 import { Response } from "express";
-import { ROLE, ERROR_MESSAGES } from "../constants";
+import { AccountRole, ERROR_MESSAGES } from "../constants";
 import { assignRole, removeRole, getAvailableRoles } from "../services";
 import { sendError, sendSuccess, ApiError } from "../utils";
 
@@ -20,7 +20,7 @@ export const handleAssignRole = async (req: Express.Request, res: Response) => {
       return sendError(res, new ApiError(401, ERROR_MESSAGES.AUTHENTICATION_REQUIRED));
     }
 
-    const result = await assignRole(fingerprintId, callerFingerprintId, role as ROLE);
+    const result = await assignRole(fingerprintId, callerFingerprintId, role as AccountRole);
 
     console.log(`${LOG_PREFIX} Successfully assigned role`, {
       targetFingerprint: fingerprintId,
@@ -53,7 +53,7 @@ export const handleRemoveRole = async (req: Express.Request, res: Response) => {
       return sendError(res, new ApiError(401, ERROR_MESSAGES.AUTHENTICATION_REQUIRED));
     }
 
-    const result = await removeRole(fingerprintId, callerFingerprintId, role as ROLE);
+    const result = await removeRole(fingerprintId, callerFingerprintId, role as AccountRole);
 
     console.log(`${LOG_PREFIX} Successfully removed role`, {
       targetFingerprint: fingerprintId,

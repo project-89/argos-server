@@ -1,5 +1,5 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
+import { ACCOUNT_ROLE, COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Account, CreateAccountRequest, UpdateAccountRequest, AccountResponse } from "../schemas";
 import { ApiError, verifySignature } from "../utils";
 import { getFingerprintById } from ".";
@@ -75,6 +75,7 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
       createdAt: now,
       lastLogin: now,
       status: "active",
+      roles: [ACCOUNT_ROLE.user],
       anonUserId: verifiedIdentity.anonUserId,
       metadata: {},
     };
@@ -224,6 +225,7 @@ const formatAccountResponse = (account: Account): AccountResponse => {
     createdAt: account.createdAt,
     lastLogin: account.lastLogin,
     status: account.status,
+    roles: account.roles,
     metadata: account.metadata,
   };
 };

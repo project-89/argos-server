@@ -1,4 +1,4 @@
-import { ROLE } from "../constants";
+import { AccountRole } from "../constants";
 
 /**
  * Represents the authentication state of a request
@@ -7,7 +7,7 @@ interface AuthContext {
   // Basic tracking (always present after fingerprintVerify middleware)
   fingerprint: {
     id: string;
-    roles: ROLE[]; // Set by role middleware for permission checks
+    roles: AccountRole[]; // Set by role middleware for permission checks
   };
 
   // Web3 authentication (present after wallet connection)
