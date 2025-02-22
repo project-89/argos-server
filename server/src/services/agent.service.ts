@@ -1,5 +1,5 @@
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
+import { AGENT_RANK, COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Agent, AgentState, RegisterAgentRequest } from "../schemas";
 import { ApiError, verifySignature } from "../utils";
 import { validateInvite, useInvite } from "./agentInvite.service";
@@ -26,6 +26,10 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
       version: request.version,
       source: request.source,
       capabilities: request.capabilities,
+      identity: {
+        isActivated: false,
+        rank: AGENT_RANK.initiate,
+      },
       state: {
         isAvailable: false,
         lastActiveAt: now,
@@ -38,9 +42,6 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
           averageResponseTime: 0,
           reputationScore: 0,
         },
-      },
-      identity: {
-        isActivated: false,
       },
       connection: request.connection,
       missionHistory: {

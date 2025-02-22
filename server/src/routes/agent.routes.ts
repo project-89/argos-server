@@ -14,9 +14,11 @@ import {
   UpdateAgentRequestSchema,
   GetAgentRequestSchema,
   UpdateAgentStateRequestSchema,
+  GetAgentsRequestSchema,
+  GetAgentsByCapabilityRequestSchema,
 } from "../schemas";
 
-import { agentEndpoint, adminEndpoint } from "../middleware";
+import { agentEndpoint, publicEndpoint, specialAccessEndpoint } from "../middleware";
 
 const router = Router();
 
@@ -25,7 +27,11 @@ const router = Router();
  * Phase 2: Will allow verified users to register agents
  * Phase 3: Will allow open registration with verification
  */
-router.post("/agents/register", adminEndpoint(RegisterAgentRequestSchema), handleRegisterAgent);
+router.post(
+  "/agents/register",
+  specialAccessEndpoint(RegisterAgentRequestSchema),
+  handleRegisterAgent,
+);
 
 /**
  * Public read access to agent directory
@@ -34,9 +40,13 @@ router.post("/agents/register", adminEndpoint(RegisterAgentRequestSchema), handl
  */
 router.get("/agents/:agentId", agentEndpoint(GetAgentRequestSchema), handleGetAgent);
 
-router.get("/agents", agentEndpoint(), handleListAgents);
+router.get("/agents", agentEndpoint(GetAgentsRequestSchema), handleListAgents);
 
-router.get("/agents/capability/:capability", agentEndpoint(), handleGetAgentsByCapability);
+router.get(
+  "/agents/capability/:capability",
+  agentEndpoint(GetAgentsByCapabilityRequestSchema),
+  handleGetAgentsByCapability,
+);
 
 /**
  * Agent self-management endpoints
