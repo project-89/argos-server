@@ -14,6 +14,7 @@ import statsRoutes from "./stats.routes";
 import onboardingRoutes from "./onboarding.routes";
 import agentRoutes from "./agent.routes";
 import agentInviteRoutes from "./agentInvite.routes";
+import knowledgeRoutes from "./knowledge.routes";
 
 const router = Router();
 
@@ -40,5 +41,6 @@ router.use(statsRoutes); // /stats/*
 router.use(onboardingRoutes); // /onboarding/*
 router.use(agentRoutes);
 router.use(agentInviteRoutes);
+router.use(knowledgeRoutes); // /knowledge/*
 
 export default router;

@@ -17,3 +17,4 @@ export * from "./mission.service";
 export * from "./onboarding.service";
 export * from "./agent.service";
 export * from "./agentInvite.service";
+export * from "./knowledge.service";

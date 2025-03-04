@@ -26,6 +26,14 @@ export const COLLECTIONS = {
   ONBOARDING: "onboarding",
   AGENTS: "agents",
   AGENT_INVITES: "agent-invites",
+  MISSION_LOGS: "mission-logs",
+  MISSION_RESULTS: "mission-results",
+  MISSION_ASSIGNMENTS: "mission-assignments",
+  MISSION_TYPES: "mission-types",
+  AGENT_LOGS: "agent-logs",
+  KNOWLEDGE: "knowledge",
+  KNOWLEDGE_SHARES: "knowledge-shares",
+  KNOWLEDGE_TRANSFERS: "knowledge-transfers",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

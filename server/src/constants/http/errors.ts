@@ -264,6 +264,17 @@ export const ERROR_MESSAGES = {
   INVITE_EXHAUSTED: "This invite has reached its maximum uses",
   INVITE_EXPIRED: "This invite has expired",
   INVITE_INVALID: "This invite is no longer valid",
+
+  // Knowledge encapsulation errors
+  INSUFFICIENT_RANK: "Agent does not have sufficient rank for this operation",
+  KNOWLEDGE_NOT_FOUND: "Knowledge not found",
+  KNOWLEDGE_ACCESS_DENIED: "Access to this knowledge is denied",
+  FAILED_TO_COMPRESS_KNOWLEDGE: "Failed to compress knowledge",
+  FAILED_TO_DECOMPRESS_KNOWLEDGE: "Failed to decompress knowledge",
+  FAILED_TO_CREATE_KNOWLEDGE: "Failed to create knowledge",
+  FAILED_TO_UPDATE_KNOWLEDGE: "Failed to update knowledge",
+  FAILED_TO_SHARE_KNOWLEDGE: "Failed to share knowledge",
+  FAILED_TO_TRANSFER_KNOWLEDGE: "Failed to transfer knowledge",
 } as const;
 
 export type ErrorMessage = (typeof ERROR_MESSAGES)[keyof typeof ERROR_MESSAGES];

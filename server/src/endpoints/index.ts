@@ -14,3 +14,4 @@ export * from "./mission.endpoint";
 export * from "./onboarding.endpoint";
 export * from "./agentInvite.endpoint";
 export * from "./agent.endpoint";
+export * from "./knowledge.endpoint";

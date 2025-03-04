@@ -23,3 +23,4 @@ export * from "./onboarding.schema";
 export * from "./social.schema";
 export * from "./agent.schema";
 export * from "./agentInvite.schema";
+export * from "./knowledge.schema";
