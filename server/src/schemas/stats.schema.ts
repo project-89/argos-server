@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { TimestampSchema } from ".";
 
 // Domain Models
 export const StatsSchema = z.object({
@@ -9,18 +8,13 @@ export const StatsSchema = z.object({
   successRate: z.number(),
   totalRewards: z.number(),
   reputation: z.number(),
-  joinedAt: TimestampSchema,
-  lastActive: TimestampSchema,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
-});
-
-export const StatsResponseSchema = StatsSchema.extend({
   joinedAt: z.number(),
   lastActive: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
 });
+
+export const StatsResponseSchema = StatsSchema;
 
 // Request/Response Validation Schemas
 export const StatsGetSchema = z.object({

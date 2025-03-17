@@ -1,4 +1,3 @@
-import { getFirestore } from "firebase-admin/firestore";
 import { ApiError } from "../utils";
 import {
   AnalyzeSkillResponse,
@@ -9,9 +8,12 @@ import {
   SkillSimilaritySchema,
   SkillAnalysis,
 } from "../schemas";
-import { generateObject } from "ai";
+import { generateObject, GenerateObjectResult } from "ai";
 import { google } from "@ai-sdk/google";
 import { DEFAULT_SKILL_ANALYSIS, ERROR_MESSAGES, COLLECTIONS } from "../constants";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
+
+const LOG_PREFIX = "[Skill Matching Service]";
 
 // Initialize Gemini model with the Google provider
 const geminiModel = google("gemini-pro");
@@ -21,12 +23,12 @@ export const skillMatchingService = {
    * Analyze a natural language skill description and find matching capabilities
    */
   async analyzeSkill({ description }: { description: string }): Promise<AnalyzeSkillResponse> {
-    console.log("[analyzeSkill] Starting with input:", description);
+    console.log(`${LOG_PREFIX} Starting with input:`, description);
 
     try {
       // First, use structured data generation to analyze the skill description
       const analysis = await this.analyzeWithStructuredData(description).catch((error) => {
-        console.error("[analyzeSkill] Structured analysis failed:", error);
+        console.error(`${LOG_PREFIX} Structured analysis failed:`, error);
         return DEFAULT_SKILL_ANALYSIS;
       });
 
@@ -35,7 +37,7 @@ export const skillMatchingService = {
       try {
         matches = await this.findMatches(description, analysis);
       } catch (error) {
-        console.error("[analyzeSkill] Finding matches failed:", error);
+        console.error(`${LOG_PREFIX} Finding matches failed:`, error);
         // Continue with empty matches if matching fails
       }
 
@@ -47,266 +49,285 @@ export const skillMatchingService = {
         parentType: analysis.parentType,
       };
     } catch (error) {
-      console.error("[analyzeSkill] Error:", error);
+      console.error(`${LOG_PREFIX} Error:`, error);
       throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   /**
-   * Use structured data generation to analyze skill description
+   * Use AI to analyze a skill description and extract structured data
    */
   async analyzeWithStructuredData(description: string): Promise<SkillAnalysis> {
-    const prompt = `Analyze the following skill description and extract key information:
-    
-Description: "${description}"
-
-Provide structured data with:
-1. The most appropriate skill type (e.g., Development, Design, Art, Music, etc.)
-2. A specific category within that type
-3. A broader parent type if applicable
-4. Key terms/keywords that describe this skill
-5. Possible alternative names or ways to describe this skill`;
-
     try {
-      const { object } = await generateObject({
+      const result = await generateObject({
         model: geminiModel,
         schema: SkillAnalysisSchema,
-        prompt,
+        prompt: `Analyze this skill description and extract the following information: type, category, keywords, and aliases. If possible, also identify a broader parent type. The description is: "${description}"`,
       });
-      return object;
+
+      // Extract the analysis from the result
+      const skillAnalysis: SkillAnalysis = {
+        type: result.object.type,
+        category: result.object.category,
+        keywords: result.object.keywords,
+        aliases: result.object.aliases,
+        parentType: result.object.parentType,
+      };
+
+      // If no type was detected, try to infer from the description
+      if (!skillAnalysis.type) {
+        const words = description.toLowerCase().split(/\s+/);
+        const possibleTypes = ["technical", "creative", "professional", "soft", "language"];
+
+        skillAnalysis.type = possibleTypes.find((type) => words.includes(type)) || "technical";
+      }
+
+      return skillAnalysis;
     } catch (error) {
-      console.error("[analyzeWithStructuredData] Analysis failed:", error);
+      console.error(`${LOG_PREFIX} AI analysis failed:`, error);
       throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   /**
-   * Find matching capabilities based on description and structured data analysis
+   * Find matching skills in the database
    */
   async findMatches(description: string, analysis: SkillAnalysis): Promise<SkillMatch[]> {
+    const db = await getDb();
+
     try {
-      const db = getFirestore();
-      const collection = db.collection(COLLECTIONS.SKILLS);
+      const { type, category, keywords } = analysis;
 
-      // Get capabilities of the same type or parent type
-      const typeMatches = collection.where("type", "==", analysis.type);
-      const parentTypeMatches = analysis.parentType
-        ? collection.where("parentType", "==", analysis.parentType)
-        : null;
+      // First, try to find exact name matches (case insensitive)
+      const words = description.toLowerCase().split(/\s+/);
+      const nameQuery = words
+        .filter((word) => word.length > 3) // Skip short words
+        .map((word) => ({ name: { $regex: word, $options: "i" } }));
 
-      const [typeSnapshot, parentSnapshot] = await Promise.all([
-        typeMatches.orderBy("useCount", "desc").limit(5).get(),
-        parentTypeMatches?.orderBy("useCount", "desc").limit(5).get(),
-      ]);
-
-      const matches: SkillMatch[] = [];
-
-      // Process direct type matches
-      for (const doc of typeSnapshot.docs) {
-        const skill = doc.data() as Skill;
-        try {
-          const confidence = await this.calculateSimilarity(description, skill);
-
-          if (confidence > 0.5) {
-            matches.push({
-              skill: this.mapToSkill(skill),
-              confidence,
-              matchedOn: {
-                name: this.hasNameMatch(description, skill.name),
-                aliases: this.hasAliasMatch(description, skill.aliases),
-                keywords: this.hasKeywordMatch(description, skill.keywords),
-                category: skill.category === analysis.category,
-              },
-            });
-          }
-        } catch (error) {
-          console.error("[findMatches] Failed to calculate similarity:", error);
-          // Continue with next match if similarity calculation fails
-        }
+      // Then find by type and category
+      const categoricalQuery: any[] = [];
+      if (type) {
+        categoricalQuery.push({ type: { $regex: type, $options: "i" } });
+      }
+      if (category) {
+        categoricalQuery.push({ category: { $regex: category, $options: "i" } });
       }
 
-      // Process parent type matches if any
-      if (parentSnapshot) {
-        for (const doc of parentSnapshot.docs) {
-          const skill = doc.data() as Skill;
+      // Then find by keywords
+      const keywordQuery: any[] = [];
+      if (keywords && keywords.length > 0) {
+        keywordQuery.push({
+          keywords: { $in: keywords.map((kw) => new RegExp(kw, "i")) },
+        });
+      }
+
+      // Combine the queries (any match is a potential candidate)
+      const query = {
+        $or: [
+          ...nameQuery,
+          ...categoricalQuery,
+          ...keywordQuery,
+          { aliases: { $elemMatch: { $regex: description, $options: "i" } } },
+        ],
+      };
+
+      // Execute the query
+      const skills = await db.collection(COLLECTIONS.SKILLS).find(query).limit(10).toArray();
+
+      // Calculate similarity scores for each skill
+      const matchPromises = skills.map(async (skill) => {
+        let similarity = 0;
+
+        // Calculate match confidence based on different criteria
+        const nameMatch = this.hasNameMatch(description, skill.name);
+        const aliasMatch = this.hasAliasMatch(description, skill.aliases);
+        const keywordMatch = this.hasKeywordMatch(description, skill.keywords);
+        const categoryMatch = skill.category
+          ? skill.category.toLowerCase() === (category?.toLowerCase() || "")
+          : false;
+
+        // Add a base similarity score
+        similarity += nameMatch ? 0.6 : 0;
+        similarity += aliasMatch ? 0.3 : 0;
+        similarity += keywordMatch ? 0.2 : 0;
+        similarity += categoryMatch ? 0.1 : 0;
+        similarity += type && skill.type.toLowerCase() === type.toLowerCase() ? 0.1 : 0;
+
+        // If no direct matches, try to calculate a more nuanced similarity score
+        if (similarity === 0) {
           try {
-            const confidence = await this.calculateSimilarity(description, skill);
-
-            if (confidence > 0.4) {
-              matches.push({
-                skill: this.mapToSkill(skill),
-                confidence: confidence * 0.8,
-                matchedOn: {
-                  name: this.hasNameMatch(description, skill.name),
-                  aliases: this.hasAliasMatch(description, skill.aliases),
-                  keywords: this.hasKeywordMatch(description, skill.keywords),
-                  category: skill.category === analysis.category,
-                },
-              });
-            }
+            similarity = await this.calculateSimilarity(description, skill);
           } catch (error) {
-            console.error("[findMatches] Failed to calculate similarity for parent match:", error);
-            // Continue with next match if similarity calculation fails
+            // If AI similarity fails, use a very basic heuristic
+            const descWords = description.toLowerCase().split(/\s+/);
+            const skillWords = `${skill.name} ${skill.description || ""} ${
+              skill.keywords?.join(" ") || ""
+            }`
+              .toLowerCase()
+              .split(/\s+/);
+
+            const commonWords = descWords.filter(
+              (word) => word.length > 3 && skillWords.includes(word),
+            );
+
+            similarity = (commonWords.length / Math.max(descWords.length, 1)) * 0.2;
           }
         }
-      }
 
-      return matches.sort((a, b) => b.confidence - a.confidence);
-    } catch (error) {
-      console.error("[findMatches] Database error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
-  },
+        // Apply a boost for popular skills
+        similarity += Math.min(skill.useCount / 100, 0.1);
 
-  /**
-   * Calculate similarity between description and skill using structured data generation
-   */
-  async calculateSimilarity(description: string, skill: Skill): Promise<number> {
-    const prompt = `Compare these two skill descriptions and rate their similarity:
-
-Skill 1: "${description}"
-Skill 2: "${skill.name}${skill.description ? ` - ${skill.description}` : ""}"
-
-Consider:
-1. Are they describing the same fundamental skill?
-2. Are they closely related skills?
-3. Do they share significant keywords or concepts?
-
-Provide a similarity score between 0 and 1, and list the reasons for your score.`;
-
-    try {
-      const { object } = await generateObject({
-        model: geminiModel,
-        schema: SkillSimilaritySchema,
-        prompt,
+        return {
+          skill: this.mapToSkill(skill),
+          confidence: parseFloat(similarity.toFixed(2)),
+          matchedOn: {
+            name: nameMatch,
+            aliases: aliasMatch,
+            keywords: keywordMatch,
+            category: categoryMatch,
+          },
+        };
       });
 
-      // Adjust confidence based on other factors
-      let confidence = object.similarity;
+      // Resolve all matches
+      const matches = await Promise.all(matchPromises);
 
-      // Boost confidence if keywords match
-      const keywordMatch = this.hasKeywordMatch(description, skill.keywords);
-      if (keywordMatch) confidence += 0.1;
-
-      // Boost confidence if aliases match
-      const aliasMatch = this.hasAliasMatch(description, skill.aliases);
-      if (aliasMatch) confidence += 0.1;
-
-      // Cap at 1.0
-      return Math.min(confidence, 1.0);
+      // Sort by confidence score
+      return matches
+        .filter((match) => match.confidence > 0.1) // Filter out low confidence matches
+        .sort((a, b) => b.confidence - a.confidence);
     } catch (error) {
-      console.error("[calculateSimilarity] Similarity calculation failed:", error);
-      return 0;
+      console.error(`${LOG_PREFIX} Error finding matches:`, error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
   },
 
   /**
-   * Map SkillModel to Skill interface
+   * Calculate AI-powered similarity between a description and a skill
+   */
+  async calculateSimilarity(description: string, skill: Skill): Promise<number> {
+    try {
+      const skillText = `${skill.name}${skill.description ? `: ${skill.description}` : ""} (${
+        skill.type
+      }, ${skill.category})`;
+
+      const result = await generateObject({
+        model: geminiModel,
+        schema: SkillSimilaritySchema,
+        prompt: `
+          You are a specialized AI for calculating semantic similarity between skills.
+          
+          Skill description: "${description}"
+          Existing skill: "${skillText}"
+          
+          Calculate a similarity score between 0 and 1, where:
+          - 0 means completely unrelated
+          - 0.3 means somewhat related
+          - 0.6 means closely related
+          - 0.9+ means extremely similar or identical
+          
+          Consider type, category, and semantic meaning. Return only the similarity score.
+        `,
+      });
+
+      return result.object.similarity;
+    } catch (error) {
+      console.error(`${LOG_PREFIX} AI similarity calculation failed:`, error);
+      throw error; // Let the caller handle this error
+    }
+  },
+
+  /**
+   * Format a database skill object into the expected Skill type
    */
   mapToSkill(model: Skill): Skill {
-    try {
-      return {
-        ...model,
-        createdAt: model.createdAt,
-        updatedAt: model.updatedAt,
-      };
-    } catch (error) {
-      console.error("[mapToSkill] Error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+    return {
+      ...model,
+      // Ensure all fields are present with defaults if missing
+      category: model.category || "",
+      keywords: model.keywords || [],
+      aliases: model.aliases || [],
+      useCount: model.useCount || 0,
+      createdAt: model.createdAt,
+      updatedAt: model.updatedAt,
+    };
   },
 
   /**
-   * Check if description matches skill name (fuzzy match)
+   * Check if a skill name matches the description
    */
   hasNameMatch(description: string, name: string): boolean {
-    try {
-      return (
-        description.toLowerCase().includes(name.toLowerCase()) ||
-        name.toLowerCase().includes(description.toLowerCase())
-      );
-    } catch (error) {
-      console.error("[hasNameMatch] Error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+    if (!name) return false;
+
+    const cleanDesc = description.toLowerCase().trim();
+    const cleanName = name.toLowerCase().trim();
+
+    return (
+      cleanDesc.includes(cleanName) || cleanName.includes(cleanDesc) || cleanDesc === cleanName
+    );
   },
 
   /**
-   * Check if description matches any aliases
+   * Check if any alias matches the description
    */
   hasAliasMatch(description: string, aliases?: string[]): boolean {
-    try {
-      if (!aliases) return false;
-      return aliases.some(
-        (alias) =>
-          description.toLowerCase().includes(alias.toLowerCase()) ||
-          alias.toLowerCase().includes(description.toLowerCase()),
-      );
-    } catch (error) {
-      console.error("[hasAliasMatch] Error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+    if (!aliases || aliases.length === 0) return false;
+
+    const cleanDesc = description.toLowerCase().trim();
+
+    return aliases.some(
+      (alias) =>
+        alias &&
+        (cleanDesc.includes(alias.toLowerCase()) || alias.toLowerCase().includes(cleanDesc)),
+    );
   },
 
   /**
-   * Check if description contains any matching keywords
+   * Check if any keyword matches the description
    */
   hasKeywordMatch(description: string, keywords?: string[]): boolean {
-    try {
-      if (!keywords) return false;
-      return keywords.some((keyword) => description.toLowerCase().includes(keyword.toLowerCase()));
-    } catch (error) {
-      console.error("[hasKeywordMatch] Error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
+    if (!keywords || keywords.length === 0) return false;
+
+    const words = description.toLowerCase().split(/\s+/);
+
+    return keywords.some((keyword) => keyword && words.includes(keyword.toLowerCase()));
   },
 
   /**
-   * Search capabilities for autocomplete
+   * Search capabilities with various filters
    */
   async searchCapabilities(input: SearchCapabilitiesInput): Promise<Skill[]> {
     try {
-      console.log("[searchCapabilities] Starting with input:", input);
-      const db = getFirestore();
-      const collection = db.collection(COLLECTIONS.SKILLS);
+      const db = await getDb();
+      const { query, limit = 10, type, category, parentType } = input;
 
-      let query = collection.orderBy("useCount", "desc");
+      // Build the query filters
+      const filters: any = {
+        $or: [
+          { name: { $regex: query, $options: "i" } },
+          { description: { $regex: query, $options: "i" } },
+          { aliases: { $elemMatch: { $regex: query, $options: "i" } } },
+          { keywords: { $elemMatch: { $regex: query, $options: "i" } } },
+        ],
+      };
 
-      if (input.type) {
-        query = query.where("type", "==", input.type);
-      }
+      // Add optional filters
+      if (type) filters.type = type;
+      if (category) filters.category = category;
+      if (parentType) filters.parentType = parentType;
 
-      if (input.category) {
-        query = query.where("category", "==", input.category);
-      }
+      // Execute the query
+      const skills = await db
+        .collection(COLLECTIONS.SKILLS)
+        .find(filters)
+        .sort({ useCount: -1 })
+        .limit(limit)
+        .toArray();
 
-      if (input.parentType) {
-        query = query.where("parentType", "==", input.parentType);
-      }
-
-      const snapshot = await query.limit(input.limit || 10).get();
-
-      // Filter results client-side based on query
-      const results = snapshot.docs
-        .map((doc) => this.mapToSkill(doc.data() as Skill))
-        .filter((skill) => {
-          const searchTerms = input.query.toLowerCase().split(" ");
-          const searchableText = [
-            skill.name,
-            skill.description,
-            ...(skill.aliases || []),
-            ...(skill.keywords || []),
-          ]
-            .join(" ")
-            .toLowerCase();
-
-          return searchTerms.every((term) => searchableText.includes(term));
-        });
-
-      return results;
+      return formatDocuments(skills) as Skill[];
     } catch (error) {
-      console.error("[searchCapabilities] Error:", error);
-      throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+      console.error(`${LOG_PREFIX} Error searching capabilities:`, error);
+      throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_FIND_SIMILAR_SKILLS);
     }
   },
 };

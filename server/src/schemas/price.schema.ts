@@ -39,9 +39,20 @@ export const PriceHistoryPointSchema = z.object({
 
 export const PriceHistoryResponseSchema = z.array(PriceHistoryPointSchema);
 
+// MongoDB cache schema for price data
+export const PriceCacheSchema = z.object({
+  symbol: z.string(), // The token symbol (serving as the _id in MongoDB)
+  usd: z.number(),
+  usd_24h_change: z.number(),
+  createdAt: z.number(), // Timestamp when the cache was created
+  history: z.array(PriceHistoryPointSchema).optional(), // Optional price history data
+  metadata: z.record(z.string(), z.unknown()).optional(), // Additional metadata
+});
+
 // Export types
 export type GetCurrentPriceRequest = z.infer<typeof getCurrentPriceSchema>;
 export type GetPriceHistoryRequest = z.infer<typeof getPriceHistorySchema>;
 export type PriceResponse = z.infer<typeof PriceResponseSchema>;
 export type PriceHistoryPoint = z.infer<typeof PriceHistoryPointSchema>;
 export type PriceHistoryResponse = z.infer<typeof PriceHistoryResponseSchema>;
+export type PriceCache = z.infer<typeof PriceCacheSchema>;

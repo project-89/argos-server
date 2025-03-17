@@ -24,7 +24,9 @@
     "superagent": "^8.1.2",
     "technicalindicators": "^3.1.0",
     "tweetnacl": "^1.0.3",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "mongodb": "^5.0.0",
+    "@types/mongodb": "^4.0.7"
   },
   "engines": {
     "node": "18"
@@ -44,6 +46,9 @@
     "test:ci": "jest --config config/jest/jest.config.js --ci --coverage",
     "test:verbose": "jest --config config/jest/jest.config.js --verbose --detectOpenHandles --runInBand",
     "test:single": "jest --config config/jest/jest.config.js --verbose --detectOpenHandles --runInBand",
+    "test:mongodb": "node scripts/test-mongodb-connection.js",
+    "test:mongodb:services": "node scripts/test-mongodb-services.js",
+    "mongodb:indexes": "node scripts/create-mongodb-indexes.js",
     "kill-ports": "kill-port 5001 8080 8085 9229 5000 8081 9000 9090 9099 4000 4400 4500"
   },
   "devDependencies": {

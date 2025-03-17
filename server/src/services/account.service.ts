@@ -1,14 +1,14 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { ACCOUNT_ROLE, COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Account, CreateAccountRequest, UpdateAccountRequest, AccountResponse } from "../schemas";
 import { ApiError, verifySignature } from "../utils";
 import { getFingerprintById } from ".";
 
+// Import MongoDB utilities
+import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
+
 export const createAccount = async (request: CreateAccountRequest): Promise<AccountResponse> => {
   try {
-    const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-
+    const db = await getDb();
     const { walletAddress, fingerprintId, signature, message, onboardingId } = request.body;
 
     // Verify wallet signature
@@ -24,23 +24,18 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
     }
 
     // Get onboarding progress to verify social identity
-    const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
-    const onboardingDoc = await onboardingRef.get();
-
-    if (!onboardingDoc.exists) {
+    const onboardingDoc = await db
+      .collection(COLLECTIONS.ONBOARDING)
+      .findOne({ _id: onboardingId });
+    if (!onboardingDoc) {
       throw new ApiError(404, ERROR_MESSAGES.ONBOARDING_NOT_FOUND);
     }
 
-    const onboarding = onboardingDoc.data();
-    if (!onboarding) {
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
-
-    if (onboarding.stage !== "wallet_created") {
+    if (onboardingDoc.stage !== "wallet_created") {
       throw new ApiError(400, ERROR_MESSAGES.INVALID_MISSION_ORDER);
     }
 
-    if (onboarding.fingerprintId !== fingerprintId) {
+    if (onboardingDoc.fingerprintId !== fingerprintId) {
       throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_MISMATCH);
     }
 
@@ -51,19 +46,18 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
     }
 
     // Check if fingerprint is already linked to another account
-    const existingAccountWithFingerprint = await accountsRef
-      .where("fingerprintId", "==", fingerprintId)
-      .limit(1)
-      .get();
+    const existingAccountWithFingerprint = await db
+      .collection(COLLECTIONS.ACCOUNTS)
+      .findOne({ fingerprintId });
 
-    if (!existingAccountWithFingerprint.empty) {
+    if (existingAccountWithFingerprint) {
       throw new ApiError(400, ERROR_MESSAGES.FINGERPRINT_ALREADY_LINKED);
     }
 
-    const now = Timestamp.now();
+    const now = new Date();
 
     // Get the verified social identity from onboarding
-    const verifiedIdentity = onboarding.metadata?.verifiedSocialIdentity;
+    const verifiedIdentity = onboardingDoc.metadata?.verifiedSocialIdentity;
     if (!verifiedIdentity) {
       throw new ApiError(400, ERROR_MESSAGES.SOCIAL_IDENTITY_REQUIRED);
     }
@@ -80,30 +74,47 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
       metadata: {},
     };
 
-    const docRef = await accountsRef.add(account);
+    // Insert the account into MongoDB
+    const result = await db.collection(COLLECTIONS.ACCOUNTS).insertOne(account);
+    const accountId = result.insertedId.toString();
 
     // Update the fingerprint with the account ID
-    await db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId).update({
-      accountId: docRef.id,
-      walletAddress,
-    });
+    await db.collection(COLLECTIONS.FINGERPRINTS).updateOne(
+      { _id: fingerprintId },
+      {
+        $set: {
+          accountId,
+          walletAddress,
+        },
+      },
+    );
 
     // Update the anon social user record
-    await db.collection(COLLECTIONS.ANON_USERS).doc(verifiedIdentity.anonUserId).update({
-      status: "claimed",
-      linkedAccountId: docRef.id,
-      claimedAt: now,
-      updatedAt: now,
-    });
+    await db.collection(COLLECTIONS.ANON_USERS).updateOne(
+      { _id: verifiedIdentity.anonUserId },
+      {
+        $set: {
+          status: "claimed",
+          linkedAccountId: accountId,
+          claimedAt: now,
+          updatedAt: now,
+        },
+      },
+    );
 
     // Update onboarding status
-    await onboardingRef.update({
-      stage: "hivemind_connected",
-      accountId: docRef.id,
-      updatedAt: now,
-    });
+    await db.collection(COLLECTIONS.ONBOARDING).updateOne(
+      { _id: onboardingId },
+      {
+        $set: {
+          stage: "hivemind_connected",
+          accountId,
+          updatedAt: now,
+        },
+      },
+    );
 
-    return formatAccountResponse({ id: docRef.id, ...account });
+    return formatAccountResponse({ id: accountId, ...account });
   } catch (error) {
     console.error("[Create Account] Error:", {
       error,
@@ -116,18 +127,16 @@ export const createAccount = async (request: CreateAccountRequest): Promise<Acco
 
 export const getAccountById = async (accountId: string): Promise<Account | null> => {
   try {
-    const db = getFirestore();
-    const accountRef = db.collection(COLLECTIONS.ACCOUNTS).doc(accountId);
-    const accountDoc = await accountRef.get();
+    const db = await getDb();
+    const accountDoc = await db
+      .collection(COLLECTIONS.ACCOUNTS)
+      .findOne({ _id: toObjectId(accountId) });
 
-    if (!accountDoc.exists) {
+    if (!accountDoc) {
       return null;
     }
 
-    return {
-      id: accountDoc.id,
-      ...accountDoc.data(),
-    } as Account;
+    return formatDocument<Account>(accountDoc);
   } catch (error) {
     console.error("[Get Account] Error:", {
       error,
@@ -140,20 +149,14 @@ export const getAccountById = async (accountId: string): Promise<Account | null>
 
 export const getAccountByWalletAddress = async (walletAddress: string): Promise<Account | null> => {
   try {
-    const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
-    const query = accountsRef.where("walletAddress", "==", walletAddress).limit(1);
-    const querySnapshot = await query.get();
+    const db = await getDb();
+    const accountDoc = await db.collection(COLLECTIONS.ACCOUNTS).findOne({ walletAddress });
 
-    if (querySnapshot.empty) {
+    if (!accountDoc) {
       return null;
     }
 
-    const accountDoc = querySnapshot.docs[0];
-    return {
-      id: accountDoc.id,
-      ...accountDoc.data(),
-    } as Account;
+    return formatDocument<Account>(accountDoc);
   } catch (error) {
     console.error("[Get Account By Wallet] Error:", {
       error,
@@ -172,8 +175,7 @@ export const updateAccount = async ({
   request: UpdateAccountRequest;
 }): Promise<AccountResponse> => {
   try {
-    const db = getFirestore();
-    const accountsRef = db.collection(COLLECTIONS.ACCOUNTS);
+    const db = await getDb();
     const account = await getAccountById(accountId);
     if (!account) {
       throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
@@ -183,7 +185,10 @@ export const updateAccount = async ({
       ...request.body,
     };
 
-    await accountsRef.doc(accountId).update(updateData);
+    await db
+      .collection(COLLECTIONS.ACCOUNTS)
+      .updateOne({ _id: toObjectId(accountId) }, { $set: updateData });
+
     return formatAccountResponse({ ...account, ...updateData });
   } catch (error) {
     console.error("[Update Account] Error:", {

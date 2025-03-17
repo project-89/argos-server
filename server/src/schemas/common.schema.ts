@@ -1,18 +1,17 @@
 import { z } from "zod";
-import { Timestamp } from "firebase-admin/firestore";
 import { ERROR_MESSAGES } from "../constants";
 
-// Base schemas
-export const TimestampSchema = z.instanceof(Timestamp);
+// For MongoDB we'll use native Date objects
+export const TimestampSchema = z.instanceof(Date);
 
 // Common ID schemas
 export const AccountIdSchema = z.string().min(1, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
-export const FingerprintIdSchema = z.string().min(1, ERROR_MESSAGES.MISSING_FINGERPRINT);
+export const FingerprintIdSchema = z.string().min(36).max(40, ERROR_MESSAGES.INVALID_FINGERPRINT);
 export const VisitIdSchema = z.string().min(1, ERROR_MESSAGES.NOT_FOUND);
 export const ImpressionIdSchema = z.string().min(1, ERROR_MESSAGES.NOT_FOUND);
 
 // Common data schemas
-export const WalletAddressSchema = z.string().regex(/^[A-HJ-NP-Za-km-z1-9]*$/, {
+export const WalletAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, {
   message: ERROR_MESSAGES.INVALID_INPUT,
 });
 
@@ -26,8 +25,8 @@ export const BaseResponseSchema = z.object({
 
 // Common request fields
 export const PaginationParamsSchema = z.object({
-  limit: z.number().min(1).max(100).optional().default(20),
-  offset: z.number().min(0).optional().default(0),
+  limit: z.string().transform(Number).optional().default("10"),
+  offset: z.string().transform(Number).optional().default("0"),
 });
 
 export const DateRangeSchema = z.object({

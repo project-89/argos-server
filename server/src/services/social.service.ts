@@ -1,8 +1,7 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES, TAG_LIMITS } from "../constants";
 import { AnonUser, FindAnonUserParams, DiscoveryInfo, SocialPlatform } from "../schemas";
-
 import { hashSocialIdentity, ApiError } from "../utils";
+import { getDb, formatDocument } from "../utils/mongodb";
 
 const LOG_PREFIX = "[Social Service]";
 
@@ -24,7 +23,7 @@ const createAnonUserData = ({
   usernameSalt: string;
   discoveryInfo: DiscoveryInfo;
   initialTagLimits: boolean;
-  now: Timestamp;
+  now: Date;
 }): Omit<AnonUser, "id"> => {
   const baseData = {
     identities: [
@@ -53,11 +52,11 @@ const createAnonUserData = ({
   return {
     ...baseData,
     tagLimits: {
-      firstTaggedAt: now,
+      firstTaggedAt: now.getTime(),
       remainingDailyTags: TAG_LIMITS.DAILY_TAGS,
-      lastTagResetAt: now,
-      createdAt: now,
-      updatedAt: now,
+      lastTagResetAt: now.getTime(),
+      createdAt: now.getTime(),
+      updatedAt: now.getTime(),
     },
   };
 };
@@ -72,14 +71,17 @@ const createDiscoveryUpdate = ({
 }: {
   platform: string;
   discoveryInfo: DiscoveryInfo;
-  now: Timestamp;
+  now: Date;
 }) => ({
-  "identities.0.lastSeen": now,
-  discoverySource: {
-    platform,
-    type: discoveryInfo.action,
-    createdAt: discoveryInfo.createdAt,
-    relatedHashedUsername: discoveryInfo.relatedHashedUsername,
+  $set: {
+    "identities.0.lastSeen": now,
+    discoverySource: {
+      platform,
+      type: discoveryInfo.action,
+      createdAt: discoveryInfo.createdAt,
+      relatedHashedUsername: discoveryInfo.relatedHashedUsername,
+    },
+    updatedAt: now,
   },
 });
 
@@ -91,25 +93,23 @@ const createDiscoveryUpdate = ({
 export const findAnonUser = async ({
   hashedUsername,
 }: FindAnonUserParams): Promise<{
-  doc: FirebaseFirestore.QueryDocumentSnapshot;
+  id: string;
   data: AnonUser;
 } | null> => {
   try {
     console.log(`${LOG_PREFIX} Finding anonymous user with hashed username: ${hashedUsername}`);
-    const db = getFirestore();
-    const query = db
+    const db = await getDb();
+    const existingUser = await db
       .collection(COLLECTIONS.ANON_USERS)
-      .where("identities.hashedUsername", "==", hashedUsername);
-    const existingDocs = await query.get();
+      .findOne({ "identities.hashedUsername": hashedUsername });
 
-    if (existingDocs.empty) {
+    if (!existingUser) {
       return null;
     }
 
-    const doc = existingDocs.docs[0];
     return {
-      doc,
-      data: { id: doc.id, ...doc.data() } as AnonUser,
+      id: existingUser.id,
+      data: formatDocument(existingUser) as AnonUser,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in findAnonUser:`, error);
@@ -126,7 +126,7 @@ export const findAnonUserByUsername = async ({
 }: {
   username: string;
   platform: SocialPlatform;
-}): Promise<{ doc: FirebaseFirestore.QueryDocumentSnapshot; data: AnonUser } | null> => {
+}): Promise<{ id: string; data: AnonUser } | null> => {
   try {
     console.log(`${LOG_PREFIX} Finding anonymous user by username: ${username}`);
     const { hashedUsername } = hashSocialIdentity(platform, username);
@@ -153,8 +153,8 @@ export const createAnonUser = async ({
 }): Promise<AnonUser> => {
   try {
     console.log(`${LOG_PREFIX} Creating new anonymous user with username: ${username}`);
-    const db = getFirestore();
-    const now = Timestamp.now();
+    const db = await getDb();
+    const now = new Date();
     const { hashedUsername, usernameSalt } = hashSocialIdentity(platform, username);
 
     const userData = createAnonUserData({
@@ -166,14 +166,13 @@ export const createAnonUser = async ({
       now,
     });
 
-    const newDoc = await db.collection(COLLECTIONS.ANON_USERS).add(userData);
-    const newDocData = await newDoc.get();
+    const userWithId = {
+      id: crypto.randomUUID(),
+      ...userData,
+    };
 
-    if (!newDocData.exists) {
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
-
-    return { id: newDoc.id, ...newDocData.data() } as AnonUser;
+    await db.collection(COLLECTIONS.ANON_USERS).insertOne(userWithId);
+    return userWithId as AnonUser;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in createAnonUser:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
@@ -184,19 +183,21 @@ export const createAnonUser = async ({
  * Update an anonymous social user's discovery information
  */
 export const updateAnonUserDiscovery = async ({
-  docRef,
+  userId,
   platform,
   discoveryInfo,
 }: {
-  docRef: FirebaseFirestore.DocumentReference;
+  userId: string;
   platform: "x";
   discoveryInfo: DiscoveryInfo;
 }): Promise<void> => {
   try {
     console.log(`${LOG_PREFIX} Updating anonymous user discovery`);
-    const now = Timestamp.now();
+    const db = await getDb();
+    const now = new Date();
     const update = createDiscoveryUpdate({ platform, discoveryInfo, now });
-    await docRef.update(update);
+
+    await db.collection(COLLECTIONS.ANON_USERS).updateOne({ id: userId }, update);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error in updateAnonUserDiscovery:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
@@ -225,7 +226,7 @@ export const handleSocialUser = async ({
     // If found, update discovery and return
     if (existingUser) {
       await updateAnonUserDiscovery({
-        docRef: existingUser.doc.ref,
+        userId: existingUser.id,
         platform,
         discoveryInfo,
       });

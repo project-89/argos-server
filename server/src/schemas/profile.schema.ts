@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { StatsResponseSchema, ContactInfoSchema, PreferencesSchema, TimestampSchema } from ".";
+import { StatsResponseSchema, ContactInfoSchema, PreferencesSchema } from ".";
 
 // Request Validation Schemas
 export const ProfileCreateSchema = z.object({
@@ -67,15 +67,12 @@ export const ProfileSchema = z.object({
   avatarUrl: z.string(),
   contactInfo: ContactInfoSchema,
   preferences: PreferencesSchema,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
-});
-
-// API Response Schema
-export const ProfileResponseSchema = ProfileSchema.extend({
   createdAt: z.number(),
   updatedAt: z.number(),
 });
+
+// API Response Schema
+export const ProfileResponseSchema = ProfileSchema;
 
 export const ProfileWithStatsResponseSchema = ProfileResponseSchema.extend({
   stats: StatsResponseSchema.nullable(),

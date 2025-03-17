@@ -1,4 +1,3 @@
-import { Timestamp } from "firebase-admin/firestore";
 import { IpMetadata } from "../schemas";
 
 /**
@@ -9,7 +8,7 @@ export const createInitialIpMetadata = ({
   timestamp,
 }: {
   ip: string;
-  timestamp: Timestamp;
+  timestamp: number;
 }): IpMetadata => ({
   primaryIp: ip,
   ipFrequency: { [ip]: 1 },
@@ -26,9 +25,9 @@ export const updateIpFrequency = ({
 }: {
   ipMetadata: IpMetadata;
   ip: string;
-}): { frequency: number; lastSeen: Timestamp } => {
+}): { frequency: number; lastSeen: number } => {
   const newFrequency = (ipMetadata.ipFrequency[ip] || 0) + 1;
-  const lastSeen = Timestamp.now();
+  const lastSeen = Date.now();
   return { frequency: newFrequency, lastSeen };
 };
 
@@ -94,21 +93,20 @@ export const updateIpMetadata = ({
 };
 
 /**
- * Updates document with new IP data in a transaction
+ * Updates document with new IP data in a MongoDB transaction
  */
 export const updateIpDataInTransaction = ({
-  transaction,
-  docRef,
+  session,
+  collection,
+  docId,
   ipAddresses,
   ipMetadata,
 }: {
-  transaction: FirebaseFirestore.Transaction;
-  docRef: FirebaseFirestore.DocumentReference;
+  session: any;
+  collection: any;
+  docId: string;
   ipAddresses: string[];
   ipMetadata: IpMetadata;
 }): void => {
-  transaction.update(docRef, {
-    ipAddresses,
-    ipMetadata,
-  });
+  collection.updateOne({ _id: docId }, { $set: { ipAddresses, ipMetadata } }, { session });
 };

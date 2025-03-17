@@ -1,4 +1,3 @@
-import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils/error";
 import {
@@ -10,38 +9,41 @@ import {
 } from "../schemas";
 import { getFingerprintById } from "./fingerprint.service";
 import { hashSocialIdentity } from "../utils/hash";
+import { getDb, formatDocument } from "../utils/mongodb";
+
+const LOG_PREFIX = "[Onboarding Service]";
 
 // Constants for social verification
 const REQUIRED_MENTION = "@index89";
 const POST_AGE_LIMIT = 5 * 60 * 1000; // 5 minutes in milliseconds
 
 const findExistingAnonUser = async ({
-  db,
   hashedUsername,
 }: {
-  db: FirebaseFirestore.Firestore;
   hashedUsername: string;
 }): Promise<{ id: string; data: any } | null> => {
-  const existingUserQuery = await db
-    .collection(COLLECTIONS.ANON_USERS)
-    .where("identity.hashedUsername", "==", hashedUsername)
-    .limit(1)
-    .get();
+  try {
+    const db = await getDb();
+    const existingUser = await db
+      .collection(COLLECTIONS.ANON_USERS)
+      .findOne({ "identity.hashedUsername": hashedUsername });
 
-  if (existingUserQuery.empty) {
-    return null;
+    if (!existingUser) {
+      return null;
+    }
+
+    return { id: existingUser.id, data: existingUser };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error finding existing anon user:`, error);
+    throw error;
   }
-
-  const doc = existingUserQuery.docs[0];
-  return { id: doc.id, data: doc.data() };
 };
 
 export const startOnboarding = async (
   request: StartOnboardingRequest,
 ): Promise<OnboardingProgress> => {
   try {
-    const db = getFirestore();
-    const onboardingRef = db.collection(COLLECTIONS.ONBOARDING);
+    const db = await getDb();
     const { fingerprintId } = request.body;
 
     // Verify fingerprint exists
@@ -50,7 +52,7 @@ export const startOnboarding = async (
       throw new ApiError(404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const now = Timestamp.now();
+    const now = new Date();
 
     // Create initial onboarding progress
     const onboarding: Omit<OnboardingProgress, "id"> = {
@@ -74,27 +76,31 @@ export const startOnboarding = async (
       updatedAt: now,
     };
 
-    const docRef = await onboardingRef.add(onboarding);
-    return { id: docRef.id, ...onboarding };
+    const onboardingWithId = {
+      id: crypto.randomUUID(),
+      ...onboarding,
+    };
+
+    await db.collection(COLLECTIONS.ONBOARDING).insertOne(onboardingWithId);
+    return onboardingWithId as OnboardingProgress;
   } catch (error) {
-    console.error("[Start Onboarding] Error:", error);
+    console.error(`${LOG_PREFIX} Error starting onboarding:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_START_ONBOARDING);
   }
 };
 
 export const verifyMission = async (request: VerifyMissionRequest): Promise<OnboardingProgress> => {
   try {
-    const db = getFirestore();
+    const db = await getDb();
     const { onboardingId } = request.params;
     const { missionId, proof } = request.body;
-    const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
 
-    const doc = await onboardingRef.get();
-    if (!doc.exists) {
+    const onboardingDoc = await db.collection(COLLECTIONS.ONBOARDING).findOne({ id: onboardingId });
+    if (!onboardingDoc) {
       throw new ApiError(404, ERROR_MESSAGES.ONBOARDING_NOT_FOUND);
     }
 
-    const onboarding = { id: doc.id, ...doc.data() } as OnboardingProgress;
+    const onboarding = onboardingDoc as OnboardingProgress;
 
     if (onboarding.stage === "hivemind_connected") {
       throw new ApiError(400, ERROR_MESSAGES.ONBOARDING_ALREADY_COMPLETED);
@@ -129,14 +135,14 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
         throw new ApiError(400, "Post is too old. Must be created within the last 5 minutes.");
       }
 
-      const now = Timestamp.now();
+      const now = new Date();
       const { hashedUsername, usernameSalt } = hashSocialIdentity(
         socialProof.platform,
         socialProof.username,
       );
 
       // Check if this social identity already exists
-      const existingAnonUser = await findExistingAnonUser({ db, hashedUsername });
+      const existingAnonUser = await findExistingAnonUser({ hashedUsername });
       let anonSocialUserId: string;
 
       const verificationProof = {
@@ -153,27 +159,29 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
       if (existingAnonUser) {
         // Update existing user
         anonSocialUserId = existingAnonUser.id;
-        await db
-          .collection(COLLECTIONS.ANON_USERS)
-          .doc(anonSocialUserId)
-          .update({
-            "identity.lastSeen": now,
-            "identity.verifiedAt": now,
-            "identity.verificationMethod": "social_proof",
-            status: "verified",
-            linkedFingerprintId: onboarding.fingerprintId,
-            discoveryHistory: FieldValue.arrayUnion(discoveryHistory),
-            metadata: {
-              ...existingAnonUser.data.metadata,
-              hivemindVerification: {
+        await db.collection(COLLECTIONS.ANON_USERS).updateOne(
+          { id: anonSocialUserId },
+          {
+            $set: {
+              "identity.lastSeen": now,
+              "identity.verifiedAt": now,
+              "identity.verificationMethod": "social_proof",
+              status: "verified",
+              linkedFingerprintId: onboarding.fingerprintId,
+              "metadata.hivemindVerification": {
                 verifiedAt: now,
                 proof: verificationProof,
               },
             },
-          });
+            $push: {
+              discoveryHistory: discoveryHistory,
+            },
+          },
+        );
       } else {
         // Create new user
-        const anonUserRef = await db.collection(COLLECTIONS.ANON_USERS).add({
+        const anonUser = {
+          id: crypto.randomUUID(),
           identity: {
             platform: socialProof.platform,
             hashedUsername,
@@ -195,8 +203,10 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
               proof: verificationProof,
             },
           },
-        });
-        anonSocialUserId = anonUserRef.id;
+        };
+
+        await db.collection(COLLECTIONS.ANON_USERS).insertOne(anonUser);
+        anonSocialUserId = anonUser.id;
       }
 
       // Store verification info in onboarding metadata
@@ -233,7 +243,7 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
       }
 
       // TODO: Implement wallet signature verification
-      const now = Timestamp.now();
+      const now = new Date();
       mission.status = "completed";
       mission.completedAt = now;
       mission.proof = proof;
@@ -245,28 +255,46 @@ export const verifyMission = async (request: VerifyMissionRequest): Promise<Onbo
       onboarding.stage = "wallet_created";
     }
 
-    onboarding.updatedAt = Timestamp.now();
-    await onboardingRef.update(onboarding);
+    onboarding.updatedAt = new Date();
+
+    // Find and update the mission in the missions array
+    const missionIndex = onboarding.missions.findIndex((m) => m.id === missionId);
+    if (missionIndex !== -1) {
+      onboarding.missions[missionIndex] = mission;
+    }
+
+    // Update the onboarding document
+    await db.collection(COLLECTIONS.ONBOARDING).updateOne(
+      { id: onboardingId },
+      {
+        $set: {
+          missions: onboarding.missions,
+          stage: onboarding.stage,
+          updatedAt: onboarding.updatedAt,
+          metadata: onboarding.metadata,
+        },
+      },
+    );
 
     return onboarding;
   } catch (error) {
-    console.error("[Verify Mission] Error:", error);
+    console.error(`${LOG_PREFIX} Error verifying mission:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_VERIFY_MISSION);
   }
 };
 
 export const getOnboardingProgress = async (onboardingId: string): Promise<OnboardingProgress> => {
   try {
-    const db = getFirestore();
-    const doc = await db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId).get();
+    const db = await getDb();
+    const onboarding = await db.collection(COLLECTIONS.ONBOARDING).findOne({ id: onboardingId });
 
-    if (!doc.exists) {
+    if (!onboarding) {
       throw new ApiError(404, ERROR_MESSAGES.ONBOARDING_NOT_FOUND);
     }
 
-    return { id: doc.id, ...doc.data() } as OnboardingProgress;
+    return formatDocument(onboarding) as OnboardingProgress;
   } catch (error) {
-    console.error("[Get Onboarding Progress] Error:", error);
+    console.error(`${LOG_PREFIX} Error getting onboarding progress:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_ONBOARDING);
   }
 };
@@ -275,17 +303,12 @@ export const completeOnboarding = async (
   request: CompleteOnboardingRequest,
 ): Promise<OnboardingProgress> => {
   try {
-    const db = getFirestore();
+    const db = await getDb();
     const { onboardingId } = request.params;
-    const { walletAddress } = request.body;
-    const onboardingRef = db.collection(COLLECTIONS.ONBOARDING).doc(onboardingId);
+    const { walletAddress, signature, message, timestamp } = request.body;
 
-    const doc = await onboardingRef.get();
-    if (!doc.exists) {
-      throw new ApiError(404, ERROR_MESSAGES.ONBOARDING_NOT_FOUND);
-    }
-
-    const onboarding = { id: doc.id, ...doc.data() } as OnboardingProgress;
+    // Get the onboarding progress
+    const onboarding = await getOnboardingProgress(onboardingId);
 
     if (onboarding.stage === "hivemind_connected") {
       throw new ApiError(400, ERROR_MESSAGES.ONBOARDING_ALREADY_COMPLETED);
@@ -295,32 +318,38 @@ export const completeOnboarding = async (
       throw new ApiError(400, ERROR_MESSAGES.INVALID_MISSION_ORDER);
     }
 
-    // Verify wallet signature
-    // TODO: Implement signature verification
+    // TODO: Verify wallet signature
+    // TODO: Create account with social and wallet details
 
-    // Create the account with the verified social identity
-    const now = Timestamp.now();
-    const accountRef = await db.collection(COLLECTIONS.ACCOUNTS).add({
-      walletAddress,
-      fingerprintId: onboarding.fingerprintId,
-      createdAt: now,
-      lastLogin: now,
-      status: "active",
-      metadata: {},
-      verifiedSocialIdentities: onboarding.metadata?.verifiedSocialIdentity
-        ? [onboarding.metadata.verifiedSocialIdentity]
-        : [],
-    });
+    const now = new Date();
 
-    // Update onboarding with account ID
-    onboarding.accountId = accountRef.id;
+    // Update onboarding with completion
     onboarding.stage = "hivemind_connected";
     onboarding.updatedAt = now;
-    await onboardingRef.update(onboarding);
+    onboarding.metadata = {
+      ...onboarding.metadata,
+      verifiedWallet: {
+        address: walletAddress,
+        verifiedAt: now,
+        signatureProof: signature,
+      },
+    };
+
+    // Update the database
+    await db.collection(COLLECTIONS.ONBOARDING).updateOne(
+      { id: onboardingId },
+      {
+        $set: {
+          stage: onboarding.stage,
+          updatedAt: onboarding.updatedAt,
+          metadata: onboarding.metadata,
+        },
+      },
+    );
 
     return onboarding;
   } catch (error) {
-    console.error("[Complete Onboarding] Error:", error);
+    console.error(`${LOG_PREFIX} Error completing onboarding:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_COMPLETE_ONBOARDING);
   }
 };

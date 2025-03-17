@@ -1,49 +1,61 @@
-import { getFirestore, Timestamp, FieldValue } from "firebase-admin/firestore";
-import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import { TagData, TagLimitData, TagResponse, TagUserParams } from "../schemas/tag.schema";
-import { AnonUser, SocialPlatform } from "../schemas/social.schema";
 import { ApiError } from "../utils";
-import { handleSocialUser } from "./social.service";
+import { ERROR_MESSAGES } from "../constants";
+import { COLLECTIONS } from "../constants/database/collections";
+import { ALLOWED_TAG_TYPES, TAG_LIMITS } from "../constants/features/tags";
+import {
+  TagData,
+  TagLimitData,
+  TagLeaderboardResponse,
+  TagStats,
+  TagUserParams,
+} from "../schemas/tag.schema";
+import {
+  getDb,
+  formatDocument,
+  formatDocuments,
+  toObjectId,
+  handleMongoError,
+} from "../utils/mongodb";
 
 const LOG_PREFIX = "[Tag Service]";
-const MAX_DAILY_TAGS = 3;
+const MAX_DAILY_TAGS = TAG_LIMITS.DAILY_TAGS;
 const MILLISECONDS_IN_DAY = 24 * 60 * 60 * 1000;
 
-// Pure Functions
-const isValidTagAttempt = (taggerUsername: string, targetUsername: string): boolean => {
-  console.log(`${LOG_PREFIX} Validating tag attempt: ${taggerUsername} -> ${targetUsername}`);
-  return taggerUsername !== targetUsername;
-};
-
-const hasTagType = (user: AnonUser, tagType: string): boolean => {
-  console.log(`${LOG_PREFIX} Checking if user has tag type: ${tagType}`);
-  return user.tags.some((tag) => tag.type === tagType);
-};
-
-const createTagData = (
-  taggerIdentity: { hashedUsername: string },
+// Pure functions
+export function isValidTagAttempt(
+  taggerUsername: string,
+  targetUsername: string,
   tagType: string,
-  platform: SocialPlatform,
-): TagData => {
-  console.log(
-    `${LOG_PREFIX} Creating tag data for: ${taggerIdentity.hashedUsername} -> ${tagType}`,
-  );
+): boolean {
+  if (taggerUsername === targetUsername) {
+    return false; // Can't tag yourself
+  }
+  if (!Object.values(ALLOWED_TAG_TYPES).includes(tagType as any)) {
+    return false; // Invalid tag type
+  }
+  return true;
+}
+
+export function hasTagType(tagTypes: Record<string, number>, tagType: string): boolean {
+  return Boolean(tagTypes && tagTypes[tagType] && tagTypes[tagType] > 0);
+}
+
+export function createTagData(taggerId: string, tagType: string, platform: string): TagData {
   return {
     type: tagType,
-    taggedBy: taggerIdentity.hashedUsername,
-    taggedAt: Timestamp.now(),
-    platform,
+    taggedBy: taggerId,
+    taggedAt: Date.now(),
+    platform: platform as any,
   };
-};
+}
 
-const shouldResetDailyTags = (lastResetTime: Timestamp): boolean => {
-  console.log(`${LOG_PREFIX} Checking if daily tags should be reset`);
-  const now = Timestamp.now();
-  return now.toMillis() - lastResetTime.toMillis() >= MILLISECONDS_IN_DAY;
-};
+export function shouldResetDailyTags(lastReset: number): boolean {
+  const now = Date.now();
+  return now - lastReset > MILLISECONDS_IN_DAY;
+}
 
-const createInitialTagLimits = (now: Timestamp): TagLimitData => {
-  console.log(`${LOG_PREFIX} Creating initial tag limits`);
+export function createInitialTagLimits(): TagLimitData {
+  const now = Date.now();
   return {
     firstTaggedAt: now,
     remainingDailyTags: MAX_DAILY_TAGS,
@@ -51,285 +63,359 @@ const createInitialTagLimits = (now: Timestamp): TagLimitData => {
     createdAt: now,
     updatedAt: now,
   };
-};
+}
 
-const calculateNewTagLimits = (
-  currentLimits: TagLimitData,
-  shouldReset: boolean,
-  shouldDecrement: boolean,
-): TagLimitData => {
-  console.log(`${LOG_PREFIX} Calculating new tag limits`);
-  const now = Timestamp.now();
-  if (shouldReset) {
-    return {
-      ...currentLimits,
-      remainingDailyTags: MAX_DAILY_TAGS,
-      lastTagResetAt: now,
-      updatedAt: now,
-    };
-  }
-  if (shouldDecrement) {
-    return {
-      ...currentLimits,
-      remainingDailyTags: currentLimits.remainingDailyTags - 1,
-      updatedAt: now,
-    };
-  }
-  return currentLimits;
-};
+export function calculateNewTagLimits(
+  existingLimits: TagLimitData,
+  hasEarnedTag: boolean,
+): TagLimitData {
+  const now = Date.now();
+  let { remainingDailyTags, lastTagResetAt } = existingLimits;
 
-// Database Operations
-const updateUserTagLimits = async (userId: string, tagLimits: TagLimitData): Promise<void> => {
-  console.log(`${LOG_PREFIX} Updating user tag limits for: ${userId}`);
-  const db = getFirestore();
-  await db.collection(COLLECTIONS.ANON_USERS).doc(userId).update({ tagLimits });
-};
-
-const addTagToUser = async (userId: string, tag: TagData): Promise<void> => {
-  console.log(`${LOG_PREFIX} Adding tag to user: ${userId}`);
-  const db = getFirestore();
-  const anonUserRef = db.collection(COLLECTIONS.ANON_USERS).doc(userId);
-  const anonUserDoc = await anonUserRef.get();
-
-  if (!anonUserDoc.exists) {
-    throw new ApiError(404, ERROR_MESSAGES.USER_NOT_FOUND);
+  // Check if daily limit should be reset
+  if (shouldResetDailyTags(lastTagResetAt)) {
+    remainingDailyTags = MAX_DAILY_TAGS;
+    lastTagResetAt = now;
   }
 
-  await anonUserRef.update({
-    tags: FieldValue.arrayUnion(tag),
-    updatedAt: Timestamp.now(),
-  });
-};
+  // If user has already been tagged, they get rewarded with extra tags
+  if (hasEarnedTag) {
+    remainingDailyTags += 1; // Bonus tag for being tagged
+  } else if (remainingDailyTags > 0) {
+    remainingDailyTags -= 1; // Use a tag
+  }
 
-const processTagLimits = async (user: AnonUser, targetHasTag: boolean): Promise<number> => {
-  console.log(`${LOG_PREFIX} Processing tag limits for user: ${user.id}`);
+  return {
+    ...existingLimits,
+    remainingDailyTags,
+    lastTagResetAt,
+    updatedAt: now,
+  };
+}
+
+// Database operations
+
+/**
+ * Update the tag limits for a user
+ */
+export async function updateUserTagLimits(
+  userId: string,
+  newLimits: TagLimitData,
+): Promise<TagLimitData> {
   try {
-    const now = Timestamp.now();
+    const db = await getDb();
 
-    // Initialize tag limits if they don't exist
-    if (!user.tagLimits) {
-      const newTagLimits = createInitialTagLimits(now);
-      await updateUserTagLimits(user.id, newTagLimits);
-      return MAX_DAILY_TAGS;
+    // Upsert tag limits doc
+    const result = await db.collection(COLLECTIONS.ANON_USERS).updateOne(
+      { _id: userId },
+      {
+        $set: {
+          tagLimits: newLimits,
+          updatedAt: Date.now(),
+        },
+        $setOnInsert: {
+          createdAt: Date.now(),
+        },
+      },
+      { upsert: true },
+    );
+
+    if (!result.acknowledged) {
+      throw new Error(`Failed to update tag limits for user ${userId}`);
     }
 
-    const { lastTagResetAt, remainingDailyTags } = user.tagLimits;
-    const needsReset = shouldResetDailyTags(lastTagResetAt);
-
-    // Handle daily reset
-    if (needsReset) {
-      const updatedLimits = calculateNewTagLimits(user.tagLimits, true, false);
-      await updateUserTagLimits(user.id, updatedLimits);
-      return MAX_DAILY_TAGS;
-    }
-
-    // Handle tag attempt on already tagged user
-    if (targetHasTag) {
-      if (remainingDailyTags <= 0) {
-        throw new ApiError(403, ERROR_MESSAGES.NO_REMAINING_TAGS);
-      }
-
-      const updatedLimits = calculateNewTagLimits(user.tagLimits, false, true);
-      await updateUserTagLimits(user.id, updatedLimits);
-      return updatedLimits.remainingDailyTags;
-    }
-
-    return remainingDailyTags;
+    return newLimits;
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in processTagLimits:`, error);
+    console.error(`${LOG_PREFIX} Failed to update tag limits:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-};
+}
 
-const getOrCreateUsers = async (
+/**
+ * Add a tag to a user's profile
+ */
+export async function addTagToUser(userId: string, tag: TagData): Promise<void> {
+  try {
+    const db = await getDb();
+
+    // Add tag to user document
+    const result = await db.collection(COLLECTIONS.ANON_USERS).updateOne(
+      { _id: userId },
+      {
+        $push: { taggedBy: tag },
+        $set: { updatedAt: Date.now() },
+      },
+    );
+
+    if (!result.acknowledged) {
+      throw new Error(`Failed to add tag for user ${userId}`);
+    }
+
+    // Update tag stats
+    await db.collection(COLLECTIONS.TAG_STATS).updateOne(
+      { fingerprintId: tag.taggedBy },
+      {
+        $inc: {
+          totalTagsMade: 1,
+          dailyTags: 1,
+          weeklyTags: 1,
+          monthlyTags: 1,
+          [`tagTypes.${tag.type}`]: 1,
+        },
+        $set: {
+          lastTagAt: Date.now(),
+          updatedAt: Date.now(),
+        },
+        $setOnInsert: {
+          createdAt: Date.now(),
+          streak: 1,
+        },
+      },
+      { upsert: true },
+    );
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to add tag:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+}
+
+/**
+ * Process tag limits for a user
+ */
+export async function processTagLimits(taggerId: string, targetHasTag: boolean): Promise<number> {
+  try {
+    const db = await getDb();
+
+    // Get current tag limits
+    const user = await db.collection(COLLECTIONS.ANON_USERS).findOne({ _id: taggerId });
+
+    // Initialize or update tag limits
+    let tagLimits: TagLimitData;
+    if (!user || !user.tagLimits) {
+      tagLimits = createInitialTagLimits();
+    } else {
+      tagLimits = calculateNewTagLimits(user.tagLimits, targetHasTag);
+    }
+
+    // Update the user's tag limits
+    await updateUserTagLimits(taggerId, tagLimits);
+
+    return tagLimits.remainingDailyTags;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to process tag limits:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
+}
+
+/**
+ * Get or create users involved in a tag
+ * @param taggerUsername
+ * @param targetUsername
+ * @param platform
+ */
+export async function getOrCreateUsers(
   taggerUsername: string,
   targetUsername: string,
-  platform: "x",
-): Promise<[AnonUser, AnonUser]> => {
-  console.log(`${LOG_PREFIX} Getting or creating users: ${taggerUsername} -> ${targetUsername}`);
-  const now = Timestamp.now();
-  return Promise.all([
-    handleSocialUser({
-      username: taggerUsername,
-      platform,
-      discoveryInfo: {
-        action: "tagging",
-        createdAt: now,
-        relatedHashedUsername: targetUsername,
+  platform: string,
+): Promise<{ taggerId: string; targetId: string }> {
+  try {
+    const db = await getDb();
+    const now = Date.now();
+
+    // Create or get tagger
+    const taggerResult = await db.collection(COLLECTIONS.ANON_USERS).findOneAndUpdate(
+      { username: taggerUsername, platform },
+      {
+        $setOnInsert: {
+          username: taggerUsername,
+          platform,
+          createdAt: now,
+          updatedAt: now,
+        },
       },
-      initialTagLimits: true,
-    }),
-    handleSocialUser({
-      username: targetUsername,
-      platform,
-      discoveryInfo: {
-        action: "being_tagged",
-        createdAt: now,
-        relatedHashedUsername: taggerUsername,
+      { upsert: true, returnDocument: "after" },
+    );
+
+    // Create or get target
+    const targetResult = await db.collection(COLLECTIONS.ANON_USERS).findOneAndUpdate(
+      { username: targetUsername, platform },
+      {
+        $setOnInsert: {
+          username: targetUsername,
+          platform,
+          createdAt: now,
+          updatedAt: now,
+        },
       },
-      initialTagLimits: true,
-    }),
-  ]);
-};
+      { upsert: true, returnDocument: "after" },
+    );
+
+    if (!taggerResult.value || !targetResult.value) {
+      throw new Error("Failed to get or create users");
+    }
+
+    return {
+      taggerId: taggerResult.value._id.toString(),
+      targetId: targetResult.value._id.toString(),
+    };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to get or create users:`, error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.USER_NOT_FOUND);
+  }
+}
 
 /**
  * Tag a user by their social identity
- * You can tag any number of users who aren't already "it"
- * Attempting to tag someone who is already "it" costs one daily tag
  */
-export const tagUserBySocialIdentity = async ({
+export async function tagUserBySocialIdentity({
   taggerUsername,
   targetUsername,
-  platform = "x",
+  platform,
   tagType,
-}: TagUserParams): Promise<TagResponse> => {
+}: TagUserParams): Promise<{ success: boolean; message: string; remainingTags: number }> {
   try {
-    console.log(
-      `${LOG_PREFIX} Tagging user by social identity: ${taggerUsername} -> ${targetUsername}`,
-    );
-    // Validate basic requirements
-    if (!isValidTagAttempt(taggerUsername, targetUsername)) {
-      throw new ApiError(400, ERROR_MESSAGES.CANNOT_TAG_SELF);
+    if (!isValidTagAttempt(taggerUsername, targetUsername, tagType)) {
+      return {
+        success: false,
+        message: "Invalid tag attempt",
+        remainingTags: 0,
+      };
     }
 
-    // Get or create user records
-    const [tagger, target] = await getOrCreateUsers(taggerUsername, targetUsername, platform);
+    const db = await getDb();
 
-    // Validate tag possession
-    if (!hasTagType(tagger, tagType)) {
-      throw new ApiError(403, ERROR_MESSAGES.NOT_IT);
+    // Get or create users
+    const { taggerId, targetId } = await getOrCreateUsers(taggerUsername, targetUsername, platform);
+
+    // Check if target is already tagged by tagger
+    const targetUser = await db.collection(COLLECTIONS.ANON_USERS).findOne({ _id: targetId });
+
+    if (
+      targetUser?.taggedBy?.some(
+        (tag: TagData) => tag.taggedBy === taggerId && tag.type === tagType,
+      )
+    ) {
+      return {
+        success: false,
+        message: "User already tagged",
+        remainingTags: 0,
+      };
     }
 
-    // Check if target already tagged
-    const targetHasTag = hasTagType(target, tagType);
-    if (targetHasTag) {
-      await processTagLimits(tagger, true);
-      throw new ApiError(400, ERROR_MESSAGES.ALREADY_TAGGED);
+    // Check tag limits
+    const targetHasTag =
+      targetUser?.taggedBy?.some((tag: TagData) => tag.taggedBy === taggerId) || false;
+    const remainingTags = await processTagLimits(taggerId, targetHasTag);
+
+    if (remainingTags <= 0) {
+      return {
+        success: false,
+        message: "Daily tag limit reached",
+        remainingTags: 0,
+      };
     }
 
-    // Get tagger's primary identity
-    const taggerIdentity = tagger.identities[0];
-    if (!taggerIdentity) {
-      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
-    }
-
-    // Create and add new tag
-    const tagData = createTagData(taggerIdentity, tagType, platform);
-    await addTagToUser(target.id, tagData);
-
-    // Process tag limits
-    const remainingTags = await processTagLimits(tagger, false);
+    // Add tag
+    const tag = createTagData(taggerId, tagType, platform);
+    await addTagToUser(targetId, tag);
 
     return {
       success: true,
-      message: `Successfully tagged user with ${tagType}`,
+      message: "User tagged successfully",
       remainingTags,
     };
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in tagUserBySocialIdentity:`, error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    console.error(`${LOG_PREFIX} Error tagging user:`, error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.USER_NOT_FOUND);
   }
-};
+}
 
 /**
- * Get all tags for a specific user
+ * Get tags for a user
  */
-export const getUserTags = async (username: string, platform: "x"): Promise<TagData[]> => {
+export async function getUserTags(username: string, platform?: string): Promise<TagData[]> {
   try {
-    console.log(`${LOG_PREFIX} Getting user tags for: ${username}`);
-    const db = getFirestore();
+    const db = await getDb();
 
-    // Get user by username
-    const usersRef = db.collection(COLLECTIONS.ANON_USERS);
-    const userQuery = await usersRef
-      .where("identities", "array-contains", { platform, username })
-      .limit(1)
-      .get();
+    // Find user
+    const query: any = { username };
+    if (platform) {
+      query.platform = platform;
+    }
 
-    if (userQuery.empty) {
+    const user = await db.collection(COLLECTIONS.ANON_USERS).findOne(query);
+
+    if (!user) {
       return [];
     }
 
-    const user = userQuery.docs[0].data() as AnonUser;
-    return user.tags || [];
+    return user.taggedBy || [];
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in getUserTags:`, error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+    console.error(`${LOG_PREFIX} Error getting user tags:`, error);
+    throw ApiError.from(error, 404, ERROR_MESSAGES.USER_NOT_FOUND);
   }
-};
+}
 
 /**
- * Get tag leaderboard based on timeframe
+ * Get tag leaderboard
  */
-export const getTagLeaderboard = async ({
-  timeFrame = "daily",
+export async function getTagLeaderboard(
+  timeFrame: "daily" | "weekly" | "monthly" | "allTime" = "allTime",
   limit = 10,
   offset = 0,
-}: {
-  timeFrame: "daily" | "weekly" | "monthly" | "allTime";
-  limit?: number;
-  offset?: number;
-}): Promise<{
-  users: Array<{
-    hashedUsername: string;
-    platform: SocialPlatform;
-    tagCount: number;
-  }>;
-  total: number;
-}> => {
+): Promise<TagLeaderboardResponse> {
   try {
-    console.log(`${LOG_PREFIX} Getting tag leaderboard for: ${timeFrame}`);
-    const db = getFirestore();
-    const now = Timestamp.now();
+    const db = await getDb();
+    const now = Date.now();
 
     // Calculate time range
-    let startTime: Timestamp;
+    let startTime = 0;
     switch (timeFrame) {
       case "daily":
-        startTime = Timestamp.fromMillis(now.toMillis() - MILLISECONDS_IN_DAY);
+        startTime = now - MILLISECONDS_IN_DAY;
         break;
       case "weekly":
-        startTime = Timestamp.fromMillis(now.toMillis() - 7 * MILLISECONDS_IN_DAY);
+        startTime = now - MILLISECONDS_IN_DAY * 7;
         break;
       case "monthly":
-        startTime = Timestamp.fromMillis(now.toMillis() - 30 * MILLISECONDS_IN_DAY);
-        break;
-      case "allTime":
-        startTime = Timestamp.fromMillis(0); // Beginning of time
+        startTime = now - MILLISECONDS_IN_DAY * 30;
         break;
       default:
-        startTime = Timestamp.fromMillis(now.toMillis() - MILLISECONDS_IN_DAY);
+        startTime = 0;
     }
 
-    // Query users with tags in the time range
-    const usersRef = db.collection(COLLECTIONS.ANON_USERS);
-    const usersQuery = usersRef
-      .where("tags", "array-contains", { taggedAt: { ">=": startTime } })
-      .orderBy("tags.length", "desc")
+    // Query tag stats that have been updated since startTime
+    const query: any = {};
+    if (timeFrame !== "allTime") {
+      query.lastTagAt = { $gte: startTime };
+    }
+
+    // Get leaderboard entries
+    const stats = await db
+      .collection(COLLECTIONS.TAG_STATS)
+      .find(query)
+      .sort({ totalTagsMade: -1 })
+      .skip(offset)
       .limit(limit)
-      .offset(offset);
+      .toArray();
 
-    const [usersSnapshot, totalCount] = await Promise.all([
-      usersQuery.get(),
-      usersQuery.count().get(),
-    ]);
-
-    const users = usersSnapshot.docs.map((doc) => {
-      const userData = doc.data() as AnonUser;
-      const identity = userData.identities[0]; // Use primary identity
-      return {
-        hashedUsername: identity.hashedUsername,
-        platform: identity.platform,
-        tagCount: userData.tags.filter((tag) => tag.taggedAt >= startTime).length,
-      };
-    });
-
-    return {
-      users,
-      total: totalCount.data().count,
+    const leaderboard: TagLeaderboardResponse = {
+      timeFrame,
+      entries: stats.map((stat: any) => ({
+        fingerprintId: stat.fingerprintId,
+        totalTags: stat.totalTagsMade,
+        lastTagAt: stat.lastTagAt,
+        createdAt: stat.createdAt,
+        updatedAt: stat.updatedAt,
+        streak: stat.streak || 0,
+        tagTypes: stat.tagTypes || {},
+      })),
+      generatedAt: now,
     };
+
+    return leaderboard;
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error in getTagLeaderboard:`, error);
+    console.error(`${LOG_PREFIX} Error getting tag leaderboard:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
-};
+}

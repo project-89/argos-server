@@ -1,4 +1,3 @@
-import { getFirestore } from "firebase-admin/firestore";
 import {
   COLLECTIONS,
   ERROR_MESSAGES,
@@ -8,8 +7,10 @@ import {
   Permission,
 } from "../constants";
 import { ApiError } from "../utils";
+import { getDb, toObjectId } from "../utils/mongodb";
 import { getAccountById } from "./account.service";
 
+const LOG_PREFIX = "[Role Service]";
 type AccountRole = (typeof ACCOUNT_ROLE)[keyof typeof ACCOUNT_ROLE];
 
 /**
@@ -85,9 +86,11 @@ export const assignRole = async (
     currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
-    await getFirestore().collection(COLLECTIONS.ACCOUNTS).doc(targetAccountId).update({
-      roles: updatedRoles,
-    });
+
+    const db = await getDb();
+    await db
+      .collection(COLLECTIONS.ACCOUNTS)
+      .updateOne({ _id: toObjectId(targetAccountId) }, { $set: { roles: updatedRoles } });
 
     return {
       accountId: targetAccountId,
@@ -97,7 +100,7 @@ export const assignRole = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error("Error in assignRole:", error);
+    console.error(`${LOG_PREFIX} Error in assignRole:`, error);
     throw new ApiError(500, ERROR_MESSAGES.FAILED_ASSIGN_ROLE);
   }
 };
@@ -133,9 +136,11 @@ export const removeRole = async (
     currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
 
     const updatedRoles = Array.from(currentRoles);
-    await getFirestore().collection(COLLECTIONS.ACCOUNTS).doc(targetAccountId).update({
-      roles: updatedRoles,
-    });
+
+    const db = await getDb();
+    await db
+      .collection(COLLECTIONS.ACCOUNTS)
+      .updateOne({ _id: toObjectId(targetAccountId) }, { $set: { roles: updatedRoles } });
 
     return {
       accountId: targetAccountId,
@@ -145,7 +150,7 @@ export const removeRole = async (
     if (error instanceof ApiError) {
       throw error;
     }
-    console.error("Error in removeRole:", error);
+    console.error(`${LOG_PREFIX} Error in removeRole:`, error);
     throw new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_ROLE);
   }
 };

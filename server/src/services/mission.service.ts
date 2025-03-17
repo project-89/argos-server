@@ -1,4 +1,3 @@
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { COLLECTIONS } from "../constants/database/collections";
 import {
   Mission,
@@ -6,13 +5,12 @@ import {
   MissionWithHistory,
   MissionStatusEnum,
 } from "../schemas/mission.schema";
+import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
 import { z } from "zod";
 
-const db = getFirestore();
+const LOG_PREFIX = "[Mission Service]";
 
 export class MissionService {
-  private collection = db.collection(COLLECTIONS.MISSIONS);
-
   /**
    * Create a new mission
    * @param mission Mission data to create
@@ -21,12 +19,21 @@ export class MissionService {
   async createMission(mission: Mission): Promise<Mission> {
     try {
       const validatedMission = MissionSchema.parse(mission);
-      const docRef = await this.collection.add(validatedMission);
-      const doc = await docRef.get();
-      const data = doc.data();
-      if (!data) throw new Error("Failed to create mission: No data returned");
-      return { id: doc.id, ...data } as Mission;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+
+      // Omit id field for insertion
+      const { id, ...missionData } = validatedMission;
+
+      const result = await collection.insertOne(missionData);
+      const insertedId = result.insertedId.toString();
+
+      return {
+        id: insertedId,
+        ...missionData,
+      } as Mission;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error creating mission:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to create mission: ${error.message}`);
       }
@@ -41,12 +48,15 @@ export class MissionService {
    */
   async getMission(id: string): Promise<Mission | null> {
     try {
-      const doc = await this.collection.doc(id).get();
-      if (!doc.exists) return null;
-      const data = doc.data();
-      if (!data) return null;
-      return { id: doc.id, ...data } as Mission;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+      const doc = await collection.findOne({ _id: toObjectId(id) });
+
+      if (!doc) return null;
+
+      return formatDocument(doc) as Mission;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error getting mission:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to get mission: ${error.message}`);
       }
@@ -61,12 +71,15 @@ export class MissionService {
    */
   async getMissionWithHistory(id: string): Promise<MissionWithHistory | null> {
     try {
-      const doc = await this.collection.doc(id).get();
-      if (!doc.exists) return null;
-      const data = doc.data();
-      if (!data) return null;
-      return { id: doc.id, ...data } as MissionWithHistory;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+      const doc = await collection.findOne({ _id: toObjectId(id) });
+
+      if (!doc) return null;
+
+      return formatDocument(doc) as MissionWithHistory;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error getting mission with history:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to get mission with history: ${error.message}`);
       }
@@ -85,13 +98,22 @@ export class MissionService {
     status: z.infer<typeof MissionStatusEnum>,
   ): Promise<Mission> {
     try {
-      const docRef = this.collection.doc(id);
-      await docRef.update({ status });
-      const doc = await docRef.get();
-      const data = doc.data();
-      if (!data) throw new Error("Failed to update mission status: No data returned");
-      return { id: doc.id, ...data } as Mission;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+
+      const result = await collection.findOneAndUpdate(
+        { _id: toObjectId(id) },
+        { $set: { status, updatedAt: Date.now() } },
+        { returnDocument: "after" },
+      );
+
+      if (!result) {
+        throw new Error("Failed to update mission status: No data returned");
+      }
+
+      return formatDocument(result) as Mission;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error updating mission status:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to update mission status: ${error.message}`);
       }
@@ -107,17 +129,17 @@ export class MissionService {
    */
   async getAvailableMissions(participantId: string, limit = 10): Promise<Mission[]> {
     try {
-      const snapshot = await this.collection
-        .where("status", "==", MissionStatusEnum.enum.available)
-        .limit(limit)
-        .get();
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
 
-      return snapshot.docs.map((doc) => {
-        const data = doc.data();
-        if (!data) throw new Error("Invalid mission data found");
-        return { id: doc.id, ...data } as Mission;
-      });
+      const docs = await collection
+        .find({ status: MissionStatusEnum.enum.available })
+        .limit(limit)
+        .toArray();
+
+      return formatDocuments(docs) as Mission[];
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error getting available missions:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to get available missions: ${error.message}`);
       }
@@ -132,14 +154,14 @@ export class MissionService {
    */
   async getMissionsByCreator(creatorId: string): Promise<Mission[]> {
     try {
-      const snapshot = await this.collection.where("createdBy", "==", creatorId).get();
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
 
-      return snapshot.docs.map((doc) => {
-        const data = doc.data();
-        if (!data) throw new Error("Invalid mission data found");
-        return { id: doc.id, ...data } as Mission;
-      });
+      const docs = await collection.find({ createdBy: creatorId }).toArray();
+
+      return formatDocuments(docs) as Mission[];
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error getting missions by creator:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to get missions by creator: ${error.message}`);
       }
@@ -154,8 +176,12 @@ export class MissionService {
    */
   async deleteMission(id: string): Promise<void> {
     try {
-      await this.collection.doc(id).delete();
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+
+      await collection.deleteOne({ _id: toObjectId(id) });
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error deleting mission:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to delete mission: ${error.message}`);
       }
@@ -174,13 +200,22 @@ export class MissionService {
     objectives: MissionWithHistory["objectives"],
   ): Promise<Mission> {
     try {
-      const docRef = this.collection.doc(id);
-      await docRef.update({ objectives });
-      const doc = await docRef.get();
-      const data = doc.data();
-      if (!data) throw new Error("Failed to update mission objectives: No data returned");
-      return { id: doc.id, ...data } as Mission;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+
+      const result = await collection.findOneAndUpdate(
+        { _id: toObjectId(id) },
+        { $set: { objectives, updatedAt: Date.now() } },
+        { returnDocument: "after" },
+      );
+
+      if (!result) {
+        throw new Error("Failed to update mission objectives: No data returned");
+      }
+
+      return formatDocument(result) as Mission;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error updating mission objectives:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to update mission objectives: ${error.message}`);
       }
@@ -195,17 +230,19 @@ export class MissionService {
    */
   async getActiveMissions(participantId: string): Promise<Mission[]> {
     try {
-      const snapshot = await this.collection
-        .where("status", "==", MissionStatusEnum.enum.active)
-        .where("participants", "array-contains", participantId)
-        .get();
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
 
-      return snapshot.docs.map((doc) => {
-        const data = doc.data();
-        if (!data) throw new Error("Invalid mission data found");
-        return { id: doc.id, ...data } as Mission;
-      });
+      const docs = await collection
+        .find({
+          status: MissionStatusEnum.enum.active,
+          participants: { $in: [participantId] },
+        })
+        .toArray();
+
+      return formatDocuments(docs) as Mission[];
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error getting active missions:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to get active missions: ${error.message}`);
       }
@@ -224,15 +261,25 @@ export class MissionService {
     failureRecord: NonNullable<MissionWithHistory["failureRecords"]>[number],
   ): Promise<Mission> {
     try {
-      const docRef = this.collection.doc(id);
-      await docRef.update({
-        failureRecords: FieldValue.arrayUnion(failureRecord),
-      });
-      const doc = await docRef.get();
-      const data = doc.data();
-      if (!data) throw new Error("Failed to add failure record: No data returned");
-      return { id: doc.id, ...data } as Mission;
+      const db = await getDb();
+      const collection = db.collection(COLLECTIONS.MISSIONS);
+
+      const result = await collection.findOneAndUpdate(
+        { _id: toObjectId(id) },
+        {
+          $push: { failureRecords: failureRecord },
+          $set: { updatedAt: Date.now() },
+        },
+        { returnDocument: "after" },
+      );
+
+      if (!result) {
+        throw new Error("Failed to add failure record: No data returned");
+      }
+
+      return formatDocument(result) as Mission;
     } catch (error: unknown) {
+      console.error(`${LOG_PREFIX} Error adding failure record:`, error);
       if (error instanceof Error) {
         throw new Error(`Failed to add failure record: ${error.message}`);
       }

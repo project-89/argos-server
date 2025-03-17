@@ -1,12 +1,11 @@
 import { z } from "zod";
-import { TimestampSchema } from "../schemas";
 import { ERROR_MESSAGES } from "../constants";
 
 // Domain Models
 export const IpMetadataSchema = z.object({
   primaryIp: z.string().optional(),
   ipFrequency: z.record(z.number()),
-  lastSeenAt: z.record(TimestampSchema),
+  lastSeenAt: z.record(z.number()),
   suspiciousIps: z.array(z.string()),
 });
 
@@ -16,8 +15,8 @@ export const FingerprintSchema = z.object({
   roles: z.array(z.string()),
   metadata: z.record(z.any()).optional(),
   ipAddresses: z.array(z.string()),
-  createdAt: TimestampSchema,
-  lastVisited: TimestampSchema,
+  createdAt: z.number(),
+  lastVisited: z.number(),
   ipMetadata: IpMetadataSchema,
   accountId: z.string().optional(), // Link to account when claimed
   anonUserId: z.string().optional(), // Single anon user link

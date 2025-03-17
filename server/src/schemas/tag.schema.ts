@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { ALLOWED_TAG_TYPES } from "../constants";
-import { AnonUser, SocialPlatformSchema, TimestampSchema } from ".";
+import { AnonUser, SocialPlatformSchema } from ".";
 
 // Base schemas
 
@@ -11,26 +11,26 @@ export const TagTimeFrameSchema = z.enum(["daily", "weekly", "monthly", "allTime
 export const TagDataSchema = z.object({
   type: z.string(),
   taggedBy: z.string(),
-  taggedAt: TimestampSchema,
+  taggedAt: z.number(),
   platform: SocialPlatformSchema,
 });
 
 export const TagLimitDataSchema = z.object({
-  firstTaggedAt: TimestampSchema,
+  firstTaggedAt: z.number(),
   remainingDailyTags: z.number(),
-  lastTagResetAt: TimestampSchema,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
+  lastTagResetAt: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
 });
 
 export const TagLeaderboardEntrySchema = z.object({
   fingerprintId: z.string(),
   totalTags: z.number(),
-  lastTagAt: TimestampSchema,
+  lastTagAt: z.number(),
   streak: z.number(),
   tagTypes: z.record(z.string(), z.number()),
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
+  createdAt: z.number(),
+  updatedAt: z.number(),
 });
 
 export const TagLeaderboardResponseSchema = z.object({
@@ -54,15 +54,16 @@ export const TagStatsSchema = z.object({
   id: z.string(),
   fingerprintId: z.string(),
   totalTagsMade: z.number(),
-  lastTagAt: TimestampSchema,
+  lastTagAt: z.number(),
   dailyTags: z.number(),
   weeklyTags: z.number(),
   monthlyTags: z.number(),
   streak: z.number(),
   tagTypes: z.record(z.string(), z.number()),
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
+  createdAt: z.number(),
+  updatedAt: z.number(),
   tagHistory: z.array(TagDataSchema).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // Internal function parameter schemas

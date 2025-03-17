@@ -2,6 +2,8 @@ import { getCurrentPrices } from ".";
 import { ApiError } from "../utils";
 import { ERROR_MESSAGES } from "../constants";
 
+const LOG_PREFIX = "[Reality Stability Service]";
+
 /**
  * Calculate reality stability index based on Project89 token price data.
  * The stability index represents reality's resistance to positive price movements:
@@ -50,6 +52,12 @@ export const calculateStabilityIndex = async (): Promise<{
       stabilityIndex = 100; // Full stability restored
     }
 
+    console.log(`${LOG_PREFIX} Calculated stability index:`, {
+      stabilityIndex: stabilityIndex.toFixed(2),
+      price: priceData.usd,
+      change: priceChange.toFixed(2) + "%",
+    });
+
     return {
       stabilityIndex,
       currentPrice: priceData.usd,
@@ -57,7 +65,7 @@ export const calculateStabilityIndex = async (): Promise<{
       timestamp: Date.now(),
     };
   } catch (error) {
-    console.error("Error calculating reality stability index:", error);
+    console.error(`${LOG_PREFIX} Error calculating reality stability index:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { ACCOUNT_ROLE } from "../constants";
-import { TimestampSchema } from ".";
 
 // Enums
 export const MissionTypeEnum = z.enum(["single", "multi"]);
@@ -62,7 +61,7 @@ export const MissionObjectiveSchema = z.object({
   id: z.string(),
   description: z.string(),
   completed: z.boolean(),
-  completedAt: TimestampSchema.optional(),
+  completedAt: z.number().optional(),
 });
 
 export const FailureConditionSchema = z.object({
@@ -115,8 +114,8 @@ export const BaseMissionSchema = z.object({
   title: z.string(),
   description: z.string(),
   status: MissionStatusEnum,
-  createdAt: TimestampSchema,
-  updatedAt: TimestampSchema,
+  createdAt: z.number(),
+  updatedAt: z.number(),
   expiryDate: z.number(),
   escrowAddress: z.string(),
   createdBy: z.string(),
@@ -146,8 +145,8 @@ export const MissionHistoryFieldsSchema = z.object({
   reward: z.number(),
   xpGained: z.number(),
   teamSize: z.number(),
-  startedAt: TimestampSchema,
-  completedAt: TimestampSchema,
+  startedAt: z.number(),
+  completedAt: z.number(),
   failedAt: z.number().optional(),
   objectives: z.array(MissionObjectiveSchema),
   failureRecords: z.array(FailureRecordSchema).optional(),
@@ -180,8 +179,8 @@ export const CreateMissionRequestSchema = z.object({
     description: z.string(),
     status: MissionStatusEnum,
     objectives: z.array(MissionObjectiveSchema),
-    startedAt: TimestampSchema.optional(),
-    completedAt: TimestampSchema.optional(),
+    startedAt: z.number().optional(),
+    completedAt: z.number().optional(),
     metadata: z.record(z.any()).optional(),
   }),
   query: z.object({}).optional(),

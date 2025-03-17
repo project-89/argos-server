@@ -1,6 +1,6 @@
-import { getFirestore, Timestamp, CollectionReference, Query } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
-import { ApiError, toUnixMillis } from "../utils";
+import { ApiError } from "../utils";
+import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
 import {
   Profile,
   ProfileCreateRequest,
@@ -11,43 +11,39 @@ import {
 } from "../schemas";
 
 const LOG_PREFIX = "[Profile Service]";
-const db = getFirestore();
 
 export async function createProfile(input: ProfileCreateRequest["body"]): Promise<ProfileResponse> {
   try {
     console.log(`${LOG_PREFIX} Starting with input:`, input);
-    const collection = db.collection(COLLECTIONS.PROFILES);
+    const db = await getDb();
+    const profilesCollection = db.collection(COLLECTIONS.PROFILES);
 
     // Check if profile already exists with this wallet
-    const existing = await collection
-      .where("walletAddress", "==", input.walletAddress)
-      .limit(1)
-      .get();
+    const existingByWallet = await profilesCollection.findOne({
+      walletAddress: input.walletAddress,
+    });
 
-    console.log(`${LOG_PREFIX} Existing check result:`, { exists: !existing.empty });
+    console.log(`${LOG_PREFIX} Existing check result:`, { exists: !!existingByWallet });
 
-    if (!existing.empty) {
+    if (existingByWallet) {
       throw ApiError.from(null, 400, ERROR_MESSAGES.PROFILE_EXISTS);
     }
 
     // Check if username is taken
-    const existingUsername = await collection
-      .where("username", "==", input.username)
-      .limit(1)
-      .get();
+    const existingByUsername = await profilesCollection.findOne({
+      username: input.username,
+    });
 
-    console.log(`${LOG_PREFIX} Username check result:`, { exists: !existingUsername.empty });
+    console.log(`${LOG_PREFIX} Username check result:`, { exists: !!existingByUsername });
 
-    if (!existingUsername.empty) {
+    if (existingByUsername) {
       throw ApiError.from(null, 400, ERROR_MESSAGES.USERNAME_TAKEN);
     }
 
-    const now = Timestamp.now();
-    const docRef = collection.doc();
+    const now = Date.now();
 
     // Create profile with explicit defaults
-    const profile: Profile = {
-      id: docRef.id,
+    const profile: Omit<Profile, "id"> = {
       walletAddress: input.walletAddress,
       username: input.username,
       fingerprintId: input.fingerprintId,
@@ -63,35 +59,50 @@ export async function createProfile(input: ProfileCreateRequest["body"]): Promis
     };
 
     // Use transaction to create both profile and stats
-    await db.runTransaction(async (transaction) => {
-      transaction.set(docRef, profile);
+    const session = db.client.startSession();
 
-      // Initialize stats with explicit values
-      const statsCollection = db.collection(COLLECTIONS.STATS);
-      const stats: Stats = {
-        id: profile.id,
-        missionsCompleted: 0,
-        profileId: profile.id,
-        successRate: 0,
-        totalRewards: 0,
-        reputation: 0,
-        joinedAt: now,
-        lastActive: now,
-        createdAt: now,
-        updatedAt: now,
-      };
-      transaction.set(statsCollection.doc(profile.id), stats);
-    });
+    // Initialize with dummy ID that will be replaced during transaction
+    let result: Profile = {
+      id: "pending",
+      ...profile,
+    };
+
+    try {
+      await session.withTransaction(async () => {
+        // Insert profile
+        const profileResult = await profilesCollection.insertOne(profile, { session });
+        const profileId = profileResult.insertedId.toString();
+
+        // Initialize stats with explicit values
+        const statsCollection = db.collection(COLLECTIONS.STATS);
+        const stats: Omit<Stats, "id"> = {
+          profileId: profileId,
+          missionsCompleted: 0,
+          successRate: 0,
+          totalRewards: 0,
+          reputation: 0,
+          joinedAt: now,
+          lastActive: now,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await statsCollection.insertOne({ ...stats, _id: toObjectId(profileId) }, { session });
+
+        result = {
+          id: profileId,
+          ...profile,
+        };
+      });
+    } finally {
+      await session.endSession();
+    }
 
     console.log(`${LOG_PREFIX} Successfully created profile and initialized stats:`, {
-      id: profile.id,
+      id: result.id,
     });
 
-    return {
-      ...profile,
-      createdAt: toUnixMillis(profile.createdAt),
-      updatedAt: toUnixMillis(profile.updatedAt),
-    };
+    return result;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -105,40 +116,31 @@ export async function createProfile(input: ProfileCreateRequest["body"]): Promis
 export async function getProfile(id: string): Promise<ProfileWithStatsResponse> {
   try {
     console.log(`${LOG_PREFIX} Starting with id:`, id);
+    const db = await getDb();
     const profileCollection = db.collection(COLLECTIONS.PROFILES);
     const statsCollection = db.collection(COLLECTIONS.STATS);
 
     // Get both profile and stats in parallel
     const [profileDoc, statsDoc] = await Promise.all([
-      profileCollection.doc(id).get(),
-      statsCollection.doc(id).get(),
+      profileCollection.findOne({ _id: toObjectId(id) }),
+      statsCollection.findOne({ _id: toObjectId(id) }),
     ]);
 
     console.log(`${LOG_PREFIX} Documents exist:`, {
-      profile: profileDoc.exists,
-      stats: statsDoc.exists,
+      profile: !!profileDoc,
+      stats: !!statsDoc,
     });
 
-    if (!profileDoc.exists) {
+    if (!profileDoc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
     }
 
-    const profileData = profileDoc.data() as Profile;
-    const statsData = statsDoc.data() as Stats;
+    const profileData = formatDocument<Profile>(profileDoc);
+    const statsData = statsDoc ? formatDocument<Stats>(statsDoc) : null;
 
     return {
       ...profileData,
-      createdAt: toUnixMillis(profileData.createdAt),
-      updatedAt: toUnixMillis(profileData.updatedAt),
-      stats: statsData
-        ? {
-            ...statsData,
-            joinedAt: toUnixMillis(statsData.joinedAt),
-            lastActive: toUnixMillis(statsData.lastActive),
-            createdAt: toUnixMillis(statsData.createdAt),
-            updatedAt: toUnixMillis(statsData.updatedAt),
-          }
-        : null,
+      stats: statsData,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
@@ -153,36 +155,26 @@ export async function getProfile(id: string): Promise<ProfileWithStatsResponse> 
 export async function getProfileByWallet(walletAddress: string): Promise<ProfileWithStatsResponse> {
   try {
     console.log(`${LOG_PREFIX} Starting with walletAddress:`, walletAddress);
+    const db = await getDb();
     const profileCollection = db.collection(COLLECTIONS.PROFILES);
 
-    const snapshot = await profileCollection
-      .where("walletAddress", "==", walletAddress)
-      .limit(1)
-      .get();
-    console.log(`${LOG_PREFIX} Profile found:`, { found: !snapshot.empty });
+    const profileDoc = await profileCollection.findOne({ walletAddress });
+    console.log(`${LOG_PREFIX} Profile found:`, { found: !!profileDoc });
 
-    if (snapshot.empty) {
+    if (!profileDoc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND_FOR_WALLET);
     }
 
-    const profileData = snapshot.docs[0].data() as Profile;
-    const statsDoc = await db.collection(COLLECTIONS.STATS).doc(profileData.id).get();
+    const profileData = formatDocument<Profile>(profileDoc);
+    const statsDoc = await db
+      .collection(COLLECTIONS.STATS)
+      .findOne({ _id: toObjectId(profileData.id) });
 
-    const statsData = statsDoc.data() as Stats;
+    const statsData = statsDoc ? formatDocument<Stats>(statsDoc) : null;
 
     return {
       ...profileData,
-      createdAt: toUnixMillis(profileData.createdAt),
-      updatedAt: toUnixMillis(profileData.updatedAt),
-      stats: statsData
-        ? {
-            ...statsData,
-            joinedAt: toUnixMillis(statsData.joinedAt),
-            lastActive: toUnixMillis(statsData.lastActive),
-            createdAt: toUnixMillis(statsData.createdAt),
-            updatedAt: toUnixMillis(statsData.updatedAt),
-          }
-        : null,
+      stats: statsData,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
@@ -200,33 +192,33 @@ export async function updateProfile(
 ): Promise<ProfileResponse> {
   try {
     console.log(`${LOG_PREFIX} Starting with:`, { id, input });
-    const collection = db.collection(COLLECTIONS.PROFILES);
+    const db = await getDb();
+    const profilesCollection = db.collection(COLLECTIONS.PROFILES);
 
-    const doc = await collection.doc(id).get();
-    console.log(`${LOG_PREFIX} Document exists:`, doc.exists);
+    const profileDoc = await profilesCollection.findOne({ _id: toObjectId(id) });
+    console.log(`${LOG_PREFIX} Document exists:`, !!profileDoc);
 
-    if (!doc.exists) {
+    if (!profileDoc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
     }
 
     // If username is being updated, check if new username is taken
     if (input.username) {
-      const existingUsername = await collection
-        .where("username", "==", input.username)
-        .limit(1)
-        .get();
-
-      console.log(`${LOG_PREFIX} Username check result:`, {
-        exists: !existingUsername.empty,
-        sameId: existingUsername.docs[0]?.id === id,
+      const existingUsername = await profilesCollection.findOne({
+        username: input.username,
+        _id: { $ne: toObjectId(id) },
       });
 
-      if (!existingUsername.empty && existingUsername.docs[0].id !== id) {
+      console.log(`${LOG_PREFIX} Username check result:`, {
+        exists: !!existingUsername,
+      });
+
+      if (existingUsername) {
         throw ApiError.from(null, 400, ERROR_MESSAGES.USERNAME_TAKEN);
       }
     }
 
-    const now = Timestamp.now();
+    const now = Date.now();
 
     // Only include fields that are actually present in the input
     const updates: Partial<Profile> = {
@@ -241,7 +233,7 @@ export async function updateProfile(
 
     // Handle preferences separately to ensure type safety
     if (input.preferences) {
-      const currentPrefs = (await doc.ref.get()).data()?.preferences;
+      const currentPrefs = formatDocument<Profile>(profileDoc).preferences;
       updates.preferences = {
         isProfilePublic: input.preferences.isProfilePublic ?? currentPrefs?.isProfilePublic ?? true,
         showStats: input.preferences.showStats ?? currentPrefs?.showStats ?? true,
@@ -249,15 +241,10 @@ export async function updateProfile(
     }
 
     console.log(`${LOG_PREFIX} Updating profile`);
-    await doc.ref.update(updates);
+    await profilesCollection.updateOne({ _id: toObjectId(id) }, { $set: updates });
 
-    const updatedDoc = await doc.ref.get();
-    const data = updatedDoc.data() as Profile;
-    return {
-      ...data,
-      createdAt: toUnixMillis(data.createdAt),
-      updatedAt: toUnixMillis(data.updatedAt),
-    };
+    const updatedDoc = await profilesCollection.findOne({ _id: toObjectId(id) });
+    return formatDocument<Profile>(updatedDoc);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -279,58 +266,64 @@ export async function searchProfiles(options: {
 }): Promise<{ profiles: Profile[]; total: number }> {
   try {
     const { query, skillType, minSkillLevel, isVerified, limit = 10, offset = 0 } = options;
-    const profilesRef = db.collection(COLLECTIONS.PROFILES) as CollectionReference<Profile>;
-    let finalQuery: Query<Profile> = profilesRef;
+    const db = await getDb();
+    const profilesCollection = db.collection(COLLECTIONS.PROFILES);
+
+    let filter: any = {};
 
     // Handle capability filtering
     if (skillType || minSkillLevel !== undefined || isVerified !== undefined) {
-      const capabilitiesSnapshot = await db.collection(COLLECTIONS.CAPABILITIES).get();
-      const eligibleProfileIds = new Set<string>();
+      const capabilitiesCollection = db.collection(COLLECTIONS.CAPABILITIES);
+      let capabilitiesFilter: any = {};
 
-      for (const doc of capabilitiesSnapshot.docs) {
-        const capability = doc.data();
-        let isEligible = true;
-
-        if (skillType && capability.type !== skillType) {
-          isEligible = false;
-        }
-        if (minSkillLevel !== undefined && capability.level < minSkillLevel) {
-          isEligible = false;
-        }
-        if (isVerified !== undefined && capability.isVerified !== isVerified) {
-          isEligible = false;
-        }
-
-        if (isEligible) {
-          eligibleProfileIds.add(capability.profileId);
-        }
+      if (skillType) {
+        capabilitiesFilter.type = skillType;
       }
 
-      if (eligibleProfileIds.size === 0) {
+      if (minSkillLevel !== undefined) {
+        capabilitiesFilter.level = { $gte: minSkillLevel };
+      }
+
+      if (isVerified !== undefined) {
+        capabilitiesFilter.isVerified = isVerified;
+      }
+
+      const capabilitiesDocs = await capabilitiesCollection.find(capabilitiesFilter).toArray();
+
+      if (capabilitiesDocs.length === 0) {
         return { profiles: [], total: 0 };
       }
-      finalQuery = finalQuery.where("id", "in", Array.from(eligibleProfileIds));
+
+      const eligibleProfileIds = capabilitiesDocs.map((doc) => doc.profileId);
+      filter._id = { $in: eligibleProfileIds.map((id) => toObjectId(id)) };
     }
 
     // Add text search conditions
     if (query) {
-      finalQuery = finalQuery
-        .where("searchableText", ">=", query.toLowerCase())
-        .where("searchableText", "<=", query.toLowerCase() + "\uf8ff");
+      // Using text index if set up, otherwise use basic search
+      const hasTextIndex = await profilesCollection.indexExists("username_text_bio_text");
+
+      if (hasTextIndex) {
+        filter.$text = { $search: query };
+      } else {
+        // Fallback to basic search if no text index
+        const queryRegex = new RegExp(query, "i");
+        filter.$or = [{ username: queryRegex }, { bio: queryRegex }];
+      }
     }
 
     // Get total count
-    const totalSnapshot = await finalQuery.count().get();
-    const total = totalSnapshot.data().count;
+    const total = await profilesCollection.countDocuments(filter);
 
     // Get paginated results
-    const snapshot = await finalQuery
-      .orderBy("updatedAt", "desc")
+    const docs = await profilesCollection
+      .find(filter)
+      .sort({ updatedAt: -1 })
+      .skip(offset)
       .limit(limit)
-      .offset(offset)
-      .get();
+      .toArray();
 
-    const profiles = snapshot.docs.map((doc) => doc.data());
+    const profiles = formatDocuments<Profile>(docs);
     return { profiles, total };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error searching profiles:`, error);

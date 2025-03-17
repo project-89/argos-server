@@ -1,7 +1,9 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Impression } from "../schemas";
 import { ApiError } from "../utils";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
+
+const LOG_PREFIX = "[Impression Service]";
 
 /**
  * Creates a new impression record
@@ -18,33 +20,35 @@ export const createImpression = async ({
   options?: {
     source?: string;
     sessionId?: string;
+    metadata?: Record<string, unknown>;
   };
 }): Promise<Impression> => {
   try {
-    const db = getFirestore();
-    const createdAt = Timestamp.now();
+    const db = await getDb();
+    const now = Date.now();
 
     const impression: Omit<Impression, "id"> = {
       fingerprintId,
       type,
       data,
-      createdAt,
+      createdAt: now,
       ...(options?.source && { source: options.source }),
       ...(options?.sessionId && { sessionId: options.sessionId }),
+      ...(options?.metadata && { metadata: options.metadata }),
     };
 
-    const impressionRef = await db.collection(COLLECTIONS.IMPRESSIONS).add(impression);
+    const result = await db.collection(COLLECTIONS.IMPRESSIONS).insertOne(impression);
 
-    if (!impressionRef.id) {
+    if (!result.acknowledged || !result.insertedId) {
       throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
 
     return {
-      id: impressionRef.id,
+      id: result.insertedId.toString(),
       ...impression,
     };
   } catch (error) {
-    console.error("Error in createImpression:", error);
+    console.error(`${LOG_PREFIX} Error in createImpression:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
@@ -66,45 +70,40 @@ export const getImpressions = async ({
   };
 }): Promise<Impression[]> => {
   try {
-    const db = getFirestore();
+    const db = await getDb();
 
-    let query = db
-      .collection(COLLECTIONS.IMPRESSIONS)
-      .where("fingerprintId", "==", fingerprintId)
-      .orderBy("createdAt", "desc");
+    // Build query
+    const query: Record<string, any> = { fingerprintId };
 
     if (options?.type) {
-      query = query.where("type", "==", options.type);
+      query.type = options.type;
     }
 
     if (options?.sessionId) {
-      query = query.where("sessionId", "==", options.sessionId);
+      query.sessionId = options.sessionId;
     }
 
-    if (options?.startTime) {
-      const startTimestamp = new Date(options.startTime);
-      query = query.where("createdAt", ">=", startTimestamp);
+    if (options?.startTime || options?.endTime) {
+      query.createdAt = {};
+      if (options?.startTime) {
+        query.createdAt.$gte = options.startTime;
+      }
+      if (options?.endTime) {
+        query.createdAt.$lte = options.endTime;
+      }
     }
 
-    if (options?.endTime) {
-      const endTimestamp = new Date(options.endTime);
-      query = query.where("createdAt", "<=", endTimestamp);
-    }
+    // Execute query
+    let cursor = db.collection(COLLECTIONS.IMPRESSIONS).find(query).sort({ createdAt: -1 }); // descending order
 
     if (options?.limit) {
-      query = query.limit(options.limit);
+      cursor = cursor.limit(options.limit);
     }
 
-    const snapshot = await query.get();
-    return snapshot.docs.map((doc) => {
-      const data = doc.data();
-      return {
-        id: doc.id,
-        ...data,
-      } as Impression;
-    });
+    const impressions = await cursor.toArray();
+    return formatDocuments(impressions);
   } catch (error) {
-    console.error("Error in getImpressions:", error);
+    console.error(`${LOG_PREFIX} Error in getImpressions:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
@@ -125,39 +124,39 @@ export const deleteImpressions = async ({
   };
 }): Promise<number> => {
   try {
-    const db = getFirestore();
+    const db = await getDb();
 
-    let query = db.collection(COLLECTIONS.IMPRESSIONS).where("fingerprintId", "==", fingerprintId);
+    // Build query
+    const query: Record<string, any> = { fingerprintId };
 
     if (options?.type) {
-      query = query.where("type", "==", options.type);
+      query.type = options.type;
     }
 
     if (options?.sessionId) {
-      query = query.where("sessionId", "==", options.sessionId);
+      query.sessionId = options.sessionId;
     }
 
-    if (options?.startTime) {
-      const startTimestamp = new Date(options.startTime);
-      query = query.where("createdAt", ">=", startTimestamp);
+    if (options?.startTime || options?.endTime) {
+      query.createdAt = {};
+      if (options?.startTime) {
+        query.createdAt.$gte = options.startTime;
+      }
+      if (options?.endTime) {
+        query.createdAt.$lte = options.endTime;
+      }
     }
 
-    if (options?.endTime) {
-      const endTimestamp = new Date(options.endTime);
-      query = query.where("createdAt", "<=", endTimestamp);
+    // Execute deletion
+    const result = await db.collection(COLLECTIONS.IMPRESSIONS).deleteMany(query);
+
+    if (!result.acknowledged) {
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
 
-    const snapshot = await query.get();
-
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-    return snapshot.size;
+    return result.deletedCount;
   } catch (error) {
-    console.error("Error in deleteImpressions:", error);
+    console.error(`${LOG_PREFIX} Error in deleteImpressions:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

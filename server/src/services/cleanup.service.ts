@@ -1,7 +1,9 @@
-import { getFirestore } from "firebase-admin/firestore";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { getCurrentUnixMillis, ApiError } from "../utils";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
 import { Visit, VisitPattern, SiteEngagement, VisitPatternAnalysisResponse } from "../schemas";
+
+const LOG_PREFIX = "[Cleanup Service]";
 
 interface CleanupResult {
   cleanupTime: number;
@@ -18,7 +20,7 @@ interface CleanupResult {
  * @returns {Promise<CleanupResult>} Result of the cleanup operation
  */
 export const cleanupService = async (): Promise<CleanupResult> => {
-  const db = getFirestore();
+  const db = await getDb();
   const now = getCurrentUnixMillis();
   const thirtyDaysAgo = now - 30 * 24 * 60 * 60 * 1000;
   const oneHourAgo = now - 60 * 60 * 1000;
@@ -36,77 +38,84 @@ export const cleanupService = async (): Promise<CleanupResult> => {
   };
 
   try {
-    // Delete old presence records
-    const presenceSnapshot = await db
-      .collection(COLLECTIONS.PRESENCE)
-      .where("lastUpdated", "<", thirtyDaysAgo)
-      .get();
+    console.log(`${LOG_PREFIX} Starting cleanup process...`);
 
-    for (const doc of presenceSnapshot.docs) {
-      await doc.ref.delete();
-    }
-    result.itemsCleaned.presence = presenceSnapshot.size;
+    // Delete old presence records
+    const presenceResult = await db
+      .collection(COLLECTIONS.PRESENCE)
+      .deleteMany({ lastUpdated: { $lt: thirtyDaysAgo } });
+
+    result.itemsCleaned.presence = presenceResult.deletedCount || 0;
+    console.log(`${LOG_PREFIX} Cleaned up ${result.itemsCleaned.presence} presence records`);
 
     // Delete old price cache
-    const priceCacheSnapshot = await db
+    const priceCacheResult = await db
       .collection(COLLECTIONS.PRICE_CACHE)
-      .where("timestamp", "<", thirtyDaysAgo)
-      .get();
+      .deleteMany({ createdAt: { $lt: thirtyDaysAgo } });
 
-    for (const doc of priceCacheSnapshot.docs) {
-      await doc.ref.delete();
-    }
-    result.itemsCleaned.priceCache = priceCacheSnapshot.size;
+    result.itemsCleaned.priceCache = priceCacheResult.deletedCount || 0;
+    console.log(`${LOG_PREFIX} Cleaned up ${result.itemsCleaned.priceCache} price cache entries`);
 
     // Delete old rate limit stats
-    const rateLimitStatsSnapshot = await db
+    const rateLimitStatsResult = await db
       .collection(COLLECTIONS.RATE_LIMIT_STATS)
-      .where("timestamp", "<", thirtyDaysAgo)
-      .get();
+      .deleteMany({ timestamp: { $lt: thirtyDaysAgo } });
 
-    for (const doc of rateLimitStatsSnapshot.docs) {
-      await doc.ref.delete();
-    }
-    result.itemsCleaned.rateLimitStats = rateLimitStatsSnapshot.size;
+    result.itemsCleaned.rateLimitStats = rateLimitStatsResult.deletedCount || 0;
+    console.log(`${LOG_PREFIX} Cleaned up ${result.itemsCleaned.rateLimitStats} rate limit stats`);
 
     // Delete old rate limit requests
-    const rateLimitRequestsSnapshot = await db
+    const rateLimitRequestsResult = await db
       .collection(COLLECTIONS.RATE_LIMITS)
-      .where("lastUpdated", "<", oneHourAgo)
-      .get();
+      .deleteMany({ lastUpdated: { $lt: oneHourAgo } });
 
-    for (const doc of rateLimitRequestsSnapshot.docs) {
-      await doc.ref.delete();
-    }
-    result.itemsCleaned.rateLimitRequests = rateLimitRequestsSnapshot.size;
+    result.itemsCleaned.rateLimitRequests = rateLimitRequestsResult.deletedCount || 0;
+    console.log(
+      `${LOG_PREFIX} Cleaned up ${result.itemsCleaned.rateLimitRequests} rate limit requests`,
+    );
 
+    console.log(`${LOG_PREFIX} Cleanup completed successfully`);
     return result;
   } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to cleanup data:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CLEANUP_DATA);
   }
 };
 
 export const cleanupRateLimits = async (identifier: string): Promise<void> => {
-  const db = getFirestore();
+  const db = await getDb();
   const now = getCurrentUnixMillis();
   const oneHourAgo = now - 3600000;
 
   try {
-    const rateLimitRef = db.collection(COLLECTIONS.RATE_LIMITS).doc(identifier);
-    const doc = await rateLimitRef.get();
+    console.log(`${LOG_PREFIX} Cleaning up rate limits for ${identifier}`);
 
-    if (doc.exists) {
-      const currentRequests = doc.data()?.requests || [];
+    // Get the current rate limit document
+    const rateLimitDoc = await db.collection(COLLECTIONS.RATE_LIMITS).findOne({ _id: identifier });
+
+    if (rateLimitDoc) {
+      const currentRequests = rateLimitDoc.requests || [];
       const updatedRequests = currentRequests.filter((timestamp: number) => timestamp > oneHourAgo);
 
       if (updatedRequests.length !== currentRequests.length) {
-        await rateLimitRef.update({
-          requests: updatedRequests,
-          lastUpdated: now,
-        });
+        await db.collection(COLLECTIONS.RATE_LIMITS).updateOne(
+          { _id: identifier },
+          {
+            $set: {
+              requests: updatedRequests,
+              lastUpdated: now,
+            },
+          },
+        );
+        console.log(
+          `${LOG_PREFIX} Updated rate limits for ${identifier}, removed ${
+            currentRequests.length - updatedRequests.length
+          } old requests`,
+        );
       }
     }
   } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to cleanup rate limits:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CLEANUP_RATE_LIMITS);
   }
 };
@@ -115,28 +124,42 @@ export const analyzeVisitPatterns = async (
   fingerprintId: string,
 ): Promise<VisitPatternAnalysisResponse> => {
   try {
-    const db = getFirestore();
+    console.log(`${LOG_PREFIX} Analyzing visit patterns for ${fingerprintId}`);
+    const db = await getDb();
 
     // Get all visits for this fingerprint, ordered by timestamp
-    const visitsSnapshot = await db
+    const visits = await db
       .collection(COLLECTIONS.VISITS)
-      .where("fingerprintId", "==", fingerprintId)
-      .orderBy("createdAt", "asc")
-      .get();
+      .find({ fingerprintId })
+      .sort({ createdAt: 1 })
+      .toArray();
 
-    const visits: Visit[] = visitsSnapshot.docs.map((doc) => ({
-      id: doc.id,
-      ...(doc.data() as Omit<Visit, "id">),
-    }));
+    const formattedVisits = formatDocuments<Visit>(visits);
 
     // Analyze site transitions
     const patterns: Map<string, VisitPattern> = new Map();
     const siteVisits: Map<string, number[]> = new Map();
 
-    for (let i = 0; i < visits.length - 1; i++) {
-      const current = visits[i];
-      const next = visits[i + 1];
-      const timeSpent = next.createdAt.seconds - current.createdAt.seconds;
+    for (let i = 0; i < formattedVisits.length - 1; i++) {
+      const current = formattedVisits[i];
+      const next = formattedVisits[i + 1];
+
+      // Extract numeric timestamps based on MongoDB's format
+      const currentTimestamp =
+        typeof current.createdAt === "number"
+          ? current.createdAt
+          : (current.createdAt as any).seconds
+          ? (current.createdAt as any).seconds * 1000
+          : 0;
+
+      const nextTimestamp =
+        typeof next.createdAt === "number"
+          ? next.createdAt
+          : (next.createdAt as any).seconds
+          ? (next.createdAt as any).seconds * 1000
+          : 0;
+
+      const timeSpent = Math.floor((nextTimestamp - currentTimestamp) / 1000); // Convert to seconds
 
       // Track site transitions
       const key = `${current.siteId}-${next.siteId}`;
@@ -183,11 +206,16 @@ export const analyzeVisitPatterns = async (
       };
     });
 
+    console.log(
+      `${LOG_PREFIX} Completed analysis for ${fingerprintId}, found ${patterns.size} patterns and ${engagement.length} engagement metrics`,
+    );
+
     return {
       patterns: Array.from(patterns.values()),
       engagement: engagement,
     };
   } catch (error) {
+    console.error(`${LOG_PREFIX} Failed to analyze visit patterns:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_ANALYZE_VISIT_PATTERNS);
   }
 };

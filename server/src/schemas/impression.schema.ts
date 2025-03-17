@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { ERROR_MESSAGES } from "../constants";
-import { TimestampSchema } from ".";
 
 export const ImpressionSchema = z.object({
   id: z.string(),
@@ -9,7 +8,8 @@ export const ImpressionSchema = z.object({
   data: z.record(z.any()),
   source: z.string().optional(),
   sessionId: z.string().optional(),
-  createdAt: TimestampSchema,
+  createdAt: z.number(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const CreateImpressionSchema = z.object({
@@ -21,6 +21,7 @@ export const CreateImpressionSchema = z.object({
     data: z.record(z.any()),
     source: z.string().optional(),
     sessionId: z.string().optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   }),
   query: z.object({}).optional(),
   params: z.object({}).optional(),
@@ -32,8 +33,8 @@ export const GetImpressionsSchema = z.object({
   }),
   query: z.object({
     type: z.string().optional(),
-    startTime: z.string().datetime().optional(),
-    endTime: z.string().datetime().optional(),
+    startTime: z.coerce.number().optional(),
+    endTime: z.coerce.number().optional(),
     limit: z.coerce.number().int().positive().optional(),
     sessionId: z.string().optional(),
   }),
@@ -46,8 +47,8 @@ export const DeleteImpressionsSchema = z.object({
   }),
   query: z.object({
     type: z.string().optional(),
-    startTime: z.string().datetime().optional(),
-    endTime: z.string().datetime().optional(),
+    startTime: z.coerce.number().optional(),
+    endTime: z.coerce.number().optional(),
     sessionId: z.string().optional(),
   }),
   body: z.object({}).optional(),

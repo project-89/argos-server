@@ -21,8 +21,15 @@ import { configureAPI } from "./constants/config/api";
 import { withMetrics, ipRateLimit } from "./middleware";
 import { HEALTH_RATE_LIMIT_CONFIG, initializeRateLimits } from "./constants/config/limits";
 import routes from "./routes";
+import { initDatabases } from "./utils";
 
-// Initialize Firebase Admin
+// Initialize databases (MongoDB & Firebase)
+initDatabases().catch((err) => {
+  console.error("Failed to initialize databases:", err);
+  process.exit(1);
+});
+
+// Initialize Firebase Admin (to be removed after migration)
 admin.initializeApp();
 
 // Create Express app

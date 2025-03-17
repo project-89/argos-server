@@ -1,7 +1,11 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { ApiError, getCurrentUnixMillis, toUnixMillis } from "../utils";
+import { ApiError, getCurrentUnixMillis } from "../utils";
 import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import { PresenceData, PresenceResponse } from "../schemas";
+
+// Import MongoDB utilities
+import { getDb, toObjectId, formatDocument } from "../utils/mongodb";
+
+const LOG_PREFIX = "[Presence Service]";
 
 // 5 minutes of inactivity before marking as away
 const AWAY_TIMEOUT_MS = 5 * 60 * 1000;
@@ -27,32 +31,39 @@ export const updatePresence = async ({
   status: PresenceStatus;
 }): Promise<PresenceResponse> => {
   try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
+    const db = await getDb();
 
-    if (!fingerprintDoc.exists) {
+    // Check if fingerprint exists
+    const fingerprint = await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .findOne({ _id: fingerprintId }, { projection: { _id: 1 } });
+
+    if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const now = Timestamp.now();
+    const now = new Date();
     const presenceData: PresenceData = {
       status,
       lastUpdated: now,
       createdAt: now,
     };
 
-    await fingerprintRef.update({
-      presence: presenceData,
-    });
+    // Update the fingerprint document with new presence data
+    await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .updateOne({ _id: fingerprintId }, { $set: { presence: presenceData } });
+
+    console.log(`${LOG_PREFIX} Updated presence for ${fingerprintId} to ${status}`);
 
     return {
       fingerprintId,
       status,
-      lastUpdated: toUnixMillis(now),
-      createdAt: toUnixMillis(now),
+      lastUpdated: now.getTime(),
+      createdAt: now.getTime(),
     };
   } catch (error) {
+    console.error(`${LOG_PREFIX} Error updating presence:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_UPDATE_PRESENCE_STATUS);
   }
 };
@@ -66,18 +77,21 @@ export const getPresence = async ({
   fingerprintId: string;
 }): Promise<PresenceResponse> => {
   try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
+    const db = await getDb();
 
-    if (!fingerprintDoc.exists) {
+    // Get fingerprint document
+    const fingerprint = await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .findOne({ _id: fingerprintId });
+
+    if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data();
-    const presence = data?.presence as PresenceData | undefined;
+    const presence = fingerprint.presence as PresenceData | undefined;
     const now = getCurrentUnixMillis();
 
+    // If no presence data exists, return offline status
     if (!presence) {
       return {
         fingerprintId,
@@ -87,19 +101,26 @@ export const getPresence = async ({
       };
     }
 
+    const lastUpdatedTime =
+      presence.lastUpdated instanceof Date ? presence.lastUpdated.getTime() : presence.lastUpdated;
+
     // Check if user should be marked as away
-    if (presence.status === "online" && shouldMarkAsAway(toUnixMillis(presence.lastUpdated))) {
+    if (presence.status === "online" && shouldMarkAsAway(lastUpdatedTime)) {
       const awayPresence = await updatePresence({ fingerprintId, status: "away" });
       return awayPresence;
     }
 
+    const createdAtTime =
+      presence.createdAt instanceof Date ? presence.createdAt.getTime() : presence.createdAt;
+
     return {
       fingerprintId,
       status: presence.status,
-      lastUpdated: toUnixMillis(presence.lastUpdated),
-      createdAt: toUnixMillis(presence.createdAt),
+      lastUpdated: lastUpdatedTime,
+      createdAt: createdAtTime,
     };
   } catch (error) {
+    console.error(`${LOG_PREFIX} Error getting presence:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_PRESENCE);
   }
 };
@@ -113,17 +134,19 @@ export const updateActivity = async ({
   fingerprintId: string;
 }): Promise<PresenceResponse> => {
   try {
-    const db = getFirestore();
-    const fingerprintRef = db.collection(COLLECTIONS.FINGERPRINTS).doc(fingerprintId);
-    const fingerprintDoc = await fingerprintRef.get();
+    const db = await getDb();
 
-    if (!fingerprintDoc.exists) {
+    // Get fingerprint document
+    const fingerprint = await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .findOne({ _id: fingerprintId });
+
+    if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
     }
 
-    const data = fingerprintDoc.data();
-    const presence = data?.presence as PresenceData | undefined;
-    const now = Timestamp.now();
+    const presence = fingerprint.presence as PresenceData | undefined;
+    const now = new Date();
 
     // If no presence or currently offline, set as online
     if (!presence || presence.status === "offline") {
@@ -134,20 +157,27 @@ export const updateActivity = async ({
     const presenceData: PresenceData = {
       status: presence.status === "away" ? "online" : presence.status, // Set back to online if away
       lastUpdated: now,
-      createdAt: now,
+      createdAt: presence.createdAt || now,
     };
 
-    await fingerprintRef.update({
-      presence: presenceData,
-    });
+    // Update the fingerprint document with new presence data
+    await db
+      .collection(COLLECTIONS.FINGERPRINTS)
+      .updateOne({ _id: fingerprintId }, { $set: { presence: presenceData } });
+
+    console.log(`${LOG_PREFIX} Updated activity timestamp for ${fingerprintId}`);
 
     return {
       fingerprintId,
       status: presenceData.status,
-      lastUpdated: toUnixMillis(presenceData.lastUpdated),
-      createdAt: toUnixMillis(presenceData.createdAt),
+      lastUpdated: now.getTime(),
+      createdAt:
+        presenceData.createdAt instanceof Date
+          ? presenceData.createdAt.getTime()
+          : presenceData.createdAt,
     };
   } catch (error) {
+    console.error(`${LOG_PREFIX} Error updating activity:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_UPDATE_ACTIVITY);
   }
 };

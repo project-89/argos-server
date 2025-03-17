@@ -1,13 +1,19 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { AGENT_RANK, COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Agent, AgentState, RegisterAgentRequest } from "../schemas";
 import { ApiError, verifySignature } from "../utils";
 import { validateInvite, useInvite } from "./agentInvite.service";
-
 import { createAccount, createProfile } from ".";
 
+// Import MongoDB utilities instead of Firebase
+import {
+  getDb,
+  toObjectId,
+  formatDocument,
+  formatDocuments,
+  handleMongoError,
+} from "../utils/mongodb";
+
 const LOG_PREFIX = "[Agent Service]";
-const db = getFirestore();
 
 export async function registerAgent(request: RegisterAgentRequest["body"]): Promise<Agent> {
   try {
@@ -16,11 +22,11 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
     // Validate invite code first
     await validateInvite(request.inviteCode);
 
-    const now = Timestamp.now();
-    const agentRef = db.collection(COLLECTIONS.AGENTS).doc();
+    const now = new Date();
+    const db = await getDb();
 
-    const agent: Agent = {
-      id: agentRef.id,
+    // Create agent document with proper typing
+    const agent: Omit<Agent, "id"> = {
       name: request.name,
       description: request.description,
       version: request.version,
@@ -33,7 +39,7 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
       state: {
         isAvailable: false,
         lastActiveAt: now,
-        status: "pending",
+        status: "pending", // using a valid status from the enum
         runtime: "offline",
         performance: {
           successRate: 0,
@@ -55,14 +61,15 @@ export async function registerAgent(request: RegisterAgentRequest["body"]): Prom
       updatedAt: now,
     };
 
-    // Store agent document
-    await agentRef.set(agent);
+    // Store agent document in MongoDB
+    const result = await db.collection(COLLECTIONS.AGENTS).insertOne(agent);
+    const agentId = result.insertedId.toString();
 
     // Mark invite as used
-    await useInvite(request.inviteCode, agent.id);
+    await useInvite(request.inviteCode, agentId);
 
-    console.log(`${LOG_PREFIX} Successfully registered agent:`, agent.id);
-    return agent;
+    console.log(`${LOG_PREFIX} Successfully registered agent:`, agentId);
+    return { ...agent, id: agentId };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error registering agent:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_CREATE_AGENT);
@@ -91,7 +98,7 @@ export async function activateAgent(
       throw new ApiError(400, ERROR_MESSAGES.AGENT_ALREADY_ACTIVATED);
     }
 
-    const now = Timestamp.now();
+    const now = new Date();
 
     // Create agent profile and account after wallet verification
     await createProfile({
@@ -115,26 +122,36 @@ export async function activateAgent(
     });
 
     // Update agent with activation details
-    const updatedAgent: Agent = {
-      ...agent,
-      identity: {
-        ...agent.identity,
-        walletAddress,
-        isActivated: true,
-        activatedAt: now,
-      },
-      state: {
-        ...agent.state,
-        status: "active",
-      },
-      updatedAt: now,
+    const db = await getDb();
+    const updatedIdentity = {
+      ...agent.identity,
+      walletAddress,
+      isActivated: true,
+      activatedAt: now,
     };
 
-    await db.collection(COLLECTIONS.AGENTS).doc(agentId).update({
-      identity: updatedAgent.identity,
-      state: updatedAgent.state,
+    const updatedState = {
+      ...agent.state,
+      status: "active" as const, // Using a const assertion to match the enum
+    };
+
+    await db.collection(COLLECTIONS.AGENTS).updateOne(
+      { _id: toObjectId(agentId) },
+      {
+        $set: {
+          identity: updatedIdentity,
+          state: updatedState,
+          updatedAt: now,
+        },
+      },
+    );
+
+    const updatedAgent: Agent = {
+      ...agent,
+      identity: updatedIdentity,
+      state: updatedState,
       updatedAt: now,
-    });
+    };
 
     return updatedAgent;
   } catch (error) {
@@ -147,13 +164,14 @@ export async function getAgent(agentId: string): Promise<Agent> {
   try {
     console.log(`${LOG_PREFIX} Fetching agent:`, agentId);
 
-    const agentDoc = await db.collection(COLLECTIONS.AGENTS).doc(agentId).get();
+    const db = await getDb();
+    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: toObjectId(agentId) });
 
-    if (!agentDoc.exists) {
+    if (!agent) {
       throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
     }
 
-    return agentDoc.data() as Agent;
+    return formatDocument<Agent>(agent);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error fetching agent:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
@@ -165,17 +183,24 @@ export async function updateAgentState(agentId: string, state: AgentState): Prom
     console.log(`${LOG_PREFIX} Updating agent state:`, agentId);
 
     const agent = await getAgent(agentId);
+    const db = await getDb();
+    const now = new Date();
+
+    await db.collection(COLLECTIONS.AGENTS).updateOne(
+      { _id: toObjectId(agentId) },
+      {
+        $set: {
+          state,
+          updatedAt: now,
+        },
+      },
+    );
 
     const updatedAgent: Agent = {
       ...agent,
       state,
-      updatedAt: Timestamp.now(),
+      updatedAt: now,
     };
-
-    await db.collection(COLLECTIONS.AGENTS).doc(agentId).update({
-      state,
-      updatedAt: Timestamp.now(),
-    });
 
     return updatedAgent;
   } catch (error) {
@@ -189,20 +214,23 @@ export async function updateAgent(agentId: string, updates: Partial<Agent>): Pro
     console.log(`${LOG_PREFIX} Updating agent:`, agentId);
 
     const agent = await getAgent(agentId);
+    const db = await getDb();
+    const now = new Date();
 
-    const updatedAgent: Agent = {
-      ...agent,
+    const updatedFields = {
       ...updates,
-      updatedAt: Timestamp.now(),
+      updatedAt: now,
     };
 
     await db
       .collection(COLLECTIONS.AGENTS)
-      .doc(agentId)
-      .update({
-        ...updates,
-        updatedAt: Timestamp.now(),
-      });
+      .updateOne({ _id: toObjectId(agentId) }, { $set: updatedFields });
+
+    const updatedAgent: Agent = {
+      ...agent,
+      ...updates,
+      updatedAt: now,
+    };
 
     return updatedAgent;
   } catch (error) {
@@ -215,9 +243,10 @@ export async function listAgents(limit: number = 10): Promise<Agent[]> {
   try {
     console.log(`${LOG_PREFIX} Listing agents`);
 
-    const agentsSnapshot = await db.collection(COLLECTIONS.AGENTS).limit(limit).get();
+    const db = await getDb();
+    const agents = await db.collection(COLLECTIONS.AGENTS).find({}).limit(limit).toArray();
 
-    return agentsSnapshot.docs.map((doc) => doc.data() as Agent);
+    return formatDocuments<Agent>(agents);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error listing agents:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
@@ -228,12 +257,13 @@ export async function getAgentsByCapability(capability: string): Promise<Agent[]
   try {
     console.log(`${LOG_PREFIX} Finding agents with capability:`, capability);
 
-    const agentsSnapshot = await db
+    const db = await getDb();
+    const agents = await db
       .collection(COLLECTIONS.AGENTS)
-      .where("capabilities", "array-contains", capability)
-      .get();
+      .find({ capabilities: { $elemMatch: { id: capability } } })
+      .toArray();
 
-    return agentsSnapshot.docs.map((doc) => doc.data() as Agent);
+    return formatDocuments<Agent>(agents);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error finding agents by capability:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);

@@ -1,11 +1,11 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import fetch from "node-fetch";
-
 import * as functions from "firebase-functions";
 import { ApiError, toUnixMillis } from "../utils";
+import { getDb } from "../utils/mongodb";
 import type { PriceResponse, PriceHistoryResponse } from "../schemas";
 import { ERROR_MESSAGES, CACHE_DURATION, COLLECTIONS } from "../constants";
 
+const LOG_PREFIX = "[Price Service]";
 const DEFAULT_TOKENS = ["project89"];
 
 type PriceResult = {
@@ -32,8 +32,8 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
     // Use default symbols if none provided
     const tokenSymbols = symbols.length > 0 ? symbols : DEFAULT_TOKENS;
 
-    const db = getFirestore();
-    const now = Timestamp.now();
+    const db = await getDb();
+    const now = Date.now();
     const results: PriceResult = {
       prices: {},
       errors: {},
@@ -42,19 +42,14 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
     for (const symbol of tokenSymbols) {
       try {
         // Check cache first
-        const cacheRef = db.collection(COLLECTIONS.PRICE_CACHE).doc(symbol);
-        const cacheDoc = await cacheRef.get();
+        const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne({ _id: symbol });
 
-        if (cacheDoc.exists) {
-          const cacheData = cacheDoc.data();
-          if (
-            cacheData &&
-            now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION.PRICE
-          ) {
+        if (cacheDoc) {
+          if (now - cacheDoc.createdAt < CACHE_DURATION.PRICE) {
             results.prices[symbol] = {
               symbol,
-              usd: cacheData.usd,
-              usd_24h_change: cacheData.usd_24h_change,
+              usd: cacheDoc.usd,
+              usd_24h_change: cacheDoc.usd_24h_change,
             };
             continue;
           }
@@ -96,11 +91,18 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
         results.prices[symbol] = priceData;
 
         // Update cache
-        await cacheRef.set({
-          ...priceData,
-          createdAt: now,
-        });
+        await db.collection(COLLECTIONS.PRICE_CACHE).updateOne(
+          { _id: symbol },
+          {
+            $set: {
+              ...priceData,
+              createdAt: now,
+            },
+          },
+          { upsert: true },
+        );
       } catch (error) {
+        console.error(`${LOG_PREFIX} Error fetching price for ${symbol}:`, error);
         results.errors[symbol] =
           error instanceof ApiError ? error.message : ERROR_MESSAGES.PRICE_DATA_NOT_FOUND;
       }
@@ -113,7 +115,7 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
     return results;
   } catch (error) {
-    console.error("Error fetching prices:", error);
+    console.error(`${LOG_PREFIX} Error fetching prices:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };
@@ -123,23 +125,20 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
  */
 export const getPriceHistory = async (symbol: string): Promise<PriceHistoryResponse> => {
   try {
-    const db = getFirestore();
-    const now = Timestamp.now();
-    const cacheRef = db.collection(COLLECTIONS.PRICE_CACHE).doc(symbol);
-    const cacheDoc = await cacheRef.get();
+    const db = await getDb();
+    const now = Date.now();
 
     // Check cache first
-    if (cacheDoc.exists) {
-      const cacheData = cacheDoc.data();
-      if (
-        cacheData &&
-        cacheData.history &&
-        Array.isArray(cacheData.history) &&
-        cacheData.history.length > 0 &&
-        now.toMillis() - toUnixMillis(cacheData.createdAt) < CACHE_DURATION.PRICE
-      ) {
-        return cacheData.history;
-      }
+    const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne({ _id: symbol });
+
+    if (
+      cacheDoc &&
+      cacheDoc.history &&
+      Array.isArray(cacheDoc.history) &&
+      cacheDoc.history.length > 0 &&
+      now - cacheDoc.createdAt < CACHE_DURATION.PRICE
+    ) {
+      return cacheDoc.history;
     }
 
     // If not in cache or cache expired, fetch from CoinGecko
@@ -176,17 +175,20 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistoryRespo
     );
 
     // Update cache
-    await cacheRef.set(
+    await db.collection(COLLECTIONS.PRICE_CACHE).updateOne(
+      { _id: symbol },
       {
-        history,
-        createdAt: now,
+        $set: {
+          history,
+          createdAt: now,
+        },
       },
-      { merge: true },
+      { upsert: true },
     );
 
     return history;
   } catch (error) {
-    console.error("Unexpected error fetching price history:", error);
+    console.error(`${LOG_PREFIX} Unexpected error fetching price history:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
   }
 };

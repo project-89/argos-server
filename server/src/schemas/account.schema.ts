@@ -1,19 +1,18 @@
 import { z } from "zod";
-import { Timestamp } from "firebase-admin/firestore";
-import { WalletAddressSchema, AccountIdSchema, FingerprintIdSchema } from ".";
+import { WalletAddressSchema, AccountIdSchema, FingerprintIdSchema, TimestampSchema } from ".";
 import { ACCOUNT_ROLE } from "../constants";
 
 export const AccountStatusSchema = z.enum(["active", "suspended"]);
 
-// Base schema for Account in Firestore
+// Base schema for Account in MongoDB
 export const AccountSchema = z.object({
   id: AccountIdSchema,
   walletAddress: WalletAddressSchema,
   fingerprintId: FingerprintIdSchema,
-  createdAt: z.instanceof(Timestamp),
-  lastLogin: z.instanceof(Timestamp),
+  createdAt: TimestampSchema,
+  lastLogin: TimestampSchema,
   status: z.enum(["active", "suspended"]),
-  roles: z.array(z.nativeEnum(ACCOUNT_ROLE)).default(["user"]),
+  roles: z.array(z.nativeEnum(ACCOUNT_ROLE)).default([ACCOUNT_ROLE.user]),
   anonUserId: z.string().optional(),
   metadata: z.record(z.any()),
 });
@@ -73,8 +72,8 @@ export const AccountResponseSchema = z.object({
   fingerprintId: FingerprintIdSchema,
   status: z.enum(["active", "suspended"]),
   roles: z.array(z.nativeEnum(ACCOUNT_ROLE)),
-  createdAt: z.instanceof(Timestamp),
-  lastLogin: z.instanceof(Timestamp),
+  createdAt: TimestampSchema,
+  lastLogin: TimestampSchema,
   metadata: z.record(z.any()),
 });
 

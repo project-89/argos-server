@@ -11,6 +11,19 @@ export const VisitSchema = z.object({
   siteId: z.string(),
   createdAt: TimestampSchema,
   clientIp: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
+});
+
+export const SiteSchema = z.object({
+  id: z.string(),
+  domain: z.string(),
+  fingerprintId: z.string(),
+  lastVisited: TimestampSchema,
+  title: z.string(),
+  visits: z.number(),
+  settings: SiteSettingsSchema,
+  createdAt: TimestampSchema,
+  updatedAt: TimestampSchema.optional(),
 });
 
 export const VisitPresenceSchema = z.object({
@@ -38,12 +51,14 @@ export const SiteEngagementSchema = z.object({
 
 // Response Types
 export const VisitResponseSchema = z.object({
+  id: z.string().optional(),
   fingerprintId: z.string(),
   url: z.string(),
   title: z.string().optional(),
   siteId: z.string(),
   createdAt: z.number(),
   clientIp: z.string().optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export const SiteResponseSchema = z.object({
@@ -55,6 +70,7 @@ export const SiteResponseSchema = z.object({
   visits: z.number(),
   settings: SiteSettingsSchema,
   createdAt: z.number(),
+  updatedAt: z.number().optional(),
 });
 
 export const VisitHistoryResponseSchema = z.object({
@@ -65,6 +81,7 @@ export const VisitHistoryResponseSchema = z.object({
   siteId: z.string(),
   createdAt: z.number(),
   site: SiteResponseSchema.optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export const VisitPatternAnalysisResponseSchema = z.object({
@@ -86,6 +103,7 @@ export const VisitLogSchema = z.object({
       })
       .url(ERROR_MESSAGES.INVALID_URL),
     title: z.string().optional(),
+    metadata: z.record(z.any()).optional(),
   }),
   query: z.object({}).optional(),
   params: z.object({}).optional(),
@@ -97,7 +115,7 @@ export const VisitPresenceRequestSchema = z.object({
       required_error: ERROR_MESSAGES.MISSING_FINGERPRINT,
       invalid_type_error: ERROR_MESSAGES.INVALID_FINGERPRINT,
     }),
-    status: z.enum(["online", "offline"] as const, {
+    status: z.enum(["online", "offline", "away"] as const, {
       invalid_type_error: ERROR_MESSAGES.INVALID_STATUS,
       required_error: ERROR_MESSAGES.MISSING_STATUS,
     }),
@@ -128,7 +146,12 @@ export const VisitHistorySchema = z.object({
     }),
   }),
   body: z.object({}).optional(),
-  query: z.object({}).optional(),
+  query: z
+    .object({
+      limit: z.string().transform(Number).optional().default("50"),
+      offset: z.string().transform(Number).optional().default("0"),
+    })
+    .optional(),
 });
 
 export const VisitPatternAnalysisSchema = z.object({
@@ -139,11 +162,16 @@ export const VisitPatternAnalysisSchema = z.object({
     }),
   }),
   body: z.object({}).optional(),
-  query: z.object({}).optional(),
+  query: z
+    .object({
+      days: z.string().transform(Number).optional().default("30"),
+    })
+    .optional(),
 });
 
 // Type Exports
 export type Visit = z.infer<typeof VisitSchema>;
+export type Site = z.infer<typeof SiteSchema>;
 export type VisitPresence = z.infer<typeof VisitPresenceSchema>;
 export type VisitResponse = z.infer<typeof VisitResponseSchema>;
 export type SiteResponse = z.infer<typeof SiteResponseSchema>;

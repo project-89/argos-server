@@ -1,11 +1,10 @@
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { nanoid } from "nanoid";
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { AgentInvite, CreateInviteRequest } from "../schemas";
 import { ApiError } from "../utils";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
 
 const LOG_PREFIX = "[Agent Invite Service]";
-const db = getFirestore();
 
 export async function createInvite(
   request: CreateInviteRequest["body"],
@@ -13,24 +12,23 @@ export async function createInvite(
 ): Promise<AgentInvite> {
   try {
     console.log(`${LOG_PREFIX} Creating new agent invite`);
+    const db = await getDb();
 
-    const now = Timestamp.now();
+    const now = new Date();
     const inviteCode = nanoid(12); // Generate unique 12-character invite code
 
     const invite: AgentInvite = {
       id: inviteCode,
       createdBy: adminId,
       createdAt: now,
-      expiresAt: Timestamp.fromMillis(
-        now.toMillis() + (request.expiresIn || 7 * 24 * 60 * 60) * 1000,
-      ), // Default 7 days
+      expiresAt: new Date(now.getTime() + (request.expiresIn || 7 * 24 * 60 * 60) * 1000), // Default 7 days
       maxUses: request.maxUses || 1,
       useCount: 0,
       isRevoked: false,
       metadata: request.metadata || {},
     };
 
-    await db.collection(COLLECTIONS.AGENT_INVITES).doc(inviteCode).set(invite);
+    await db.collection(COLLECTIONS.AGENT_INVITES).insertOne(invite);
 
     console.log(`${LOG_PREFIX} Created invite:`, inviteCode);
     return invite;
@@ -43,14 +41,13 @@ export async function createInvite(
 export async function validateInvite(inviteCode: string): Promise<AgentInvite> {
   try {
     console.log(`${LOG_PREFIX} Validating invite:`, inviteCode);
+    const db = await getDb();
 
-    const inviteDoc = await db.collection(COLLECTIONS.AGENT_INVITES).doc(inviteCode).get();
+    const invite = await db.collection(COLLECTIONS.AGENT_INVITES).findOne({ id: inviteCode });
 
-    if (!inviteDoc.exists) {
+    if (!invite) {
       throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
     }
-
-    const invite = inviteDoc.data() as AgentInvite;
 
     // Check if invite is valid
     if (invite.isRevoked) {
@@ -61,11 +58,12 @@ export async function validateInvite(inviteCode: string): Promise<AgentInvite> {
       throw new ApiError(400, ERROR_MESSAGES.INVITE_EXHAUSTED);
     }
 
-    if (invite.expiresAt.toMillis() < Timestamp.now().toMillis()) {
+    const now = new Date();
+    if (invite.expiresAt < now) {
       throw new ApiError(400, ERROR_MESSAGES.INVITE_EXPIRED);
     }
 
-    return invite;
+    return formatDocument(invite) as AgentInvite;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error validating invite:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.INVITE_NOT_FOUND);
@@ -75,36 +73,44 @@ export async function validateInvite(inviteCode: string): Promise<AgentInvite> {
 export async function useInvite(inviteCode: string, agentId: string): Promise<void> {
   try {
     console.log(`${LOG_PREFIX} Using invite:`, inviteCode);
+    const db = await getDb();
 
-    // Run in transaction to prevent race conditions
-    await db.runTransaction(async (transaction) => {
-      const inviteRef = db.collection(COLLECTIONS.AGENT_INVITES).doc(inviteCode);
-      const inviteDoc = await transaction.get(inviteRef);
+    // Use MongoDB session for transaction
+    const session = db.client.startSession();
+    try {
+      await session.withTransaction(async () => {
+        const invite = await db
+          .collection(COLLECTIONS.AGENT_INVITES)
+          .findOne({ id: inviteCode }, { session });
 
-      if (!inviteDoc.exists) {
-        throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
-      }
+        if (!invite) {
+          throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
+        }
 
-      const invite = inviteDoc.data() as AgentInvite;
+        // Revalidate in transaction
+        const now = new Date();
+        if (invite.isRevoked || invite.useCount >= invite.maxUses || invite.expiresAt < now) {
+          throw new ApiError(400, ERROR_MESSAGES.INVITE_INVALID);
+        }
 
-      // Revalidate in transaction
-      if (
-        invite.isRevoked ||
-        invite.useCount >= invite.maxUses ||
-        invite.expiresAt.toMillis() < Timestamp.now().toMillis()
-      ) {
-        throw new ApiError(400, ERROR_MESSAGES.INVITE_INVALID);
-      }
-
-      // Update invite
-      transaction.update(inviteRef, {
-        useCount: invite.useCount + 1,
-        usedBy: agentId,
-        usedAt: Timestamp.now(),
+        // Update invite
+        await db.collection(COLLECTIONS.AGENT_INVITES).updateOne(
+          { id: inviteCode },
+          {
+            $set: {
+              usedBy: agentId,
+              usedAt: now,
+            },
+            $inc: { useCount: 1 },
+          },
+          { session },
+        );
       });
-    });
 
-    console.log(`${LOG_PREFIX} Successfully used invite:`, inviteCode);
+      console.log(`${LOG_PREFIX} Successfully used invite:`, inviteCode);
+    } finally {
+      await session.endSession();
+    }
   } catch (error) {
     console.error(`${LOG_PREFIX} Error using invite:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.INVITE_NOT_FOUND);
@@ -114,14 +120,37 @@ export async function useInvite(inviteCode: string, agentId: string): Promise<vo
 export async function revokeInvite(inviteCode: string): Promise<void> {
   try {
     console.log(`${LOG_PREFIX} Revoking invite:`, inviteCode);
+    const db = await getDb();
 
-    await db.collection(COLLECTIONS.AGENT_INVITES).doc(inviteCode).update({
-      isRevoked: true,
-    });
+    const result = await db
+      .collection(COLLECTIONS.AGENT_INVITES)
+      .updateOne({ id: inviteCode }, { $set: { isRevoked: true } });
+
+    if (result.matchedCount === 0) {
+      throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
+    }
 
     console.log(`${LOG_PREFIX} Successfully revoked invite:`, inviteCode);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error revoking invite:`, error);
     throw ApiError.from(error, 404, ERROR_MESSAGES.INVITE_NOT_FOUND);
+  }
+}
+
+export async function listInvites(adminId: string): Promise<AgentInvite[]> {
+  try {
+    console.log(`${LOG_PREFIX} Listing invites for admin:`, adminId);
+    const db = await getDb();
+
+    const invites = await db
+      .collection(COLLECTIONS.AGENT_INVITES)
+      .find({ createdBy: adminId })
+      .sort({ createdAt: -1 })
+      .toArray();
+
+    return formatDocuments(invites) as AgentInvite[];
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error listing invites:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 }
