@@ -176,13 +176,16 @@ export type KnowledgeResponse = z.infer<typeof KnowledgeResponseSchema>;
 
 export const CompressKnowledgeResponseSchema = z.object({
   compressedContent: z.string(),
-  domain: KnowledgeDomainSchema,
+  originalLength: z.number(),
+  compressedLength: z.number(),
+  compressionRatio: z.number(),
 });
 export type CompressKnowledgeResponse = z.infer<typeof CompressKnowledgeResponseSchema>;
 
 export const DecompressKnowledgeResponseSchema = z.object({
-  decompressedContent: z.string(),
-  domain: KnowledgeDomainSchema,
+  content: z.string(),
+  decompressedLength: z.number(),
+  originalLength: z.number(),
 });
 export type DecompressKnowledgeResponse = z.infer<typeof DecompressKnowledgeResponseSchema>;
 

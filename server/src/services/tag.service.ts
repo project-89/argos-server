@@ -1,7 +1,6 @@
 import { ApiError } from "../utils";
-import { ERROR_MESSAGES } from "../constants";
-import { COLLECTIONS } from "../constants/database/collections";
-import { ALLOWED_TAG_TYPES, TAG_LIMITS } from "../constants/features/tags";
+import { COLLECTIONS, ERROR_MESSAGES, TAG_LIMITS } from "../constants";
+import { ALLOWED_TAG_TYPES } from "../constants/features/tags";
 import {
   TagData,
   TagLimitData,
@@ -9,13 +8,9 @@ import {
   TagStats,
   TagUserParams,
 } from "../schemas/tag.schema";
-import {
-  getDb,
-  formatDocument,
-  formatDocuments,
-  toObjectId,
-  handleMongoError,
-} from "../utils/mongodb";
+import { getDb, formatDocument, formatDocuments, handleMongoError } from "../utils/mongodb";
+import { stringIdFilter } from "../utils/mongo-filters";
+import { ObjectId } from "mongodb";
 
 const LOG_PREFIX = "[Tag Service]";
 const MAX_DAILY_TAGS = TAG_LIMITS.DAILY_TAGS;
@@ -105,9 +100,12 @@ export async function updateUserTagLimits(
   try {
     const db = await getDb();
 
+    // Create user filter with string ID
+    const userFilter = stringIdFilter("_id", userId);
+
     // Upsert tag limits doc
     const result = await db.collection(COLLECTIONS.ANON_USERS).updateOne(
-      { _id: userId },
+      userFilter,
       {
         $set: {
           tagLimits: newLimits,
@@ -138,17 +136,17 @@ export async function addTagToUser(userId: string, tag: TagData): Promise<void> 
   try {
     const db = await getDb();
 
+    // Create user filter with string ID
+    const userFilter = stringIdFilter("_id", userId);
+
     // Add tag to user document
-    const result = await db.collection(COLLECTIONS.ANON_USERS).updateOne(
-      { _id: userId },
-      {
-        $push: { taggedBy: tag },
-        $set: { updatedAt: Date.now() },
-      },
-    );
+    const result = await db.collection(COLLECTIONS.ANON_USERS).updateOne(userFilter, {
+      $push: { taggedBy: tag },
+      $set: { updatedAt: Date.now() },
+    });
 
     if (!result.acknowledged) {
-      throw new Error(`Failed to add tag for user ${userId}`);
+      throw new Error(`Failed to add tag to user ${userId}`);
     }
 
     // Update tag stats
@@ -186,8 +184,11 @@ export async function processTagLimits(taggerId: string, targetHasTag: boolean):
   try {
     const db = await getDb();
 
-    // Get current tag limits
-    const user = await db.collection(COLLECTIONS.ANON_USERS).findOne({ _id: taggerId });
+    // Create tagger filter with string ID
+    const taggerFilter = stringIdFilter("_id", taggerId);
+
+    // Get tagger to check current limits
+    const user = await db.collection(COLLECTIONS.ANON_USERS).findOne(taggerFilter);
 
     // Initialize or update tag limits
     let tagLimits: TagLimitData;
@@ -287,8 +288,11 @@ export async function tagUserBySocialIdentity({
     // Get or create users
     const { taggerId, targetId } = await getOrCreateUsers(taggerUsername, targetUsername, platform);
 
+    // Create target filter with string ID
+    const targetFilter = stringIdFilter("_id", targetId);
+
     // Check if target is already tagged by tagger
-    const targetUser = await db.collection(COLLECTIONS.ANON_USERS).findOne({ _id: targetId });
+    const targetUser = await db.collection(COLLECTIONS.ANON_USERS).findOne(targetFilter);
 
     if (
       targetUser?.taggedBy?.some(

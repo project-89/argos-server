@@ -1,36 +1,59 @@
 import {
-  COLLECTIONS,
-  ERROR_MESSAGES,
   ACCOUNT_ROLE,
   ACCOUNT_ROLE_HIERARCHY,
   ACCOUNT_ROLE_PERMISSIONS,
-  Permission,
+  COLLECTIONS,
+  ERROR_MESSAGES,
+  PERMISSION,
 } from "../constants";
-import { ApiError } from "../utils";
-import { getDb, toObjectId } from "../utils/mongodb";
+import { ApiError, idFilter } from "../utils";
 import { getAccountById } from "./account.service";
+import { getDb, formatDocument } from "../utils/mongodb";
 
 const LOG_PREFIX = "[Role Service]";
+
+// Use the imported types from constants
 type AccountRole = (typeof ACCOUNT_ROLE)[keyof typeof ACCOUNT_ROLE];
+type Permission = (typeof PERMISSION)[keyof typeof PERMISSION];
 
 /**
- * Core role checking logic
+ * Get all roles assigned to an account
  */
 export const getAccountRoles = async (accountId: string): Promise<AccountRole[]> => {
-  const account = await getAccountById(accountId);
-  if (!account) {
-    return [ACCOUNT_ROLE.user];
-  }
+  try {
+    console.log(`${LOG_PREFIX} Getting roles for account:`, accountId);
+    const db = await getDb();
 
-  return account.roles || [ACCOUNT_ROLE.user];
+    // Get account and extract roles
+    const filter = idFilter(accountId);
+    if (!filter) {
+      console.warn(`${LOG_PREFIX} Invalid account ID: ${accountId}`);
+      return [];
+    }
+
+    const account = await db.collection(COLLECTIONS.ACCOUNTS).findOne(filter);
+    if (!account) {
+      return [];
+    }
+
+    // Explicitly type the formatted document
+    const formattedAccount = formatDocument<{ roles?: AccountRole[] }>(account);
+    return formattedAccount?.roles || [];
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error getting account roles:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+  }
 };
 
+/**
+ * Get all available account roles
+ */
 export const getAvailableRoles = (): AccountRole[] => {
   return Object.values(ACCOUNT_ROLE);
 };
 
 /**
- * All role-based checks
+ * Check if account has a specific permission
  */
 export const hasPermission = async (
   accountId: string,
@@ -38,26 +61,50 @@ export const hasPermission = async (
 ): Promise<boolean> => {
   const roles = await getAccountRoles(accountId);
 
-  return roles.some((role) => {
-    const permissions = ACCOUNT_ROLE_PERMISSIONS[role];
-    return Array.isArray(permissions) && permissions.includes(permission);
-  });
+  for (const role of roles) {
+    // Get permissions for this role and cast to any to bypass TypeScript constraint
+    const rolePermissions = (ACCOUNT_ROLE_PERMISSIONS as any)[role] || [];
+    if (rolePermissions.includes(permission)) {
+      return true;
+    }
+  }
+
+  return false;
 };
 
+/**
+ * Check if account can manage a specific role
+ */
 export const canManageRole = async (
   callerAccountId: string,
   targetRole: AccountRole,
 ): Promise<boolean> => {
-  const roles = await getAccountRoles(callerAccountId);
+  try {
+    // Get caller's roles
+    const callerRoles = await getAccountRoles(callerAccountId);
 
-  const callerLevel = Math.max(...roles.map((role) => ACCOUNT_ROLE_HIERARCHY[role] || 0));
-  const targetLevel = ACCOUNT_ROLE_HIERARCHY[targetRole];
+    // Admin can manage all roles
+    if (callerRoles.includes(ACCOUNT_ROLE.admin)) {
+      return true;
+    }
 
-  return callerLevel > targetLevel;
+    // Otherwise, check if caller's highest role is above target role
+    let callerHighestRank = -1;
+    for (const role of callerRoles) {
+      const roleRank = ACCOUNT_ROLE_HIERARCHY[role] || 0;
+      callerHighestRank = Math.max(callerHighestRank, roleRank);
+    }
+
+    const targetRoleRank = ACCOUNT_ROLE_HIERARCHY[targetRole] || 0;
+    return callerHighestRank > targetRoleRank;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error checking role management permissions:`, error);
+    return false;
+  }
 };
 
 /**
- * Role modification methods
+ * Assign a role to an account
  */
 export const assignRole = async (
   targetAccountId: string,
@@ -65,92 +112,104 @@ export const assignRole = async (
   role: AccountRole,
 ): Promise<{ accountId: string; roles: AccountRole[] }> => {
   try {
-    // Only prevent self-role modification for non-admins
-    if (targetAccountId === callerAccountId) {
+    console.log(`${LOG_PREFIX} Adding role to account:`, { targetAccountId, role });
+
+    // Check if caller can manage this role
+    const canManage = await canManageRole(callerAccountId, role);
+    if (!canManage) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
-    // Check if caller has sufficient privileges
-    const hasPermission = await canManageRole(callerAccountId, role);
-    if (!hasPermission) {
-      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-    }
+    const db = await getDb();
 
-    const account = await getAccountById(targetAccountId);
-    if (!account) {
+    // Get target account
+    const targetAccount = await getAccountById(targetAccountId);
+    if (!targetAccount) {
       throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    const currentRoles = new Set<AccountRole>(account.roles || [ACCOUNT_ROLE.user]);
-    currentRoles.add(role);
-    currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
-
-    const updatedRoles = Array.from(currentRoles);
-
-    const db = await getDb();
-    await db
-      .collection(COLLECTIONS.ACCOUNTS)
-      .updateOne({ _id: toObjectId(targetAccountId) }, { $set: { roles: updatedRoles } });
-
-    return {
-      accountId: targetAccountId,
-      roles: updatedRoles,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
+    // Check if role already assigned
+    if (targetAccount.roles.includes(role)) {
+      return { accountId: targetAccountId, roles: targetAccount.roles };
     }
-    console.error(`${LOG_PREFIX} Error in assignRole:`, error);
-    throw new ApiError(500, ERROR_MESSAGES.FAILED_ASSIGN_ROLE);
+
+    // Create new roles array with unique values
+    const updatedRoles = [...new Set([...targetAccount.roles, role])];
+
+    // Update account with new roles
+    const filter = idFilter(targetAccountId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
+    }
+
+    await db.collection(COLLECTIONS.ACCOUNTS).updateOne(filter, {
+      $set: {
+        roles: updatedRoles,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { accountId: targetAccountId, roles: updatedRoles };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error adding role:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
+/**
+ * Remove a role from an account
+ */
 export const removeRole = async (
   targetAccountId: string,
   callerAccountId: string,
   role: AccountRole,
 ): Promise<{ accountId: string; roles: AccountRole[] }> => {
   try {
-    if (role === ACCOUNT_ROLE.user) {
-      throw new ApiError(400, ERROR_MESSAGES.CANNOT_REMOVE_USER_ROLE);
-    }
+    console.log(`${LOG_PREFIX} Removing role from account:`, { targetAccountId, role });
 
-    // Only prevent self-role modification for non-admins
-    if (targetAccountId === callerAccountId) {
+    // Check if caller can manage this role
+    const canManage = await canManageRole(callerAccountId, role);
+    if (!canManage) {
       throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
-    // Check if caller has sufficient privileges
-    const hasPermission = await canManageRole(callerAccountId, role);
-    if (!hasPermission) {
-      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-    }
+    const db = await getDb();
 
-    const account = await getAccountById(targetAccountId);
-    if (!account) {
+    // Get target account
+    const targetAccount = await getAccountById(targetAccountId);
+    if (!targetAccount) {
       throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
     }
 
-    const currentRoles = new Set<AccountRole>(account.roles || [ACCOUNT_ROLE.user]);
-    currentRoles.delete(role);
-    currentRoles.add(ACCOUNT_ROLE.user); // Ensure user role is always present
-
-    const updatedRoles = Array.from(currentRoles);
-
-    const db = await getDb();
-    await db
-      .collection(COLLECTIONS.ACCOUNTS)
-      .updateOne({ _id: toObjectId(targetAccountId) }, { $set: { roles: updatedRoles } });
-
-    return {
-      accountId: targetAccountId,
-      roles: updatedRoles,
-    };
-  } catch (error) {
-    if (error instanceof ApiError) {
-      throw error;
+    // Check if role is assigned
+    if (!targetAccount.roles.includes(role)) {
+      return { accountId: targetAccountId, roles: targetAccount.roles };
     }
-    console.error(`${LOG_PREFIX} Error in removeRole:`, error);
-    throw new ApiError(500, ERROR_MESSAGES.FAILED_REMOVE_ROLE);
+
+    // Check if it's the only role
+    if (targetAccount.roles.length === 1 && targetAccount.roles[0] === role) {
+      throw new ApiError(400, ERROR_MESSAGES.CANNOT_REMOVE_USER_ROLE);
+    }
+
+    // Create new roles array without the role to remove
+    const updatedRoles = targetAccount.roles.filter((r) => r !== role);
+
+    // Update account with new roles
+    const filter = idFilter(targetAccountId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.ACCOUNT_NOT_FOUND);
+    }
+
+    await db.collection(COLLECTIONS.ACCOUNTS).updateOne(filter, {
+      $set: {
+        roles: updatedRoles,
+        updatedAt: new Date(),
+      },
+    });
+
+    return { accountId: targetAccountId, roles: updatedRoles };
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error removing role:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

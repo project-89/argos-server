@@ -1,6 +1,6 @@
 import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils";
-import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
 import {
   Profile,
   ProfileCreateRequest,
@@ -9,6 +9,9 @@ import {
   ProfileWithStatsResponse,
   Stats,
 } from "../schemas";
+import { startMongoSession, withTransaction } from "../utils/mongo-session";
+import { idFilter, notEqualIdFilter } from "../utils/mongo-filters";
+import { ObjectId } from "mongodb";
 
 const LOG_PREFIX = "[Profile Service]";
 
@@ -58,51 +61,37 @@ export async function createProfile(input: ProfileCreateRequest["body"]): Promis
       updatedAt: now,
     };
 
-    // Use transaction to create both profile and stats
-    const session = db.client.startSession();
+    // Use withTransaction pattern for better session management
+    return await withTransaction(async (session) => {
+      // Insert profile
+      const profileResult = await profilesCollection.insertOne(profile, { session });
+      const profileId = profileResult.insertedId.toString();
 
-    // Initialize with dummy ID that will be replaced during transaction
-    let result: Profile = {
-      id: "pending",
-      ...profile,
-    };
+      // Initialize stats with explicit values
+      const statsCollection = db.collection(COLLECTIONS.STATS);
+      const stats: Omit<Stats, "id"> = {
+        profileId: profileId,
+        missionsCompleted: 0,
+        successRate: 0,
+        totalRewards: 0,
+        reputation: 0,
+        joinedAt: now,
+        lastActive: now,
+        createdAt: now,
+        updatedAt: now,
+      };
 
-    try {
-      await session.withTransaction(async () => {
-        // Insert profile
-        const profileResult = await profilesCollection.insertOne(profile, { session });
-        const profileId = profileResult.insertedId.toString();
+      // Insert stats with the same ID as the profile for easier reference
+      await statsCollection.insertOne({ ...stats, _id: new ObjectId(profileId) }, { session });
 
-        // Initialize stats with explicit values
-        const statsCollection = db.collection(COLLECTIONS.STATS);
-        const stats: Omit<Stats, "id"> = {
-          profileId: profileId,
-          missionsCompleted: 0,
-          successRate: 0,
-          totalRewards: 0,
-          reputation: 0,
-          joinedAt: now,
-          lastActive: now,
-          createdAt: now,
-          updatedAt: now,
-        };
+      // Update result with the created ID
+      const result: Profile = {
+        ...profile,
+        id: profileId,
+      };
 
-        await statsCollection.insertOne({ ...stats, _id: toObjectId(profileId) }, { session });
-
-        result = {
-          id: profileId,
-          ...profile,
-        };
-      });
-    } finally {
-      await session.endSession();
-    }
-
-    console.log(`${LOG_PREFIX} Successfully created profile and initialized stats:`, {
-      id: result.id,
+      return formatDocument<ProfileResponse>(result)!;
     });
-
-    return result;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -120,10 +109,18 @@ export async function getProfile(id: string): Promise<ProfileWithStatsResponse> 
     const profileCollection = db.collection(COLLECTIONS.PROFILES);
     const statsCollection = db.collection(COLLECTIONS.STATS);
 
+    // Create ID filters for MongoDB
+    const profileFilter = idFilter(id);
+    const statsFilter = idFilter(id);
+
+    if (!Object.keys(profileFilter).length) {
+      throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_INPUT);
+    }
+
     // Get both profile and stats in parallel
     const [profileDoc, statsDoc] = await Promise.all([
-      profileCollection.findOne({ _id: toObjectId(id) }),
-      statsCollection.findOne({ _id: toObjectId(id) }),
+      profileCollection.findOne(profileFilter),
+      statsCollection.findOne(statsFilter),
     ]);
 
     console.log(`${LOG_PREFIX} Documents exist:`, {
@@ -139,9 +136,9 @@ export async function getProfile(id: string): Promise<ProfileWithStatsResponse> 
     const statsData = statsDoc ? formatDocument<Stats>(statsDoc) : null;
 
     return {
-      ...profileData,
+      ...profileData!,
       stats: statsData,
-    };
+    } as ProfileWithStatsResponse;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -166,16 +163,17 @@ export async function getProfileByWallet(walletAddress: string): Promise<Profile
     }
 
     const profileData = formatDocument<Profile>(profileDoc);
-    const statsDoc = await db
-      .collection(COLLECTIONS.STATS)
-      .findOne({ _id: toObjectId(profileData.id) });
+
+    // Use idFilter for proper ObjectId handling
+    const statsFilter = idFilter(profileData!.id);
+    const statsDoc = await db.collection(COLLECTIONS.STATS).findOne(statsFilter);
 
     const statsData = statsDoc ? formatDocument<Stats>(statsDoc) : null;
 
     return {
-      ...profileData,
+      ...profileData!,
       stats: statsData,
-    };
+    } as ProfileWithStatsResponse;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -191,12 +189,18 @@ export async function updateProfile(
   input: ProfileUpdateRequest["body"],
 ): Promise<ProfileResponse> {
   try {
-    console.log(`${LOG_PREFIX} Starting with:`, { id, input });
+    console.log(`${LOG_PREFIX} Starting with input:`, { id, input });
     const db = await getDb();
     const profilesCollection = db.collection(COLLECTIONS.PROFILES);
 
-    const profileDoc = await profilesCollection.findOne({ _id: toObjectId(id) });
-    console.log(`${LOG_PREFIX} Document exists:`, !!profileDoc);
+    // Create ID filter for MongoDB
+    const filter = idFilter(id);
+    if (!Object.keys(filter).length) {
+      throw ApiError.from(null, 400, ERROR_MESSAGES.INVALID_INPUT);
+    }
+
+    // First check if profile exists
+    const profileDoc = await profilesCollection.findOne(filter);
 
     if (!profileDoc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.PROFILE_NOT_FOUND);
@@ -204,10 +208,13 @@ export async function updateProfile(
 
     // If username is being updated, check if new username is taken
     if (input.username) {
-      const existingUsername = await profilesCollection.findOne({
+      // Use notEqualIdFilter for type-safe $ne query
+      const usernameFilter = {
         username: input.username,
-        _id: { $ne: toObjectId(id) },
-      });
+        ...notEqualIdFilter(id),
+      };
+
+      const existingUsername = await profilesCollection.findOne(usernameFilter);
 
       console.log(`${LOG_PREFIX} Username check result:`, {
         exists: !!existingUsername,
@@ -233,7 +240,7 @@ export async function updateProfile(
 
     // Handle preferences separately to ensure type safety
     if (input.preferences) {
-      const currentPrefs = formatDocument<Profile>(profileDoc).preferences;
+      const currentPrefs = formatDocument<Profile>(profileDoc!)?.preferences;
       updates.preferences = {
         isProfilePublic: input.preferences.isProfilePublic ?? currentPrefs?.isProfilePublic ?? true,
         showStats: input.preferences.showStats ?? currentPrefs?.showStats ?? true,
@@ -241,10 +248,10 @@ export async function updateProfile(
     }
 
     console.log(`${LOG_PREFIX} Updating profile`);
-    await profilesCollection.updateOne({ _id: toObjectId(id) }, { $set: updates });
+    await profilesCollection.updateOne(filter, { $set: updates });
 
-    const updatedDoc = await profilesCollection.findOne({ _id: toObjectId(id) });
-    return formatDocument<Profile>(updatedDoc);
+    const updatedDoc = await profilesCollection.findOne(filter);
+    return formatDocument<ProfileResponse>(updatedDoc)!;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -295,7 +302,7 @@ export async function searchProfiles(options: {
       }
 
       const eligibleProfileIds = capabilitiesDocs.map((doc) => doc.profileId);
-      filter._id = { $in: eligibleProfileIds.map((id) => toObjectId(id)) };
+      filter._id = { $in: eligibleProfileIds.map((id) => new ObjectId(id)) };
     }
 
     // Add text search conditions

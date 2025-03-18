@@ -1,17 +1,12 @@
 import { AGENT_RANK, COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Agent, AgentState, RegisterAgentRequest } from "../schemas";
-import { ApiError, verifySignature } from "../utils";
+import { ApiError, verifySignature, idFilter } from "../utils";
 import { validateInvite, useInvite } from "./agentInvite.service";
 import { createAccount, createProfile } from ".";
 
 // Import MongoDB utilities instead of Firebase
-import {
-  getDb,
-  toObjectId,
-  formatDocument,
-  formatDocuments,
-  handleMongoError,
-} from "../utils/mongodb";
+import { getDb, formatDocument, formatDocuments, handleMongoError } from "../utils/mongodb";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Agent Service]";
 
@@ -111,14 +106,11 @@ export async function activateAgent(
       preferences: {},
     });
 
-    await createAccount({
-      body: {
-        walletAddress,
-        fingerprintId: agentId,
-        message,
-        signature,
-        onboardingId: agentId,
-      },
+    // Call createAccount with separate parameters
+    await createAccount(walletAddress, agentId, {
+      message,
+      signature,
+      onboardingId: agentId,
     });
 
     // Update agent with activation details
@@ -135,16 +127,19 @@ export async function activateAgent(
       status: "active" as const, // Using a const assertion to match the enum
     };
 
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: toObjectId(agentId) },
-      {
-        $set: {
-          identity: updatedIdentity,
-          state: updatedState,
-          updatedAt: now,
-        },
+    // Create MongoDB filter using our utility
+    const filter = idFilter(agentId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    await db.collection(COLLECTIONS.AGENTS).updateOne(filter, {
+      $set: {
+        identity: updatedIdentity,
+        state: updatedState,
+        updatedAt: now,
       },
-    );
+    });
 
     const updatedAgent: Agent = {
       ...agent,
@@ -165,16 +160,26 @@ export async function getAgent(agentId: string): Promise<Agent> {
     console.log(`${LOG_PREFIX} Fetching agent:`, agentId);
 
     const db = await getDb();
-    const agent = await db.collection(COLLECTIONS.AGENTS).findOne({ _id: toObjectId(agentId) });
+    const filter = idFilter(agentId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    const agent = await db.collection(COLLECTIONS.AGENTS).findOne(filter);
 
     if (!agent) {
       throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
     }
 
-    return formatDocument<Agent>(agent);
+    const formattedAgent = formatDocument<Agent>(agent);
+    if (!formattedAgent) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    return formattedAgent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error fetching agent:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_AGENT);
   }
 }
 
@@ -186,15 +191,18 @@ export async function updateAgentState(agentId: string, state: AgentState): Prom
     const db = await getDb();
     const now = new Date();
 
-    await db.collection(COLLECTIONS.AGENTS).updateOne(
-      { _id: toObjectId(agentId) },
-      {
-        $set: {
-          state,
-          updatedAt: now,
-        },
+    // Create MongoDB filter using our utility
+    const filter = idFilter(agentId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    await db.collection(COLLECTIONS.AGENTS).updateOne(filter, {
+      $set: {
+        state,
+        updatedAt: now,
       },
-    );
+    });
 
     const updatedAgent: Agent = {
       ...agent,
@@ -205,7 +213,7 @@ export async function updateAgentState(agentId: string, state: AgentState): Prom
     return updatedAgent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating agent state:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_UPDATE_AGENT_STATE);
   }
 }
 
@@ -213,29 +221,31 @@ export async function updateAgent(agentId: string, updates: Partial<Agent>): Pro
   try {
     console.log(`${LOG_PREFIX} Updating agent:`, agentId);
 
-    const agent = await getAgent(agentId);
     const db = await getDb();
-    const now = new Date();
+    // Verify agent exists
+    const existingAgent = await getAgent(agentId);
 
+    const filter = idFilter(agentId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    const now = new Date();
     const updatedFields = {
       ...updates,
       updatedAt: now,
     };
 
-    await db
-      .collection(COLLECTIONS.AGENTS)
-      .updateOne({ _id: toObjectId(agentId) }, { $set: updatedFields });
+    await db.collection(COLLECTIONS.AGENTS).updateOne(filter, { $set: updatedFields });
 
-    const updatedAgent: Agent = {
-      ...agent,
-      ...updates,
-      updatedAt: now,
+    // Return updated agent
+    return {
+      ...existingAgent,
+      ...updatedFields,
     };
-
-    return updatedAgent;
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating agent:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_UPDATE_AGENT);
   }
 }
 
@@ -249,7 +259,7 @@ export async function listAgents(limit: number = 10): Promise<Agent[]> {
     return formatDocuments<Agent>(agents);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error listing agents:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_AGENT);
   }
 }
 
@@ -258,14 +268,33 @@ export async function getAgentsByCapability(capability: string): Promise<Agent[]
     console.log(`${LOG_PREFIX} Finding agents with capability:`, capability);
 
     const db = await getDb();
-    const agents = await db
-      .collection(COLLECTIONS.AGENTS)
-      .find({ capabilities: { $elemMatch: { id: capability } } })
-      .toArray();
+    // Create a string ID filter for the capability ID
+    const capabilityFilter = stringIdFilter("capabilities.id", capability);
+
+    const agents = await db.collection(COLLECTIONS.AGENTS).find(capabilityFilter).toArray();
 
     return formatDocuments<Agent>(agents);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error finding agents by capability:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_GET_AGENT);
+  }
+}
+
+export async function deleteAgent(agentId: string): Promise<boolean> {
+  try {
+    console.log(`${LOG_PREFIX} Deleting agent:`, agentId);
+
+    const db = await getDb();
+    const filter = idFilter(agentId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
+    }
+
+    const result = await db.collection(COLLECTIONS.AGENTS).deleteOne(filter);
+
+    return result.deletedCount > 0;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error deleting agent:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_DELETE_AGENT);
   }
 }

@@ -11,14 +11,15 @@
     "build": "cd server && npm run build",
     "test": "cd server && npm run test",
     "deploy": "cd server && npm run deploy",
+    "deploy:prod": "cd server && npm run deploy:prod",
     "serve": "cd server && npm run serve",
+    "start": "cd server && npm run start",
+    "mongodb": "cd server && npm run mongodb",
     "terraform:init": "cd terraform && terraform init",
     "terraform:plan": "cd terraform && terraform plan",
-    "terraform:apply": "cd terraform && terraform apply",
-    "firebase:deploy": "firebase deploy"
+    "terraform:apply": "cd terraform && terraform apply"
   },
   "dependencies": {
-    "firebase-tools": "^13.0.0"
   },
   "devDependencies": {
     "dotenv-cli": "^7.4.4",

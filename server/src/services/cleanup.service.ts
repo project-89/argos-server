@@ -2,6 +2,7 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { getCurrentUnixMillis, ApiError } from "../utils";
 import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
 import { Visit, VisitPattern, SiteEngagement, VisitPatternAnalysisResponse } from "../schemas";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Cleanup Service]";
 
@@ -90,23 +91,23 @@ export const cleanupRateLimits = async (identifier: string): Promise<void> => {
   try {
     console.log(`${LOG_PREFIX} Cleaning up rate limits for ${identifier}`);
 
+    // Create string ID filter for rate limits
+    const rateLimitFilter = stringIdFilter("_id", identifier);
+
     // Get the current rate limit document
-    const rateLimitDoc = await db.collection(COLLECTIONS.RATE_LIMITS).findOne({ _id: identifier });
+    const rateLimitDoc = await db.collection(COLLECTIONS.RATE_LIMITS).findOne(rateLimitFilter);
 
     if (rateLimitDoc) {
       const currentRequests = rateLimitDoc.requests || [];
       const updatedRequests = currentRequests.filter((timestamp: number) => timestamp > oneHourAgo);
 
       if (updatedRequests.length !== currentRequests.length) {
-        await db.collection(COLLECTIONS.RATE_LIMITS).updateOne(
-          { _id: identifier },
-          {
-            $set: {
-              requests: updatedRequests,
-              lastUpdated: now,
-            },
+        await db.collection(COLLECTIONS.RATE_LIMITS).updateOne(rateLimitFilter, {
+          $set: {
+            requests: updatedRequests,
+            lastUpdated: now,
           },
-        );
+        });
         console.log(
           `${LOG_PREFIX} Updated rate limits for ${identifier}, removed ${
             currentRequests.length - updatedRequests.length
@@ -128,9 +129,10 @@ export const analyzeVisitPatterns = async (
     const db = await getDb();
 
     // Get all visits for this fingerprint, ordered by timestamp
+    const fingerprintFilter = stringIdFilter("fingerprintId", fingerprintId);
     const visits = await db
       .collection(COLLECTIONS.VISITS)
-      .find({ fingerprintId })
+      .find(fingerprintFilter)
       .sort({ createdAt: 1 })
       .toArray();
 

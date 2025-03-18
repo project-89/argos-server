@@ -11,7 +11,9 @@ import {
 } from "../schemas";
 
 // Import MongoDB utilities
-import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
+import { getDb } from "../utils/mongodb";
+import { startMongoSession, withTransaction } from "../utils/mongo-session";
+import { idFilter, stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Visit Service]";
 
@@ -75,17 +77,14 @@ export const logVisit = async ({
       siteId = site._id.toString();
       const updatedVisits = (site.visits || 0) + 1;
 
-      await db.collection(COLLECTIONS.SITES).updateOne(
-        { _id: toObjectId(siteId) },
-        {
-          $set: {
-            lastVisited: now,
-            visits: updatedVisits,
-            title: title || domain,
-            updatedAt: now,
-          },
+      await db.collection(COLLECTIONS.SITES).updateOne(idFilter(siteId), {
+        $set: {
+          lastVisited: now,
+          visits: updatedVisits,
+          title: title || domain,
+          updatedAt: now,
         },
-      );
+      });
 
       siteResponse = {
         ...site,
@@ -172,9 +171,7 @@ export const removeSiteAndVisits = async ({
     const db = await getDb();
 
     // Check if site exists and belongs to fingerprint
-    const site = await db.collection(COLLECTIONS.SITES).findOne({
-      _id: toObjectId(siteId),
-    });
+    const site = await db.collection(COLLECTIONS.SITES).findOne(idFilter(siteId));
 
     if (!site) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.SITE_NOT_FOUND);
@@ -184,30 +181,16 @@ export const removeSiteAndVisits = async ({
       throw ApiError.from(null, 403, ERROR_MESSAGES.PERMISSION_REQUIRED);
     }
 
-    // Use MongoDB transactions to ensure atomic operations
-    const session = db.client.startSession();
+    // Use withTransaction pattern for atomic operations
+    await withTransaction(async (session) => {
+      // Delete all visits for this site
+      await db
+        .collection(COLLECTIONS.VISITS)
+        .deleteMany(stringIdFilter("siteId", siteId), { session });
 
-    try {
-      await session.withTransaction(async () => {
-        // Delete all visits for this site
-        await db.collection(COLLECTIONS.VISITS).deleteMany(
-          {
-            siteId,
-          },
-          { session },
-        );
-
-        // Delete the site
-        await db.collection(COLLECTIONS.SITES).deleteOne(
-          {
-            _id: toObjectId(siteId),
-          },
-          { session },
-        );
-      });
-    } finally {
-      await session.endSession();
-    }
+      // Delete the site using idFilter for proper ObjectId handling
+      await db.collection(COLLECTIONS.SITES).deleteOne(idFilter(siteId), { session });
+    });
 
     console.log(`${LOG_PREFIX} Removed site ${siteId} and its visits for ${fingerprintId}`);
 
@@ -257,7 +240,7 @@ export const getVisitHistory = async ({
       .map((id) => {
         if (typeof id === "string") {
           try {
-            return toObjectId(id);
+            return idFilter(id);
           } catch (error) {
             console.warn(`${LOG_PREFIX} Invalid ObjectId: ${id}`);
             return null;

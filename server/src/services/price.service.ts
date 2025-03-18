@@ -1,29 +1,31 @@
 import fetch from "node-fetch";
-import * as functions from "firebase-functions";
-import { ApiError, toUnixMillis } from "../utils";
+import { ApiError, toMillis } from "../utils";
 import { getDb } from "../utils/mongodb";
 import type { PriceResponse, PriceHistoryResponse } from "../schemas";
 import { ERROR_MESSAGES, CACHE_DURATION, COLLECTIONS } from "../constants";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Price Service]";
-const DEFAULT_TOKENS = ["project89"];
+const DEFAULT_TOKENS = ["project89", "ethereum", "bitcoin"];
 
 type PriceResult = {
   prices: Record<string, PriceResponse>;
   errors: { [symbol: string]: string };
 };
 
-// Get Coingecko configuration
+/**
+ * Get Coingecko API configuration
+ */
 const getCoingeckoConfig = () => {
-  const config = functions.config();
+  const isPro = process.env.COINGECKO_PRO === "true";
   return {
-    apiUrl: config.coingecko?.api_url || "https://api.coingecko.com/api/v3",
-    apiKey: config.coingecko?.api_key,
+    apiUrl: isPro ? "https://pro-api.coingecko.com/api/v3" : "https://api.coingecko.com/api/v3",
+    apiKey: process.env.COINGECKO_API_KEY || "",
   };
 };
 
 /**
- * Get current prices for specified tokens
+ * Get current prices for provided tokens, or defaults if none provided
  */
 export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceResult> => {
   try {
@@ -41,8 +43,11 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
     for (const symbol of tokenSymbols) {
       try {
+        // Create a filter using string ID
+        const symbolFilter = stringIdFilter("_id", symbol);
+
         // Check cache first
-        const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne({ _id: symbol });
+        const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne(symbolFilter);
 
         if (cacheDoc) {
           if (now - cacheDoc.createdAt < CACHE_DURATION.PRICE) {
@@ -90,9 +95,9 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
         results.prices[symbol] = priceData;
 
-        // Update cache
+        // Update cache with the filter
         await db.collection(COLLECTIONS.PRICE_CACHE).updateOne(
-          { _id: symbol },
+          symbolFilter,
           {
             $set: {
               ...priceData,
@@ -102,9 +107,8 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
           { upsert: true },
         );
       } catch (error) {
-        console.error(`${LOG_PREFIX} Error fetching price for ${symbol}:`, error);
-        results.errors[symbol] =
-          error instanceof ApiError ? error.message : ERROR_MESSAGES.PRICE_DATA_NOT_FOUND;
+        console.error(`${LOG_PREFIX} Error getting price for ${symbol}:`, error);
+        results.errors[symbol] = error instanceof Error ? error.message : String(error);
       }
     }
 
@@ -115,8 +119,8 @@ export const getCurrentPrices = async (symbols: string[] = []): Promise<PriceRes
 
     return results;
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error fetching prices:`, error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    console.error(`${LOG_PREFIX} Error in getCurrentPrices:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };
 
@@ -128,8 +132,11 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistoryRespo
     const db = await getDb();
     const now = Date.now();
 
+    // Create a filter using string ID
+    const symbolFilter = stringIdFilter("_id", symbol);
+
     // Check cache first
-    const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne({ _id: symbol });
+    const cacheDoc = await db.collection(COLLECTIONS.PRICE_CACHE).findOne(symbolFilter);
 
     if (
       cacheDoc &&
@@ -174,9 +181,9 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistoryRespo
       }),
     );
 
-    // Update cache
+    // Update cache using the filter
     await db.collection(COLLECTIONS.PRICE_CACHE).updateOne(
-      { _id: symbol },
+      symbolFilter,
       {
         $set: {
           history,
@@ -188,7 +195,7 @@ export const getPriceHistory = async (symbol: string): Promise<PriceHistoryRespo
 
     return history;
   } catch (error) {
-    console.error(`${LOG_PREFIX} Unexpected error fetching price history:`, error);
-    throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_GET_TOKEN_PRICE);
+    console.error(`${LOG_PREFIX} Error in getPriceHistory:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 };

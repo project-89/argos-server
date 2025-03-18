@@ -13,7 +13,8 @@ const LOG_PREFIX = "[Account Endpoint]";
 export const handleCreateAccount = async (req: Request, res: Response) => {
   try {
     console.log(`${LOG_PREFIX} Starting account creation`);
-    const account = await createAccount(req.body);
+    const { walletAddress, fingerprintId, metadata } = req.body;
+    const account = await createAccount(walletAddress, fingerprintId, metadata);
     console.log(`${LOG_PREFIX} Successfully created account:`, { id: account.id });
     return sendSuccess(res, account, "Account created successfully", 201);
   } catch (error) {

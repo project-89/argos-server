@@ -1,4 +1,4 @@
-import { MongoClient, Db, ObjectId, ClientSession, FindOptions } from "mongodb";
+import { MongoClient, Db, ObjectId, ClientSession, FindOptions, Filter } from "mongodb";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -37,7 +37,7 @@ export async function getDb(): Promise<Db> {
 }
 
 /**
- * Close MongoDB connection
+ * Close the MongoDB connection
  */
 export async function closeConnection(): Promise<void> {
   if (client) {
@@ -49,14 +49,12 @@ export async function closeConnection(): Promise<void> {
 }
 
 /**
- * Start a MongoDB transaction session
+ * Start a MongoDB session
  * @returns MongoDB session
  */
 export async function startSession(): Promise<ClientSession> {
-  const client = await getMongoClient();
-  const session = client.startSession();
-  session.startTransaction();
-  return session;
+  const mongoClient = await getMongoClient();
+  return mongoClient.startSession();
 }
 
 /**
@@ -64,8 +62,17 @@ export async function startSession(): Promise<ClientSession> {
  * @param session MongoDB session
  */
 export async function commitTransaction(session: ClientSession): Promise<void> {
-  await session.commitTransaction();
-  session.endSession();
+  if (!session) return;
+
+  try {
+    await session.commitTransaction();
+    console.log("[MongoDB] Transaction committed successfully");
+  } catch (error) {
+    console.error("[MongoDB] Error committing transaction:", error);
+    throw error;
+  } finally {
+    await session.endSession();
+  }
 }
 
 /**
@@ -73,97 +80,148 @@ export async function commitTransaction(session: ClientSession): Promise<void> {
  * @param session MongoDB session
  */
 export async function abortTransaction(session: ClientSession): Promise<void> {
-  await session.abortTransaction();
-  session.endSession();
-}
+  if (!session) return;
 
-/**
- * Convert string ID to MongoDB ObjectId
- * @param id The string ID to convert
- * @returns MongoDB ObjectId
- */
-export function toObjectId(id: string): ObjectId {
   try {
-    return new ObjectId(id);
+    await session.abortTransaction();
+    console.log("[MongoDB] Transaction aborted");
   } catch (error) {
-    throw new Error(`Invalid MongoDB ObjectId: ${id}`);
+    console.error("[MongoDB] Error aborting transaction:", error);
+  } finally {
+    await session.endSession();
   }
 }
 
 /**
- * Safely convert string ID to MongoDB ObjectId, returning null if invalid
- * @param id The string ID to convert
- * @returns MongoDB ObjectId or null if invalid
+ * Creates a MongoDB _id filter that handles null ObjectIds safely
+ * Compatible with MongoDB's Filter<T> type
+ * @param id The id to convert to ObjectId
+ * @returns A filter object with a safe _id condition or empty object if invalid
  */
-export function safeObjectId(id: string | null | undefined): ObjectId | null {
-  if (!id) return null;
+export const idFilter = (id: string | null | undefined): Filter<any> => {
+  if (!id) {
+    // Return an empty filter to maintain compatibility with Filter<T>
+    return {};
+  }
 
   try {
-    return new ObjectId(id);
+    // Return a valid filter with ObjectId
+    return { _id: new ObjectId(id) };
   } catch (error) {
+    console.error(`[MongoDB Utils] Invalid ObjectId: ${id}`);
+    // Return empty filter rather than an invalid one
+    return {};
+  }
+};
+
+/**
+ * Converts an ObjectId to a string
+ * @param id ObjectId to convert
+ * @returns String ID or null
+ */
+export function fromObjectId(id: ObjectId | string | null | undefined): string | null {
+  if (!id) return null;
+  if (typeof id === "string") return id;
+  return id.toString();
+}
+
+/**
+ * Get the current server timestamp
+ * @returns Current date
+ */
+export function serverTimestamp(): Date {
+  return new Date();
+}
+
+/**
+ * Convert various timestamp formats to a Date object
+ * @param timestamp Timestamp to convert
+ * @returns Date object or null
+ */
+export function toDate(timestamp: Date | number | string | null | undefined): Date | null {
+  if (!timestamp) return null;
+
+  try {
+    if (timestamp instanceof Date) return timestamp;
+
+    if (typeof timestamp === "number") {
+      // Handle milliseconds
+      return new Date(timestamp);
+    }
+
+    if (typeof timestamp === "string") {
+      // Try to parse string as date
+      return new Date(timestamp);
+    }
+
+    return null;
+  } catch (error) {
+    console.error(`[MongoDB Utils] Error converting to date:`, error);
     return null;
   }
 }
 
 /**
- * Convert array of string IDs to MongoDB ObjectIds
- * @param ids Array of string IDs
- * @returns Array of MongoDB ObjectIds
+ * Convert various timestamp formats to milliseconds
+ * @param timestamp Timestamp to convert
+ * @returns Milliseconds or null
  */
-export function toObjectIds(ids: string[]): ObjectId[] {
-  return ids
-    .map((id) => {
-      try {
-        return new ObjectId(id);
-      } catch (error) {
-        return null;
-      }
-    })
-    .filter((id): id is ObjectId => id !== null);
+export function toMillis(timestamp: Date | number | string | null | undefined): number | null {
+  const date = toDate(timestamp);
+  return date ? date.getTime() : null;
 }
 
 /**
- * Convert MongoDB document to API response format
- * @param doc MongoDB document
- * @returns Document with _id converted to id
+ * Compare two timestamps for equality
+ * @param a First timestamp
+ * @param b Second timestamp
+ * @returns Whether timestamps are equal
  */
-export function formatDocument<T>(doc: Record<string, any> | null): T | null {
-  if (!doc) return null;
+export function isTimestampEqual(
+  a: Date | number | string | null | undefined,
+  b: Date | number | string | null | undefined,
+): boolean {
+  const aMillis = toMillis(a);
+  const bMillis = toMillis(b);
 
-  const { _id, ...rest } = doc;
-  return {
-    id: _id ? _id.toString() : undefined,
-    ...rest,
-  } as T;
+  if (aMillis === null && bMillis === null) return true;
+  if (aMillis === null || bMillis === null) return false;
+
+  return aMillis === bMillis;
 }
 
 /**
- * Convert multiple MongoDB documents to API response format
- * @param docs Array of MongoDB documents
- * @returns Array of documents with _id converted to id
+ * Process a document for MongoDB storage
+ * Handles Date objects and nested objects
+ * @param doc Document to process
+ * @returns Processed document
  */
-export function formatDocuments<T>(docs: Record<string, any>[] | null | undefined): T[] {
-  if (!docs || !Array.isArray(docs)) return [];
-  return docs.map((doc) => formatDocument<T>(doc)).filter((doc): doc is T => doc !== null);
-}
+export function processDocumentForMongoDB(doc: Record<string, any>): Record<string, any> {
+  if (!doc) return {};
 
-/**
- * Convert API document to MongoDB format
- * @param doc API document
- * @returns Document with id converted to _id
- */
-export function toMongoDocument(doc: Record<string, any> | null): Record<string, any> | null {
-  if (!doc) return null;
+  const result: Record<string, any> = {};
 
-  const { id, ...rest } = doc;
-  const result = { ...rest };
+  for (const [key, value] of Object.entries(doc)) {
+    // Skip id field - it will be handled by _id
+    if (key === "id") continue;
 
-  if (id) {
-    try {
-      result._id = new ObjectId(id);
-    } catch (error) {
-      // If id isn't a valid ObjectId, just use it as a string
-      result._id = id;
+    if (value === null || value === undefined) {
+      // Skip null values
+      continue;
+    } else if (value instanceof Date) {
+      // Keep Date objects as-is
+      result[key] = value;
+    } else if (Array.isArray(value)) {
+      // Process array items
+      result[key] = value.map((item) =>
+        typeof item === "object" && item !== null ? processDocumentForMongoDB(item) : item,
+      );
+    } else if (typeof value === "object") {
+      // Process nested objects
+      result[key] = processDocumentForMongoDB(value);
+    } else {
+      // Keep other values as-is
+      result[key] = value;
     }
   }
 
@@ -171,80 +229,126 @@ export function toMongoDocument(doc: Record<string, any> | null): Record<string,
 }
 
 /**
- * Create pagination parameters for MongoDB queries
- * @param page Page number (1-based)
- * @param limit Items per page
- * @returns MongoDB skip and limit values
+ * Process a document from MongoDB for application use
+ * @param doc Document from MongoDB
+ * @returns Processed document with id field instead of _id
  */
-export function createPagination(
-  page: number = 1,
-  limit: number = 20,
-): { skip: number; limit: number } {
-  const validPage = Math.max(1, page);
-  const validLimit = Math.min(100, Math.max(1, limit)); // Limit between 1 and 100
+export function processDocumentFromMongoDB(
+  doc: Record<string, any> | null,
+): Record<string, any> | null {
+  if (!doc) return null;
 
-  return {
-    skip: (validPage - 1) * validLimit,
-    limit: validLimit,
-  };
-}
+  const result: Record<string, any> = {};
 
-/**
- * Create MongoDB find options with pagination and sorting
- * @param options Pagination and sorting options
- * @returns MongoDB FindOptions
- */
-export function createFindOptions({
-  page = 1,
-  limit = 20,
-  sortField = "createdAt",
-  sortOrder = -1,
-}: {
-  page?: number;
-  limit?: number;
-  sortField?: string;
-  sortOrder?: 1 | -1;
-}): FindOptions {
-  const { skip, limit: validLimit } = createPagination(page, limit);
-
-  return {
-    skip,
-    limit: validLimit,
-    sort: { [sortField]: sortOrder },
-  };
-}
-
-/**
- * Handle MongoDB errors consistently
- * @param error Error object
- * @param operation Description of the operation that failed
- * @returns Standardized error message
- */
-export function handleMongoError(error: any, operation: string): Error {
-  console.error(`MongoDB Error during ${operation}:`, error);
-
-  // Check for specific MongoDB error types
-  if (error.code === 11000) {
-    return new Error(`Duplicate key error: ${JSON.stringify(error.keyValue)}`);
+  // Convert _id to id string
+  if (doc._id) {
+    result.id = doc._id.toString();
   }
 
-  return new Error(`Database error during ${operation}: ${error.message}`);
+  // Process other fields
+  for (const [key, value] of Object.entries(doc)) {
+    if (key === "_id") continue;
+
+    if (value instanceof Date) {
+      // Convert Date to milliseconds for consistency
+      result[key] = value.getTime();
+    } else if (Array.isArray(value)) {
+      // Process array items
+      result[key] = value.map((item) =>
+        typeof item === "object" && item !== null ? processDocumentFromMongoDB(item) : item,
+      );
+    } else if (typeof value === "object" && value !== null) {
+      // Process nested objects
+      result[key] = processDocumentFromMongoDB(value);
+    } else {
+      // Keep other values as-is
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
+/**
+ * Convert an array of IDs to ObjectIds
+ * @param ids Array of string IDs
+ * @returns Array of ObjectIds
+ */
+export function toObjectIds(ids: string[]): ObjectId[] {
+  return ids.map((id) => new ObjectId(id)).filter(Boolean);
+}
+
+/**
+ * Format a MongoDB document for application use
+ * @param doc MongoDB document
+ * @returns Formatted document
+ */
+export function formatDocument<T>(doc: Record<string, any> | null): T | null {
+  if (!doc) return null;
+
+  const result: Record<string, any> = { ...doc };
+
+  // Convert _id to string id
+  if (doc._id) {
+    result.id = doc._id.toString();
+    delete result._id;
+  }
+
+  // Convert Date objects to numbers for consistency
+  for (const [key, value] of Object.entries(result)) {
+    if (value instanceof Date) {
+      result[key] = value.getTime();
+    } else if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+      // Process nested objects
+      result[key] = formatDocument(value);
+    }
+  }
+
+  return result as T;
+}
+
+/**
+ * Format an array of MongoDB documents
+ * @param docs Array of MongoDB documents
+ * @returns Array of formatted documents
+ */
+export function formatDocuments<T>(docs: Record<string, any>[] | null | undefined): T[] {
+  if (!docs) return [];
+  return docs.map((doc) => formatDocument<T>(doc)).filter(Boolean) as T[];
+}
+
+/**
+ * Handle MongoDB errors
+ * @param error Error to handle
+ * @param operation Operation that caused the error
+ * @returns Formatted error
+ */
+export function handleMongoError(error: any, operation: string): Error {
+  console.error(`[MongoDB Error] ${operation}:`, error);
+
+  // MongoDB-specific error handling can be added here
+
+  return new Error(`MongoDB operation failed: ${operation}`);
+}
+
+// Export the module default
 export default {
   getMongoClient,
   getDb,
   closeConnection,
-  toObjectId,
-  safeObjectId,
-  toObjectIds,
-  formatDocument,
-  formatDocuments,
-  toMongoDocument,
   startSession,
   commitTransaction,
   abortTransaction,
-  createPagination,
-  createFindOptions,
+  idFilter,
+  fromObjectId,
+  serverTimestamp,
+  toDate,
+  toMillis,
+  isTimestampEqual,
+  processDocumentForMongoDB,
+  processDocumentFromMongoDB,
+  toObjectIds,
+  formatDocument,
+  formatDocuments,
   handleMongoError,
 };

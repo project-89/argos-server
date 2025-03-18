@@ -2,6 +2,7 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { ApiError } from "../utils";
 import { Stats, StatsResponse } from "../schemas";
 import { getDb, formatDocument } from "../utils/mongodb";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Stats Service]";
 
@@ -9,7 +10,8 @@ export const getStats = async (profileId: string): Promise<StatsResponse> => {
   console.log(`${LOG_PREFIX} Getting stats for profile: ${profileId}`);
   try {
     const db = await getDb();
-    const doc = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const doc = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
 
     if (!doc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
@@ -30,7 +32,8 @@ export const updateStats = async (
   console.log(`${LOG_PREFIX} Updating stats for profile: ${profileId}`);
   try {
     const db = await getDb();
-    const doc = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const doc = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
 
     if (!doc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
@@ -45,7 +48,7 @@ export const updateStats = async (
       },
     };
 
-    await db.collection(COLLECTIONS.STATS).updateOne({ id: profileId }, updateData);
+    await db.collection(COLLECTIONS.STATS).updateOne(profileFilter, updateData);
     return getStats(profileId);
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating stats:`, error);
@@ -73,22 +76,20 @@ export const updateLastActive = async (profileId: string): Promise<void> => {
   try {
     console.log(`${LOG_PREFIX} Updating last active for profile: ${profileId}`);
     const db = await getDb();
-    const doc = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const doc = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
 
     if (!doc) {
       throw new ApiError(404, ERROR_MESSAGES.STATS_NOT_FOUND);
     }
 
     const now = Date.now();
-    await db.collection(COLLECTIONS.STATS).updateOne(
-      { id: profileId },
-      {
-        $set: {
-          lastActive: now,
-          updatedAt: now,
-        },
+    await db.collection(COLLECTIONS.STATS).updateOne(profileFilter, {
+      $set: {
+        lastActive: now,
+        updatedAt: now,
       },
-    );
+    });
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating last active:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
@@ -99,7 +100,8 @@ export const calculateSuccessRate = async (profileId: string): Promise<number> =
   try {
     console.log(`${LOG_PREFIX} Calculating success rate for profile: ${profileId}`);
     const db = await getDb();
-    const doc = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const doc = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
 
     if (!doc) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
@@ -119,7 +121,8 @@ export const updateReputation = async (
   try {
     console.log(`${LOG_PREFIX} Updating reputation for profile: ${profileId}`);
     const db = await getDb();
-    const stats = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const stats = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
 
     if (!stats) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.STATS_NOT_FOUND);
@@ -139,7 +142,8 @@ export const createStats = async (profileId: string): Promise<StatsResponse> => 
     const db = await getDb();
 
     // Check if stats already exist
-    const existingStats = await db.collection(COLLECTIONS.STATS).findOne({ id: profileId });
+    const profileFilter = stringIdFilter("id", profileId);
+    const existingStats = await db.collection(COLLECTIONS.STATS).findOne(profileFilter);
     if (existingStats) {
       return formatDocument(existingStats) as StatsResponse;
     }

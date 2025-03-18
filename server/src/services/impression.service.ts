@@ -2,6 +2,7 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { Impression } from "../schemas";
 import { ApiError } from "../utils";
 import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Impression Service]";
 
@@ -73,7 +74,9 @@ export const getImpressions = async ({
     const db = await getDb();
 
     // Build query
-    const query: Record<string, any> = { fingerprintId };
+    const query: Record<string, any> = {
+      ...stringIdFilter("fingerprintId", fingerprintId),
+    };
 
     if (options?.type) {
       query.type = options.type;
@@ -127,7 +130,9 @@ export const deleteImpressions = async ({
     const db = await getDb();
 
     // Build query
-    const query: Record<string, any> = { fingerprintId };
+    const query: Record<string, any> = {
+      ...stringIdFilter("fingerprintId", fingerprintId),
+    };
 
     if (options?.type) {
       query.type = options.type;

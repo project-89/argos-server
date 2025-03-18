@@ -3,7 +3,8 @@ import { ERROR_MESSAGES, COLLECTIONS } from "../constants";
 import { PresenceData, PresenceResponse } from "../schemas";
 
 // Import MongoDB utilities
-import { getDb, toObjectId, formatDocument } from "../utils/mongodb";
+import { getDb, formatDocument } from "../utils/mongodb";
+import { stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Presence Service]";
 
@@ -33,10 +34,13 @@ export const updatePresence = async ({
   try {
     const db = await getDb();
 
+    // Create a fingerprint filter using string ID
+    const fingerprintFilter = stringIdFilter("_id", fingerprintId);
+
     // Check if fingerprint exists
     const fingerprint = await db
       .collection(COLLECTIONS.FINGERPRINTS)
-      .findOne({ _id: fingerprintId }, { projection: { _id: 1 } });
+      .findOne(fingerprintFilter, { projection: { _id: 1 } });
 
     if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
@@ -52,7 +56,7 @@ export const updatePresence = async ({
     // Update the fingerprint document with new presence data
     await db
       .collection(COLLECTIONS.FINGERPRINTS)
-      .updateOne({ _id: fingerprintId }, { $set: { presence: presenceData } });
+      .updateOne(fingerprintFilter, { $set: { presence: presenceData } });
 
     console.log(`${LOG_PREFIX} Updated presence for ${fingerprintId} to ${status}`);
 
@@ -79,10 +83,11 @@ export const getPresence = async ({
   try {
     const db = await getDb();
 
+    // Create a fingerprint filter using string ID
+    const fingerprintFilter = stringIdFilter("_id", fingerprintId);
+
     // Get fingerprint document
-    const fingerprint = await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .findOne({ _id: fingerprintId });
+    const fingerprint = await db.collection(COLLECTIONS.FINGERPRINTS).findOne(fingerprintFilter);
 
     if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
@@ -136,10 +141,11 @@ export const updateActivity = async ({
   try {
     const db = await getDb();
 
+    // Create a fingerprint filter using string ID
+    const fingerprintFilter = stringIdFilter("_id", fingerprintId);
+
     // Get fingerprint document
-    const fingerprint = await db
-      .collection(COLLECTIONS.FINGERPRINTS)
-      .findOne({ _id: fingerprintId });
+    const fingerprint = await db.collection(COLLECTIONS.FINGERPRINTS).findOne(fingerprintFilter);
 
     if (!fingerprint) {
       throw ApiError.from(null, 404, ERROR_MESSAGES.FINGERPRINT_NOT_FOUND);
@@ -163,7 +169,7 @@ export const updateActivity = async ({
     // Update the fingerprint document with new presence data
     await db
       .collection(COLLECTIONS.FINGERPRINTS)
-      .updateOne({ _id: fingerprintId }, { $set: { presence: presenceData } });
+      .updateOne(fingerprintFilter, { $set: { presence: presenceData } });
 
     console.log(`${LOG_PREFIX} Updated activity timestamp for ${fingerprintId}`);
 

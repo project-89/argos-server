@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:5.0
+    container_name: argos-mongodb
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    # No authentication for easier testing 
+    command: mongod --bind_ip_all
+    restart: unless-stopped
+
+volumes:
+  mongodb_data: 

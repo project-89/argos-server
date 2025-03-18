@@ -10,9 +10,11 @@ export const ACCOUNT_ERRORS = {
   FAILED_TO_CREATE_ACCOUNT: "Failed to create account",
   FAILED_TO_GET_ACCOUNT: "Failed to get account",
   FAILED_TO_UPDATE_ACCOUNT: "Failed to update account",
+  FAILED_TO_DELETE_ACCOUNT: "Failed to delete account",
   FAILED_TO_LINK_FINGERPRINT: "Failed to link fingerprint",
   FAILED_TO_UNLINK_FINGERPRINT: "Failed to unlink fingerprint",
   FAILED_TO_VERIFY_ACCOUNT_OWNERSHIP: "Failed to verify account ownership",
+  ACCOUNT_HAS_AGENTS: "Account has associated agents and cannot be deleted",
 } as const;
 
 // Profile related errors
@@ -112,22 +114,6 @@ export const FEATURE_ERRORS = {
   // User
   USER_NOT_FOUND: "User not found",
 
-  // Agent
-  FAILED_TO_REGISTER_AGENT: "Failed to register agent",
-  FAILED_TO_GET_AGENT: "Failed to get agent",
-  FAILED_TO_UPDATE_AGENT: "Failed to update agent",
-  FAILED_TO_UPDATE_AGENT_STATE: "Failed to update agent state",
-  FAILED_TO_LIST_AGENTS: "Failed to list agents",
-  FAILED_TO_GET_AGENTS_BY_CAPABILITY: "Failed to get agents by capability",
-  FAILED_TO_REVOKE_INVITE: "Failed to revoke invite",
-  // Agent Invite
-  FAILED_TO_CREATE_INVITE: "Failed to create agent invite",
-  INVITE_NOT_FOUND: "Invite code not found",
-  INVITE_REVOKED: "This invite has been revoked",
-  INVITE_EXHAUSTED: "This invite has reached its maximum uses",
-  INVITE_EXPIRED: "This invite has expired",
-  INVITE_INVALID: "This invite is no longer valid",
-
   // Mission
   FAILED_TO_CREATE_MISSION: "Failed to create mission",
   FAILED_TO_GET_MISSION: "Failed to get mission",
@@ -143,10 +129,10 @@ export const FEATURE_ERRORS = {
 
   // Fingerprint
   FINGERPRINT_NOT_FOUND: "Fingerprint not found",
-  INVALID_FINGERPRINT: "Invalid fingerprint",
-  FINGERPRINT_EXISTS: "Fingerprint already exists",
-  FINGERPRINT_MUST_BE_STRING: "Fingerprint must be a string",
-  TARGET_FINGERPRINT_ID_REQUIRED: "Target fingerprint ID is required",
+  FINGERPRINT_ALREADY_EXISTS: "Fingerprint already exists",
+  FAILED_TO_SAVE_FINGERPRINT: "Failed to save fingerprint",
+  FAILED_TO_GET_FINGERPRINT: "Failed to get fingerprint",
+  FAILED_TO_UPDATE_FINGERPRINT: "Failed to update fingerprint",
   FAILED_TO_REGISTER_FINGERPRINT: "Failed to register fingerprint",
   TRANSITORY_FINGERPRINT_NOT_FOUND: "Transitory fingerprint record not found",
   MISSING_FINGERPRINT: "Fingerprint is required",
@@ -229,6 +215,41 @@ export const FEATURE_ERRORS = {
   INVALID_MISSION_ORDER: "Invalid mission completion order",
 } as const;
 
+// Agent related errors
+export const AGENT_ERRORS = {
+  AGENT_NOT_FOUND: "Agent not found",
+  AGENT_NOT_ACTIVE: "Agent is not active",
+  AGENT_ALREADY_ACTIVATED: "Agent is already activated",
+  INSUFFICIENT_CAPABILITIES: "Agent does not have required capabilities",
+  AGENT_AUTHENTICATION_REQUIRED: "Agent authentication required",
+  FAILED_TO_REGISTER_AGENT: "Failed to register agent",
+  FAILED_TO_ACTIVATE_AGENT: "Failed to activate agent",
+  FAILED_TO_GET_AGENT: "Failed to get agent",
+  FAILED_TO_UPDATE_AGENT: "Failed to update agent",
+  FAILED_TO_DELETE_AGENT: "Failed to delete agent",
+  FAILED_TO_UPDATE_AGENT_STATE: "Failed to update agent state",
+  FAILED_TO_LIST_AGENTS: "Failed to list agents",
+  FAILED_TO_GET_AGENTS_BY_CAPABILITY: "Failed to get agents by capability",
+  FAILED_TO_CREATE_AGENT: "Failed to create agent",
+} as const;
+
+// Fingerprint related errors
+export const FINGERPRINT_ERRORS = {
+  FINGERPRINT_NOT_FOUND: "Fingerprint not found",
+  FINGERPRINT_EXISTS: "Fingerprint already exists",
+  FINGERPRINT_ALREADY_EXISTS: "Fingerprint already exists",
+  FAILED_TO_SAVE_FINGERPRINT: "Failed to save fingerprint",
+  FAILED_TO_GET_FINGERPRINT: "Failed to get fingerprint",
+  FAILED_TO_UPDATE_FINGERPRINT: "Failed to update fingerprint",
+  FAILED_TO_REGISTER_FINGERPRINT: "Failed to register fingerprint",
+  TRANSITORY_FINGERPRINT_NOT_FOUND: "Transitory fingerprint record not found",
+  MISSING_FINGERPRINT: "Fingerprint is required",
+  INVALID_FINGERPRINT_DATA: "Invalid fingerprint data",
+  INVALID_FINGERPRINT: "Invalid fingerprint",
+  FINGERPRINT_MUST_BE_STRING: "Fingerprint must be a string",
+  FINGERPRINT_REQUIRED: "Fingerprint ID is required",
+} as const;
+
 // Export all error types
 export type AccountError = (typeof ACCOUNT_ERRORS)[keyof typeof ACCOUNT_ERRORS];
 export type ProfileError = (typeof PROFILE_ERRORS)[keyof typeof PROFILE_ERRORS];
@@ -237,6 +258,8 @@ export type OperationError = (typeof OPERATION_ERRORS)[keyof typeof OPERATION_ER
 export type ValidationError = (typeof VALIDATION_ERRORS)[keyof typeof VALIDATION_ERRORS];
 export type SystemError = (typeof SYSTEM_ERRORS)[keyof typeof SYSTEM_ERRORS];
 export type FeatureError = (typeof FEATURE_ERRORS)[keyof typeof FEATURE_ERRORS];
+export type AgentError = (typeof AGENT_ERRORS)[keyof typeof AGENT_ERRORS];
+export type FingerprintError = (typeof FINGERPRINT_ERRORS)[keyof typeof FINGERPRINT_ERRORS];
 
 // Combine all errors into a single object for backward compatibility
 export const ERROR_MESSAGES = {
@@ -247,6 +270,8 @@ export const ERROR_MESSAGES = {
   ...VALIDATION_ERRORS,
   ...SYSTEM_ERRORS,
   ...FEATURE_ERRORS,
+  ...AGENT_ERRORS,
+  ...FINGERPRINT_ERRORS,
 
   // Agent errors
   AGENT_NOT_FOUND: "Agent not found",

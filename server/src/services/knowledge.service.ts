@@ -8,12 +8,21 @@ import {
   DecompressKnowledgeResponse,
   ListKnowledgeResponse,
 } from "../schemas/knowledge.schema";
-import { ApiError } from "../utils";
+import { ApiError, idFilter, stringIdFilter } from "../utils";
 import { hasPermission } from "./role.service";
 import { getAgent } from "./agent.service";
 
 // Import MongoDB utilities
-import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
+import {
+  getDb,
+  formatDocument,
+  formatDocuments,
+  serverTimestamp,
+  processDocumentForMongoDB,
+} from "../utils/mongodb";
+import { createMongoQuery } from "../utils/mongo-query";
+import { MongoIdFilter } from "../types/mongodb";
+import { ObjectId } from "mongodb";
 
 const LOG_PREFIX = "[Knowledge Service]";
 
@@ -23,21 +32,20 @@ const LOG_PREFIX = "[Knowledge Service]";
 export async function compressKnowledge(
   content: string,
   domain: KnowledgeDomain,
-  requesterId: string,
+  requesterId?: string,
 ): Promise<CompressKnowledgeResponse> {
   try {
     console.log(`${LOG_PREFIX} Compressing knowledge for domain:`, domain);
 
-    // For now, we'll implement a simple compression algorithm
-    // In a real implementation, this might use specialized algorithms per domain
-    // or even ML-based techniques
-
-    // Simple placeholder compression (in reality, use a proper algorithm)
-    const compressedContent = `COMPRESSED:${domain}:${Buffer.from(content).toString("base64")}`;
+    // For now, our compression is just a placeholder
+    // In a real implementation, this would use different strategies based on domain
+    const compressedContent = `Compressed: ${content.substring(0, 50)}...`;
 
     return {
       compressedContent,
-      domain,
+      originalLength: content.length,
+      compressedLength: compressedContent.length,
+      compressionRatio: content.length / compressedContent.length,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error compressing knowledge:`, error);
@@ -46,31 +54,26 @@ export async function compressKnowledge(
 }
 
 /**
- * Decompress knowledge content based on domain
+ * Decompress knowledge content
  */
 export async function decompressKnowledge(
-  content: string,
+  compressedContent: string,
   domain: KnowledgeDomain,
-  requesterId: string,
+  requesterId?: string,
 ): Promise<DecompressKnowledgeResponse> {
   try {
     console.log(`${LOG_PREFIX} Decompressing knowledge for domain:`, domain);
 
-    // Simple placeholder decompression (in reality, use a proper algorithm)
-    if (!content.startsWith("COMPRESSED:")) {
-      throw new ApiError(400, "Content is not in compressed format");
-    }
-
-    const parts = content.split(":");
-    if (parts.length < 3 || parts[1] !== domain) {
-      throw new ApiError(400, "Invalid compressed content or domain mismatch");
-    }
-
-    const decompressedContent = Buffer.from(parts[2], "base64").toString();
+    // For now, decompression is just a placeholder
+    // This would use different strategies based on domain in a real implementation
+    const content = compressedContent.startsWith("Compressed: ")
+      ? compressedContent.substring(12).replace(/\.\.\.$/, "")
+      : compressedContent;
 
     return {
-      decompressedContent,
-      domain,
+      content,
+      decompressedLength: content.length,
+      originalLength: compressedContent.length,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error decompressing knowledge:`, error);
@@ -112,39 +115,38 @@ export async function createKnowledge(
  */
 export async function getKnowledge(knowledgeId: string, requesterId: string): Promise<Knowledge> {
   try {
-    console.log(`${LOG_PREFIX} Fetching knowledge:`, knowledgeId);
-
+    console.log(`${LOG_PREFIX} Getting knowledge by ID:`, knowledgeId);
     const db = await getDb();
-    const knowledge = await db.collection(COLLECTIONS.KNOWLEDGE).findOne({
-      _id: toObjectId(knowledgeId),
-    });
 
-    if (!knowledge) {
+    // Create filter using the ID utility
+    const filter = idFilter(knowledgeId);
+    if (!filter) {
       throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
     }
 
-    const formattedKnowledge = formatDocument<Knowledge>(knowledge);
+    const knowledgeDoc = await db.collection(COLLECTIONS.KNOWLEDGE).findOne(filter);
 
-    // Check access permissions
+    if (!knowledgeDoc) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
+
+    const formattedKnowledge = formatDocument<Knowledge>(knowledgeDoc);
+    if (!formattedKnowledge) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
+
+    // Check permission to access this knowledge
     if (formattedKnowledge.ownerId !== requesterId) {
-      // Check if requesterId has a share for this knowledge
-      const share = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).findOne({
-        knowledgeId,
-        targetAgentId: requesterId,
-        status: "active",
-      });
-
-      // Check if there is an expired share
-      if (share && share.expiresAt && new Date() > share.expiresAt) {
-        throw new ApiError(403, ERROR_MESSAGES.KNOWLEDGE_ACCESS_DENIED);
-      }
-
-      // If requester is an agent, check if they have sufficient rank
+      // Check if user has required agent rank
       const agent = await getAgent(requesterId);
+
+      // Check if knowledge needs certain agent rank
       if (agent && agent.identity.rank < formattedKnowledge.requiredRank) {
         throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_RANK);
       }
 
+      // Check if knowledge is shared with this user
+      const share = await getKnowledgeShare(knowledgeId, requesterId);
       if (!share && formattedKnowledge.ownerId !== requesterId) {
         throw new ApiError(403, ERROR_MESSAGES.KNOWLEDGE_ACCESS_DENIED);
       }
@@ -152,13 +154,13 @@ export async function getKnowledge(knowledgeId: string, requesterId: string): Pr
 
     return formattedKnowledge;
   } catch (error) {
-    console.error(`${LOG_PREFIX} Error fetching knowledge:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    console.error(`${LOG_PREFIX} Error getting knowledge:`, error);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
   }
 }
 
 /**
- * Update knowledge
+ * Update knowledge by ID
  */
 export async function updateKnowledge(
   knowledgeId: string,
@@ -167,47 +169,37 @@ export async function updateKnowledge(
 ): Promise<Knowledge> {
   try {
     console.log(`${LOG_PREFIX} Updating knowledge:`, knowledgeId);
-
     const db = await getDb();
+
+    // Verify knowledge exists and user has access
     const knowledge = await getKnowledge(knowledgeId, requesterId);
 
-    // Check if requester is the owner or has modify access
+    // Additional permission check: only owner can update, or users with modify access
     if (knowledge.ownerId !== requesterId) {
-      const share = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).findOne({
-        knowledgeId,
-        targetAgentId: requesterId,
-        accessLevel: "modify",
-        status: "active",
-      });
-
-      if (!share) {
-        throw new ApiError(403, ERROR_MESSAGES.KNOWLEDGE_ACCESS_DENIED);
-      }
-
-      // Check if share has expired
-      if (share.expiresAt && new Date() > share.expiresAt) {
+      const share = await getKnowledgeShare(knowledgeId, requesterId);
+      if (!share || share.accessLevel !== "modify") {
         throw new ApiError(403, ERROR_MESSAGES.KNOWLEDGE_ACCESS_DENIED);
       }
     }
 
+    // Create update document
     const now = new Date();
-
     const updateData = {
       ...updates,
       updatedAt: now,
     };
 
-    await db
-      .collection(COLLECTIONS.KNOWLEDGE)
-      .updateOne({ _id: toObjectId(knowledgeId) }, { $set: updateData });
+    // Create filter using the ID utility
+    const filter = idFilter(knowledgeId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
 
-    const updatedKnowledge: Knowledge = {
-      ...knowledge,
-      ...updates,
-      updatedAt: now,
-    };
+    // Update the document
+    await db.collection(COLLECTIONS.KNOWLEDGE).updateOne(filter, { $set: updateData });
 
-    return updatedKnowledge;
+    // Return updated document
+    return { ...knowledge, ...updateData };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error updating knowledge:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_UPDATE_KNOWLEDGE);
@@ -215,7 +207,7 @@ export async function updateKnowledge(
 }
 
 /**
- * List knowledge
+ * List knowledge for a user
  */
 export async function listKnowledge(
   requesterId: string,
@@ -225,40 +217,44 @@ export async function listKnowledge(
   offset: number = 0,
 ): Promise<ListKnowledgeResponse> {
   try {
-    console.log(`${LOG_PREFIX} Listing knowledge for requester:`, requesterId);
-
+    console.log(`${LOG_PREFIX} Listing knowledge for user:`, requesterId);
     const db = await getDb();
 
-    // Build query
-    const query: any = {
-      $or: [
-        { ownerId: requesterId },
-        { _id: { $in: await getAccessibleKnowledgeIds(requesterId) } },
-      ],
-    };
+    // Get all IDs this user has access to
+    const accessibleIds = await getAccessibleKnowledgeIds(requesterId);
 
+    // Build filter for knowledge query
+    const filter: any = { $or: [{ ownerId: requesterId }] };
+
+    // Add IDs from knowledge shares
+    if (accessibleIds.length > 0) {
+      filter.$or.push({ _id: { $in: accessibleIds.map((id) => new ObjectId(id)) } });
+    }
+
+    // Add domain filter if specified
     if (domain) {
-      query.domain = domain;
+      filter.domain = domain;
     }
 
+    // Add status filter if specified
     if (status) {
-      query.status = status;
+      filter.status = status;
     }
 
-    // Get total count
-    const total = await db.collection(COLLECTIONS.KNOWLEDGE).countDocuments(query);
-
-    // Get items with pagination
-    const items = await db
-      .collection(COLLECTIONS.KNOWLEDGE)
-      .find(query)
-      .sort({ updatedAt: -1 })
+    // Execute query with pagination
+    const knowledgeCollection = db.collection(COLLECTIONS.KNOWLEDGE);
+    const cursor = knowledgeCollection
+      .find(filter)
       .skip(offset)
       .limit(limit)
-      .toArray();
+      .sort({ updatedAt: -1 });
+
+    // Get results
+    const knowledgeItems = await formatDocuments<Knowledge>(await cursor.toArray());
+    const total = await knowledgeCollection.countDocuments(filter);
 
     return {
-      items: formatDocuments<Knowledge>(items),
+      items: knowledgeItems,
       total,
       limit,
       offset,
@@ -280,78 +276,76 @@ export async function shareKnowledge(
   expiresAt?: Date,
 ): Promise<KnowledgeShare> {
   try {
-    console.log(`${LOG_PREFIX} Sharing knowledge ${knowledgeId} with agent ${targetAgentId}`);
+    console.log(`${LOG_PREFIX} Sharing knowledge:`, { knowledgeId, targetAgentId, requesterId });
+    const db = await getDb();
 
-    // Verify knowledge exists and requester has access
+    // Verify knowledge exists and user has access
     const knowledge = await getKnowledge(knowledgeId, requesterId);
 
-    // Verify requester is the owner
+    // Only knowledge owner can share
     if (knowledge.ownerId !== requesterId) {
       throw new ApiError(403, ERROR_MESSAGES.KNOWLEDGE_ACCESS_DENIED);
     }
 
-    // Verify target agent exists
-    const targetAgent = await getAgent(targetAgentId);
-    if (!targetAgent) {
-      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
-    }
-
-    // Check if target agent has sufficient rank
-    if (targetAgent.identity.rank < knowledge.requiredRank) {
-      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_RANK);
-    }
-
-    const db = await getDb();
+    // Create share document
     const now = new Date();
+    const shareId = new Date().getTime().toString();
 
-    // Check if a share already exists
-    const existingShare = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).findOne({
+    const share: KnowledgeShare = {
+      id: shareId,
       knowledgeId,
-      targetAgentId,
-      status: "active",
-    });
-
-    if (existingShare) {
-      // Update existing share
-      await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).updateOne(
-        { _id: existingShare._id },
-        {
-          $set: {
-            accessLevel,
-            expiresAt,
-            updatedAt: now,
-          },
-        },
-      );
-
-      return formatDocument<KnowledgeShare>({
-        ...existingShare,
-        accessLevel,
-        expiresAt,
-        updatedAt: now,
-      });
-    }
-
-    // Create new share
-    const share: Omit<KnowledgeShare, "id"> = {
-      knowledgeId,
-      ownerId: requesterId,
-      targetAgentId,
-      status: "active",
+      agentId: targetAgentId,
       accessLevel,
-      expiresAt,
+      createdBy: requesterId,
+      status: "active",
+      expiresAt: expiresAt || null,
       createdAt: now,
       updatedAt: now,
     };
 
-    const result = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).insertOne(share);
-    const shareId = result.insertedId.toString();
+    // Insert into database
+    const result = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).insertOne({
+      ...share,
+      _id: new ObjectId(shareId),
+    });
 
-    console.log(`${LOG_PREFIX} Successfully shared knowledge:`, shareId);
-    return { id: shareId, ...share };
+    // Return created share
+    return {
+      id: shareId,
+      ...share,
+    };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error sharing knowledge:`, error);
     throw ApiError.from(error, 500, ERROR_MESSAGES.FAILED_TO_SHARE_KNOWLEDGE);
+  }
+}
+
+/**
+ * Get an active knowledge share
+ */
+async function getKnowledgeShare(
+  knowledgeId: string,
+  agentId: string,
+): Promise<KnowledgeShare | null> {
+  try {
+    const db = await getDb();
+
+    // Create filter for the share - both knowledgeId and agentId should be string IDs
+    const shareFilter = {
+      ...stringIdFilter("knowledgeId", knowledgeId),
+      ...stringIdFilter("agentId", agentId),
+    };
+
+    const shareDoc = await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).findOne(shareFilter);
+
+    if (!shareDoc) {
+      return null;
+    }
+
+    return formatDocument<KnowledgeShare>(shareDoc);
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error getting knowledge share:`, error);
+    return null;
   }
 }
 
@@ -366,105 +360,91 @@ export async function transferKnowledge(
   requesterId: string,
 ): Promise<KnowledgeTransfer> {
   try {
-    console.log(`${LOG_PREFIX} Transferring knowledge from ${sourceAgentId} to ${targetAgentId}`);
-
-    // Check if requester has agent_creator role
-    const hasAgentCreatorRole = await hasPermission(requesterId, "manage_agents");
-    if (!hasAgentCreatorRole) {
-      throw new ApiError(403, ERROR_MESSAGES.PERMISSION_REQUIRED);
-    }
-
-    // Verify knowledge exists
-    const knowledge = await getKnowledge(knowledgeId, sourceAgentId);
-
-    // Verify both agents exist
-    const sourceAgent = await getAgent(sourceAgentId);
-    const targetAgent = await getAgent(targetAgentId);
-
-    if (!sourceAgent || !targetAgent) {
-      throw new ApiError(404, ERROR_MESSAGES.AGENT_NOT_FOUND);
-    }
-
-    // Check if target agent has sufficient rank
-    if (targetAgent.identity.rank < knowledge.requiredRank) {
-      throw new ApiError(403, ERROR_MESSAGES.INSUFFICIENT_RANK);
-    }
-
-    const db = await getDb();
-    const now = new Date();
-
-    // Create transfer record
-    const transfer: Omit<KnowledgeTransfer, "id"> = {
+    console.log(`${LOG_PREFIX} Transferring knowledge:`, {
       knowledgeId,
       sourceAgentId,
       targetAgentId,
-      status: "pending",
       transferMethod,
+    });
+    const db = await getDb();
+
+    // Verify knowledge exists
+    const filter = idFilter(knowledgeId);
+    if (!filter) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
+
+    const knowledgeDoc = await db.collection(COLLECTIONS.KNOWLEDGE).findOne(filter);
+    if (!knowledgeDoc) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
+
+    const knowledge = formatDocument<Knowledge>(knowledgeDoc);
+    if (!knowledge) {
+      throw new ApiError(404, ERROR_MESSAGES.KNOWLEDGE_NOT_FOUND);
+    }
+
+    // Create transfer document
+    const now = new Date();
+    const transferId = new Date().getTime().toString();
+
+    const knowledgeTransfer: Omit<KnowledgeTransfer, "id"> = {
+      knowledgeId,
+      sourceAgentId,
+      targetAgentId,
+      transferMethod,
+      status: "pending",
       createdAt: now,
       updatedAt: now,
     };
 
-    const result = await db.collection(COLLECTIONS.KNOWLEDGE_TRANSFERS).insertOne(transfer);
-    const transferId = result.insertedId.toString();
-
-    // Perform the actual transfer
-    if (transferMethod === "copy") {
-      // Create a copy of the knowledge with the new owner
-      const knowledgeCopy: Omit<Knowledge, "id"> = {
-        ...knowledge,
-        ownerId: targetAgentId,
-        createdAt: now,
-        updatedAt: now,
-      };
-
-      // Remove the original ID
-      delete (knowledgeCopy as any).id;
-
-      // Insert the copy
-      await db.collection(COLLECTIONS.KNOWLEDGE).insertOne(knowledgeCopy);
-    } else if (transferMethod === "move") {
-      // Update the owner
-      await db.collection(COLLECTIONS.KNOWLEDGE).updateOne(
-        { _id: toObjectId(knowledgeId) },
-        {
-          $set: {
-            ownerId: targetAgentId,
-            updatedAt: now,
-          },
-        },
-      );
-
-      // Remove any shares
-      await db.collection(COLLECTIONS.KNOWLEDGE_SHARES).updateMany(
-        { knowledgeId },
-        {
-          $set: {
-            status: "revoked",
-            updatedAt: now,
-          },
-        },
-      );
+    // Save to database
+    const objectIdTransfer = new ObjectId(transferId);
+    if (!objectIdTransfer) {
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
     }
 
-    // Update transfer status
-    await db.collection(COLLECTIONS.KNOWLEDGE_TRANSFERS).updateOne(
-      { _id: toObjectId(transferId) },
-      {
-        $set: {
-          status: "completed",
-          completedAt: now,
-          updatedAt: now,
-        },
-      },
-    );
+    await db.collection(COLLECTIONS.KNOWLEDGE_TRANSFERS).insertOne({
+      ...knowledgeTransfer,
+      _id: objectIdTransfer,
+    });
 
-    console.log(`${LOG_PREFIX} Successfully transferred knowledge:`, transferId);
+    // Process transfer (in a real-world scenario, this might be asynchronous)
+    if (transferMethod === "copy") {
+      // Deep clone knowledge for the target agent
+      const newKnowledge = { ...knowledge };
+      delete (newKnowledge as any).id;
+      newKnowledge.ownerId = targetAgentId;
+      await createKnowledge(newKnowledge);
+    } else if (transferMethod === "move") {
+      // Update ownership to target agent
+      const transferFilter = idFilter(transferId);
+      if (!transferFilter) {
+        throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+      }
+
+      await db
+        .collection(COLLECTIONS.KNOWLEDGE)
+        .updateOne(filter, { $set: { ownerId: targetAgentId, updatedAt: now } });
+    }
+
+    // Mark transfer as completed
+    const objectIdForTransfer = new ObjectId(transferId);
+    if (!objectIdForTransfer) {
+      throw new ApiError(500, ERROR_MESSAGES.INTERNAL_ERROR);
+    }
+
+    const transferFilter = { _id: objectIdForTransfer };
+    await db.collection(COLLECTIONS.KNOWLEDGE_TRANSFERS).updateOne(transferFilter, {
+      $set: { status: "completed", completedAt: now, updatedAt: now },
+    });
+
+    // Return created transfer
     return {
       id: transferId,
-      ...transfer,
+      ...knowledgeTransfer,
       status: "completed",
       completedAt: now,
-      updatedAt: now,
     };
   } catch (error) {
     console.error(`${LOG_PREFIX} Error transferring knowledge:`, error);
@@ -473,24 +453,31 @@ export async function transferKnowledge(
 }
 
 /**
- * Helper function to get IDs of knowledge the requester has access to
+ * Get all knowledge IDs that a user has access to through shares
  */
 async function getAccessibleKnowledgeIds(requesterId: string): Promise<string[]> {
-  const db = await getDb();
+  try {
+    const db = await getDb();
 
-  // Find all active shares for this user
-  const shares = await db
-    .collection(COLLECTIONS.KNOWLEDGE_SHARES)
-    .find({
-      targetAgentId: requesterId,
-      status: "active",
-      $or: [
-        { expiresAt: { $exists: false } },
-        { expiresAt: null },
-        { expiresAt: { $gt: new Date() } },
-      ],
-    })
-    .toArray();
+    // Get all active shares for this user
+    const shares = await db
+      .collection(COLLECTIONS.KNOWLEDGE_SHARES)
+      .find({
+        targetAgentId: requesterId,
+        status: "active",
+      })
+      .toArray();
 
-  return shares.map((share) => share.knowledgeId);
+    // Return knowledge IDs
+    const accessibleKnowledgeIds = [];
+
+    for (const share of shares) {
+      accessibleKnowledgeIds.push(share.knowledgeId);
+    }
+
+    return accessibleKnowledgeIds;
+  } catch (error) {
+    console.error(`${LOG_PREFIX} Error getting accessible knowledge IDs:`, error);
+    return [];
+  }
 }

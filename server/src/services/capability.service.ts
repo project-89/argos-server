@@ -10,7 +10,10 @@ import {
   SkillLevel,
   CapabilityWithSkill,
 } from "../schemas";
-import { getDb, formatDocument, formatDocuments, toObjectId } from "../utils/mongodb";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
+import { startMongoSession, withTransaction } from "../utils/mongo-session";
+import { idFilter, stringIdFilter } from "../utils/mongo-filters";
+import { ObjectId } from "mongodb";
 
 const LOG_PREFIX = "[Capability Service]";
 
@@ -286,100 +289,76 @@ export const updateCapability = async ({
     console.log(`${LOG_PREFIX} Starting update:`, { profileId, capabilityId, input });
     const db = await getDb();
 
-    // Start a session for transaction
-    const session = db.client.startSession();
-
-    try {
+    // Use withTransaction pattern instead of manual session management
+    return await withTransaction(async (session) => {
       let result: CapabilityWithSkill;
 
-      await session.withTransaction(async () => {
-        // Get the capability
-        const capability = await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .findOne({ id: capabilityId }, { session });
+      // Get the capability
+      const capability = await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .findOne({ id: capabilityId }, { session });
 
-        if (!capability) {
-          throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
-        }
+      if (!capability) {
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
+      }
 
-        if (capability.profileId !== profileId) {
-          throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
-        }
+      if (capability.profileId !== profileId) {
+        throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
+      }
 
-        // Get the skill
-        const skill = await db
-          .collection(COLLECTIONS.SKILLS)
-          .findOne({ id: capability.skillId }, { session });
+      // Get the skill
+      const skill = await db
+        .collection(COLLECTIONS.SKILLS)
+        .findOne({ id: capability.skillId }, { session });
 
-        if (!skill) {
-          throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-        }
+      if (!skill) {
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
+      }
 
-        const now = new Date();
-        const updates: Record<string, any> = { updatedAt: now };
-        const skillUpdates: Record<string, any> = { updatedAt: now };
+      // Create update object
+      const updates: Record<string, any> = {
+        updatedAt: new Date(),
+      };
 
-        // Update capability fields
-        if (input.level) {
-          updates.level = input.level;
-        }
+      // Only update fields that were provided
+      if (input.level !== undefined) {
+        updates.level = input.level;
+      }
 
-        // Update associated skill if name, type, category, etc. are provided
-        if (
-          input.name ||
-          input.type ||
-          input.category ||
-          input.description ||
-          input.keywords ||
-          input.parentType
-        ) {
-          if (input.name) skillUpdates.name = input.name;
-          if (input.type) skillUpdates.type = input.type;
-          if (input.category) skillUpdates.category = input.category;
-          if (input.description) skillUpdates.description = input.description;
-          if (input.keywords) skillUpdates.keywords = input.keywords;
-          if (input.parentType) skillUpdates.parentType = input.parentType;
+      if (input.name !== undefined) {
+        updates.name = input.name;
+      }
 
-          // Update the skill
-          await db
-            .collection(COLLECTIONS.SKILLS)
-            .updateOne({ id: capability.skillId }, { $set: skillUpdates }, { session });
-        }
+      if (input.description !== undefined) {
+        updates.description = input.description;
+      }
 
-        // Update the capability
-        await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .updateOne({ id: capabilityId }, { $set: updates }, { session });
+      if (input.showcaseUrl !== undefined) {
+        updates.showcaseUrl = input.showcaseUrl;
+      }
 
-        // Re-fetch the capability and skill with updates
-        const updatedCapability = await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .findOne({ id: capabilityId }, { session });
+      // Update the capability
+      await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .updateOne({ id: capabilityId }, { $set: updates }, { session });
 
-        const updatedSkill = await db
-          .collection(COLLECTIONS.SKILLS)
-          .findOne({ id: capability.skillId }, { session });
+      // Get the updated capability
+      const updatedCapability = await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .findOne({ id: capabilityId }, { session });
 
-        if (!updatedCapability || !updatedSkill) {
-          throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-        }
+      // Format the response with proper typing
+      result = {
+        ...updatedCapability,
+        createdAt: updatedCapability.createdAt.getTime(),
+        updatedAt: updatedCapability.updatedAt.getTime(),
+        verifiedAt: updatedCapability.verifiedAt
+          ? updatedCapability.verifiedAt.getTime()
+          : undefined,
+      } as CapabilityWithSkill;
 
-        // Create the result
-        result = {
-          ...updatedCapability,
-          ...updatedSkill,
-          createdAt: updatedCapability.createdAt.getTime(),
-          updatedAt: updatedCapability.updatedAt.getTime(),
-          verifiedAt: updatedCapability.verifiedAt
-            ? updatedCapability.verifiedAt.getTime()
-            : undefined,
-        } as CapabilityWithSkill;
-      });
-
-      return result!;
-    } finally {
-      await session.endSession();
-    }
+      return result;
+    });
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -404,61 +383,21 @@ export const verifyCapability = async ({
     console.log(`${LOG_PREFIX} Verifying capability:`, { capabilityId, verifierId });
     const db = await getDb();
 
-    // Start a session for transaction
-    const session = db.client.startSession();
-
-    try {
+    // Use withTransaction pattern instead of manual session management
+    return await withTransaction(async (session) => {
       let result: CapabilityWithSkill;
 
-      await session.withTransaction(async () => {
-        // Get the capability
-        const capability = await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .findOne({ id: capabilityId }, { session });
+      // Get the capability
+      const capability = await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .findOne({ id: capabilityId }, { session });
 
-        if (!capability) {
-          throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
-        }
+      if (!capability) {
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
+      }
 
-        if (capability.isVerified) {
-          console.log(`${LOG_PREFIX} Capability already verified:`, capabilityId);
-
-          // Get the skill
-          const skill = await db
-            .collection(COLLECTIONS.SKILLS)
-            .findOne({ id: capability.skillId }, { session });
-
-          if (!skill) {
-            throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-          }
-
-          // Create the result
-          result = {
-            ...capability,
-            ...skill,
-            createdAt: capability.createdAt.getTime(),
-            updatedAt: capability.updatedAt.getTime(),
-            verifiedAt: capability.verifiedAt ? capability.verifiedAt.getTime() : undefined,
-          } as CapabilityWithSkill;
-
-          return;
-        }
-
-        const now = new Date();
-
-        // Update the capability
-        await db.collection(COLLECTIONS.PROFILE_CAPABILITIES).updateOne(
-          { id: capabilityId },
-          {
-            $set: {
-              isVerified: true,
-              verifierId: verifierId,
-              verifiedAt: now,
-              updatedAt: now,
-            },
-          },
-          { session },
-        );
+      if (capability.isVerified) {
+        console.log(`${LOG_PREFIX} Capability already verified:`, capabilityId);
 
         // Get the skill
         const skill = await db
@@ -466,34 +405,60 @@ export const verifyCapability = async ({
           .findOne({ id: capability.skillId }, { session });
 
         if (!skill) {
-          throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
+          throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
         }
 
-        // Re-fetch the capability with updates
-        const updatedCapability = await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .findOne({ id: capabilityId }, { session });
-
-        if (!updatedCapability) {
-          throw ApiError.from(null, 500, ERROR_MESSAGES.INTERNAL_ERROR);
-        }
-
-        // Create the result
-        result = {
-          ...updatedCapability,
-          ...skill,
-          createdAt: updatedCapability.createdAt.getTime(),
-          updatedAt: updatedCapability.updatedAt.getTime(),
-          verifiedAt: updatedCapability.verifiedAt
-            ? updatedCapability.verifiedAt.getTime()
-            : undefined,
+        // Format the response with proper typing
+        const result = {
+          ...capability,
+          createdAt: capability.createdAt.getTime(),
+          updatedAt: capability.updatedAt.getTime(),
+          verifiedAt: capability.verifiedAt ? capability.verifiedAt.getTime() : undefined,
         } as CapabilityWithSkill;
-      });
 
-      return result!;
-    } finally {
-      await session.endSession();
-    }
+        return result;
+      }
+
+      // Update the capability
+      await db.collection(COLLECTIONS.PROFILE_CAPABILITIES).updateOne(
+        { id: capabilityId },
+        {
+          $set: {
+            isVerified: true,
+            verifierId,
+            verifiedAt: new Date(),
+            updatedAt: new Date(),
+          },
+        },
+        { session },
+      );
+
+      // Get the updated capability
+      const updatedCapability = await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .findOne({ id: capabilityId }, { session });
+
+      // Get the skill
+      const skill = await db
+        .collection(COLLECTIONS.SKILLS)
+        .findOne({ id: updatedCapability.skillId }, { session });
+
+      if (!skill) {
+        throw ApiError.from(null, 404, ERROR_MESSAGES.NOT_FOUND);
+      }
+
+      // Format the response with proper typing
+      const result = {
+        ...updatedCapability,
+        createdAt: updatedCapability.createdAt.getTime(),
+        updatedAt: updatedCapability.updatedAt.getTime(),
+        verifiedAt: updatedCapability.verifiedAt
+          ? updatedCapability.verifiedAt.getTime()
+          : undefined,
+      } as CapabilityWithSkill;
+
+      return result;
+    });
   } catch (error) {
     console.error(`${LOG_PREFIX} Error:`, {
       error,
@@ -530,29 +495,23 @@ export const deleteCapability = async ({
       throw ApiError.from(null, 403, ERROR_MESSAGES.INSUFFICIENT_PERMISSIONS);
     }
 
-    // Start a session for transaction
-    const session = db.client.startSession();
+    // Use withTransaction pattern instead of manual session management
+    await withTransaction(async (session) => {
+      // Delete the capability
+      await db
+        .collection(COLLECTIONS.PROFILE_CAPABILITIES)
+        .deleteOne({ id: capabilityId }, { session });
 
-    try {
-      await session.withTransaction(async () => {
-        // Delete the capability
-        await db
-          .collection(COLLECTIONS.PROFILE_CAPABILITIES)
-          .deleteOne({ id: capabilityId }, { session });
-
-        // Decrement the useCount on the skill
-        await db.collection(COLLECTIONS.SKILLS).updateOne(
-          { id: capability.skillId },
-          {
-            $inc: { useCount: -1 },
-            $set: { updatedAt: new Date() },
-          },
-          { session },
-        );
-      });
-    } finally {
-      await session.endSession();
-    }
+      // Decrement the useCount on the skill
+      await db.collection(COLLECTIONS.SKILLS).updateOne(
+        { id: capability.skillId },
+        {
+          $inc: { useCount: -1 },
+          $set: { updatedAt: new Date() },
+        },
+        { session },
+      );
+    });
 
     console.log(`${LOG_PREFIX} Successfully deleted capability:`, capabilityId);
   } catch (error) {

@@ -5,8 +5,9 @@ import {
   MissionWithHistory,
   MissionStatusEnum,
 } from "../schemas/mission.schema";
-import { getDb, toObjectId, formatDocument, formatDocuments } from "../utils/mongodb";
+import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
 import { z } from "zod";
+import { idFilter, stringIdFilter } from "../utils/mongo-filters";
 
 const LOG_PREFIX = "[Mission Service]";
 
@@ -50,8 +51,14 @@ export class MissionService {
     try {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
-      const doc = await collection.findOne({ _id: toObjectId(id) });
 
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        console.warn(`${LOG_PREFIX} Invalid mission ID: ${id}`);
+        return null;
+      }
+
+      const doc = await collection.findOne(filter);
       if (!doc) return null;
 
       return formatDocument(doc) as Mission;
@@ -73,8 +80,14 @@ export class MissionService {
     try {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
-      const doc = await collection.findOne({ _id: toObjectId(id) });
 
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        console.warn(`${LOG_PREFIX} Invalid mission ID: ${id}`);
+        return null;
+      }
+
+      const doc = await collection.findOne(filter);
       if (!doc) return null;
 
       return formatDocument(doc) as MissionWithHistory;
@@ -101,8 +114,13 @@ export class MissionService {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
 
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        throw new Error(`Invalid mission ID: ${id}`);
+      }
+
       const result = await collection.findOneAndUpdate(
-        { _id: toObjectId(id) },
+        filter,
         { $set: { status, updatedAt: Date.now() } },
         { returnDocument: "after" },
       );
@@ -179,7 +197,12 @@ export class MissionService {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
 
-      await collection.deleteOne({ _id: toObjectId(id) });
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        throw new Error(`Invalid mission ID: ${id}`);
+      }
+
+      await collection.deleteOne(filter);
     } catch (error: unknown) {
       console.error(`${LOG_PREFIX} Error deleting mission:`, error);
       if (error instanceof Error) {
@@ -203,8 +226,13 @@ export class MissionService {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
 
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        throw new Error(`Invalid mission ID: ${id}`);
+      }
+
       const result = await collection.findOneAndUpdate(
-        { _id: toObjectId(id) },
+        filter,
         { $set: { objectives, updatedAt: Date.now() } },
         { returnDocument: "after" },
       );
@@ -264,8 +292,13 @@ export class MissionService {
       const db = await getDb();
       const collection = db.collection(COLLECTIONS.MISSIONS);
 
+      const filter = idFilter(id);
+      if (!Object.keys(filter).length) {
+        throw new Error(`Invalid mission ID: ${id}`);
+      }
+
       const result = await collection.findOneAndUpdate(
-        { _id: toObjectId(id) },
+        filter,
         {
           $push: { failureRecords: failureRecord },
           $set: { updatedAt: Date.now() },

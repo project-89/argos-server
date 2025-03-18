@@ -1,5 +1,7 @@
 import { config } from "dotenv";
 import path from "path";
+import express from "express";
+import http from "http";
 
 // Load environment variables based on NODE_ENV first
 const envFile = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
@@ -11,10 +13,6 @@ console.log("Environment loaded:", {
   IP_RATE_LIMIT_DISABLED: process.env.IP_RATE_LIMIT_DISABLED,
 });
 
-import { onRequest } from "firebase-functions/v2/https";
-import * as admin from "firebase-admin";
-import express from "express";
-
 import { errorHandler } from "./middleware";
 import { configureCORS, corsErrorHandler } from "./middleware/global.middleware";
 import { configureAPI } from "./constants/config/api";
@@ -22,15 +20,13 @@ import { withMetrics, ipRateLimit } from "./middleware";
 import { HEALTH_RATE_LIMIT_CONFIG, initializeRateLimits } from "./constants/config/limits";
 import routes from "./routes";
 import { initDatabases } from "./utils";
+import { setupScheduledTasks } from "./scheduled";
 
-// Initialize databases (MongoDB & Firebase)
+// Initialize MongoDB database
 initDatabases().catch((err) => {
   console.error("Failed to initialize databases:", err);
   process.exit(1);
 });
-
-// Initialize Firebase Admin (to be removed after migration)
-admin.initializeApp();
 
 // Create Express app
 const app = express();
@@ -58,23 +54,34 @@ app.use("/api", routes);
 app.use(corsErrorHandler);
 app.use(errorHandler);
 
-// Export the Express app as a Firebase Cloud Function
-export const api = onRequest(
-  {
-    cors: false, // Disable Firebase's CORS handling (we handle it ourselves)
-    memory: "256MiB",
-    timeoutSeconds: 60,
-    minInstances: 0,
-    maxInstances: 100,
-    concurrency: 80,
-    cpu: 1,
-    region: "us-central1",
-    labels: {
-      deployment: "production",
-    },
-  },
-  app,
-);
+// Get port from environment or use default
+const PORT = process.env.PORT || 3000;
 
-// Export the scheduled cleanup function
-export * from "./scheduled/cleanup.scheduled";
+// Create server
+const server = http.createServer(app);
+
+// Start the server
+server.listen(PORT, () => {
+  console.log(`Server listening on port ${PORT}`);
+
+  // Setup scheduled tasks after server starts
+  setupScheduledTasks();
+});
+
+// Handle shutdown gracefully
+process.on("SIGTERM", () => {
+  console.log("SIGTERM signal received: closing HTTP server");
+  server.close(() => {
+    console.log("HTTP server closed");
+    process.exit(0);
+  });
+});
+
+// For direct execution (not as a module)
+if (require.main === module) {
+  // Server is already started above
+  console.log("Server running in standalone mode");
+}
+
+// Export the Express app for testing or programmatic usage
+export { app };

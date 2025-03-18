@@ -22,6 +22,11 @@ export const FingerprintSchema = z.object({
   anonUserId: z.string().optional(), // Single anon user link
 });
 
+// API Response Schemas
+export const FingerprintResponseSchema = z.object({
+  data: FingerprintSchema,
+});
+
 // Request/Response Validation Schemas
 export const FingerprintRegisterSchema = z.object({
   body: z.object({
@@ -73,6 +78,7 @@ export const FingerprintParamsSchema = z.object({
 // Type Exports
 export type Fingerprint = z.infer<typeof FingerprintSchema>;
 export type IpMetadata = z.infer<typeof IpMetadataSchema>;
+export type FingerprintResponse = z.infer<typeof FingerprintResponseSchema>;
 export type FingerprintRegisterRequest = z.infer<typeof FingerprintRegisterSchema>;
 export type FingerprintUpdateRequest = z.infer<typeof FingerprintUpdateSchema>;
 export type FingerprintParamsRequest = z.infer<typeof FingerprintParamsSchema>;

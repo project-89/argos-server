@@ -3,6 +3,7 @@ import { COLLECTIONS, ERROR_MESSAGES } from "../constants";
 import { AgentInvite, CreateInviteRequest } from "../schemas";
 import { ApiError } from "../utils";
 import { getDb, formatDocument, formatDocuments } from "../utils/mongodb";
+import { startMongoSession, withTransaction } from "../utils/mongo-session";
 
 const LOG_PREFIX = "[Agent Invite Service]";
 
@@ -75,45 +76,52 @@ export async function useInvite(inviteCode: string, agentId: string): Promise<vo
     console.log(`${LOG_PREFIX} Using invite:`, inviteCode);
     const db = await getDb();
 
-    // Use MongoDB session for transaction
-    const session = db.client.startSession();
-    try {
-      await session.withTransaction(async () => {
-        const invite = await db
-          .collection(COLLECTIONS.AGENT_INVITES)
-          .findOne({ id: inviteCode }, { session });
+    // Use withTransaction pattern for better session management
+    await withTransaction(async (session) => {
+      const invite = await db
+        .collection(COLLECTIONS.AGENT_INVITES)
+        .findOne({ id: inviteCode }, { session });
 
-        if (!invite) {
-          throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
-        }
+      if (!invite) {
+        throw new ApiError(404, ERROR_MESSAGES.INVITE_NOT_FOUND);
+      }
 
-        // Revalidate in transaction
-        const now = new Date();
-        if (invite.isRevoked || invite.useCount >= invite.maxUses || invite.expiresAt < now) {
-          throw new ApiError(400, ERROR_MESSAGES.INVITE_INVALID);
-        }
+      // Revalidate in transaction
+      const now = new Date();
+      if (invite.isRevoked || invite.useCount >= invite.maxUses || invite.expiresAt < now) {
+        throw new ApiError(400, ERROR_MESSAGES.INVITE_INVALID);
+      }
 
-        // Update invite
-        await db.collection(COLLECTIONS.AGENT_INVITES).updateOne(
-          { id: inviteCode },
-          {
-            $set: {
-              usedBy: agentId,
-              usedAt: now,
-            },
-            $inc: { useCount: 1 },
+      // Update invite
+      await db.collection(COLLECTIONS.AGENT_INVITES).updateOne(
+        { id: inviteCode },
+        {
+          $set: {
+            lastUsedAt: now,
           },
-          { session },
-        );
-      });
+          $inc: { useCount: 1 },
+          $push: { usedBy: agentId },
+        },
+        { session },
+      );
 
-      console.log(`${LOG_PREFIX} Successfully used invite:`, inviteCode);
-    } finally {
-      await session.endSession();
-    }
+      // Update agent to mark as invited
+      await db.collection(COLLECTIONS.AGENTS).updateOne(
+        { id: agentId },
+        {
+          $set: {
+            inviteCode: inviteCode,
+            updatedAt: now,
+          },
+        },
+        { session },
+      );
+    });
+
+    console.log(`${LOG_PREFIX} Successfully used invite:`, { inviteCode, agentId });
   } catch (error) {
     console.error(`${LOG_PREFIX} Error using invite:`, error);
-    throw ApiError.from(error, 404, ERROR_MESSAGES.INVITE_NOT_FOUND);
+    throw ApiError.from(error, 500, ERROR_MESSAGES.INTERNAL_ERROR);
   }
 }
 
