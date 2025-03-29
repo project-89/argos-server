@@ -15,3 +15,5 @@ export * from "./onboarding.endpoint";
 export * from "./agentInvite.endpoint";
 export * from "./agent.endpoint";
 export * from "./knowledge.endpoint";
+export * from "./mcp.endpoint";
+export * from "./mcp.agent.endpoint";

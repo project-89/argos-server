@@ -34,6 +34,9 @@ export const COLLECTIONS = {
   KNOWLEDGE: "knowledge",
   KNOWLEDGE_SHARES: "knowledge-shares",
   KNOWLEDGE_TRANSFERS: "knowledge-transfers",
+  MCP_PROGRAMS: "mcp.programs",
+  MCP_EXECUTIONS: "mcp.executions",
+  MCP_TEMPLATES: "mcp.templates",
 } as const;
 
 export type Collection = (typeof COLLECTIONS)[keyof typeof COLLECTIONS];

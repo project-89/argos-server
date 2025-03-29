@@ -105,6 +105,48 @@ graph TD
     C -->|No Match| F[Locked]
 ```
 
+### 6. Agent System
+#### Agent Types
+1. **User Agents**
+   - Represent user's operational capabilities
+   - Have specific skill sets and ranks
+   - Can execute missions and manage knowledge
+
+2. **System Agents**
+   - Perform specialized functions
+   - Provide services to user agents
+   - Maintain system operations
+
+#### Agent Ranks
+- **Initiate**: Basic functionality
+- **Operative**: Standard operations
+- **Specialist**: Domain expertise
+- **Master**: Advanced capabilities
+- **Administrator**: System-level privileges
+
+#### Agent Creation Flow
+```mermaid
+graph TD
+    A[Agent Registration] --> B[Basic Information]
+    B --> C[Capability Definition]
+    C --> D[Invite Code Validation]
+    D --> E[Pending Agent]
+    E --> F[Agent Activation]
+```
+
+### 7. Knowledge System
+#### Knowledge Types
+- **Personal Knowledge**: Owned by single agent
+- **Shared Knowledge**: Accessible to multiple agents
+- **Public Knowledge**: Available to all agents
+
+#### Knowledge Operations
+- **Creation**: Adding new knowledge to the system
+- **Compression**: Condensing knowledge for efficient storage
+- **Decompression**: Expanding knowledge for use
+- **Sharing**: Granting access to other agents
+- **Transfer**: Moving ownership between agents
+
 ## Authentication & Account Creation
 
 ### Phantom Wallet Integration
@@ -116,51 +158,73 @@ The HiveMind system uses Solana's Phantom wallet for authentication and account 
 ### Account Creation Flow
 ```mermaid
 graph TD
-    A[Anonymous User] -->|Has Fingerprint ID| B[Phantom Login]
-    A -->|Has Transitory ID| C[Temporary Identity]
-    B --> D[Create Account]
+    A[Anonymous User] -->|Has Fingerprint ID| B[Onboarding Process]
+    A -->|Has AnonUser ID| C[Social Identity]
+    B --> D[Phantom Wallet Authentication]
     C --> D
-    D -->|Link Fingerprint| E[HiveMind Account]
-    D -->|Update Status| F[Mark Transitory as Claimed]
+    D -->|Create Account| E[HiveMind Account]
+    E -->|Link Fingerprint| F[Full HiveMind Access]
 ```
 
 ### Account Components
 - **Wallet Address**: Primary identifier from Phantom
 - **Fingerprint ID**: Links to anonymous tracking
-- **Transitory Fingerprint**: Optional temporary identity
+- **AnonUser ID**: Optional social identity
 - **Status**: Account state tracking
+- **Roles**: Permission levels
 - **Metadata**: Additional user data
 
 ### Identity Linking Process
 1. **Initial State**:
-   - Anonymous fingerprint or transitory fingerprint exists
+   - Anonymous fingerprint or AnonUser exists
    - User has Phantom wallet
 
 2. **Account Creation**:
    ```typescript
    interface CreateAccountRequest {
      walletAddress: string;
-     fingerprintId?: string;
-     transitoryFingerprintId?: string;
+     fingerprintId: string;
+     signature: string;
+     message: string;
+     onboardingId: string;
    }
    ```
 
 3. **Verification Steps**:
    - Check for existing wallet account
    - Verify fingerprint existence
-   - Link transitory fingerprint if provided
+   - Verify signature with wallet
+   - Link onboarding progress
    - Create permanent account record
 
 4. **Final State**:
    - Wallet linked to fingerprint
-   - Transitory record marked as claimed
-   - HiveMind account activated
+   - AnonUser record linked if applicable
+   - HiveMind account activated with roles
 
 ### Security Considerations
 - One wallet per account
 - One fingerprint per account
-- Transitory fingerprints can be claimed once
-- Wallet ownership verification
+- AnonUsers can be claimed once
+- Wallet ownership verification through signatures
+
+## MongoDB Implementation
+
+### Collection Structure
+- **accounts**: Wallet-linked user accounts
+- **profiles**: User profiles with capabilities
+- **agents**: AI agents with capabilities
+- **anonUsers**: Social identities from tags/games
+- **capabilities**: User skills and abilities
+- **missions**: Tasks and challenges
+- **knowledge**: Agent knowledge base
+- **stats**: Performance metrics
+
+### Data Access Patterns
+- Safe filter utilities for MongoDB ObjectId handling
+- Transaction management for data consistency
+- Proper error handling and recovery
+- Consistent timestamp handling
 
 ## Data Structures
 
@@ -169,11 +233,14 @@ graph TD
 interface Profile {
   id: string;
   userId: string;
+  walletAddress: string;
+  displayName: string;
   level: number;
   experience: number;
-  capabilities: Capability[];
-  completedMissions: string[];
-  stats: Stats;
+  contactInfo: ContactInfo;
+  preferences: Preferences;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -184,7 +251,8 @@ interface Skill {
   name: string;
   description: string;
   category: string;
-  similarSkills: string[];
+  aliases: string[];
+  keywords: string[];
   usageCount: number;
   createdAt: Date;
 }
@@ -194,12 +262,46 @@ interface Skill {
 ```typescript
 interface Capability {
   id: string;
-  skillId: string;
   profileId: string;
+  skillId: string;
   level: ProficiencyLevel;
   verified: boolean;
+  verifiedBy: string[];
   lastUsed: Date;
-  missions: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Agent Schema
+```typescript
+interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  version: string;
+  source: AgentSource;
+  capabilities: string[];
+  identity: AgentIdentity;
+  state: AgentState;
+  integrations: AgentIntegration[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+```
+
+### Knowledge Schema
+```typescript
+interface Knowledge {
+  id: string;
+  title: string;
+  content: string;
+  domain: KnowledgeDomain;
+  ownerId: string;
+  status: KnowledgeStatus;
+  metadata: Record<string, any>;
+  createdAt: Date;
+  updatedAt: Date;
 }
 ```
 
@@ -231,6 +333,21 @@ if (matchScore > MISSION_THRESHOLD) {
 }
 ```
 
+### Agent Knowledge Creation
+```typescript
+// Create knowledge for an agent
+const knowledgeData = {
+  title: "Market Analysis Algorithm",
+  content: "Detailed market analysis process...",
+  domain: "finance",
+  ownerId: agentId,
+  status: "active",
+  metadata: { source: "user_input", confidential: true }
+};
+
+const knowledge = await createKnowledge(knowledgeData);
+```
+
 ## Best Practices
 
 1. **Skill Creation**
@@ -248,11 +365,17 @@ if (matchScore > MISSION_THRESHOLD) {
 3. **Mission Design**
    - Clear skill requirements
    - Balanced difficulty
-   - Multiple completion paths
    - Meaningful rewards
+   - Progressive challenge
 
-4. **Performance Optimization**
-   - Cache common skills
-   - Batch capability updates
-   - Optimize matching algorithms
-   - Regular data cleanup 
+4. **Agent Management**
+   - Consistent capability definitions
+   - Proper authentication
+   - Clear permission boundaries
+   - Regular activity monitoring
+
+5. **Knowledge Handling**
+   - Proper domain categorization
+   - Access control implementation
+   - Regular knowledge assessment
+   - Efficient compression techniques 

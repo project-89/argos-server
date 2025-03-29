@@ -11,6 +11,7 @@ export * from "./mongo-filters";
 export { default as mongodb } from "./mongodb";
 
 import { getMongoClient } from "./mongodb";
+import { seedMCPTemplates } from "./seed/mcp.templates";
 
 // Export MongoDB utilities
 export {
@@ -44,6 +45,9 @@ export async function initDatabases() {
     // Initialize MongoDB
     const client = await getMongoClient();
     console.log("MongoDB initialized successfully");
+
+    // Seed initial data
+    await seedMCPTemplates();
 
     return { mongodb: client };
   } catch (error) {

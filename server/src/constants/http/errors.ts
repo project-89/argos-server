@@ -289,6 +289,7 @@ export const ERROR_MESSAGES = {
   INVITE_EXHAUSTED: "This invite has reached its maximum uses",
   INVITE_EXPIRED: "This invite has expired",
   INVITE_INVALID: "This invite is no longer valid",
+  FAILED_TO_REVOKE_INVITE: "Failed to revoke invite",
 
   // Knowledge encapsulation errors
   INSUFFICIENT_RANK: "Agent does not have sufficient rank for this operation",

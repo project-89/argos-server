@@ -17,9 +17,9 @@
   - Enables HiveMind participation
   - Manages wallet-based authorization
 
-#### Transitory Fingerprinting
+#### Anonymous Social Users
 - **Social Identity Bridge**
-  - Temporary storage for social identities (usernames, accounts)
+  - Stored as `anonUsers` in MongoDB
   - Used in mini-games and social interactions
   - Can be linked to permanent fingerprint records via account creation
   - Enables progressive identity revelation
@@ -28,8 +28,8 @@
 ```mermaid
 graph TD
     A[Anonymous Visit] -->|Create| B[Fingerprint]
-    A -->|Optional| C[Transitory Record]
-    B -->|Phantom Login| D[Account Creation]
+    A -->|Social Interaction| C[AnonUser]
+    B -->|Wallet Authentication| D[Account Creation]
     C -->|Optional| D
     D --> E[HiveMind Profile]
 ```
@@ -42,7 +42,7 @@ graph TD
   
 - **Presence Service**
   - Real-time user state management
-  - Active user tracking
+  - Active user status tracking
   - Site engagement metrics
 
 ### 2. User Interaction Capture
@@ -98,10 +98,23 @@ graph TD
 
 #### Tag System
 - **Mini-game Implementation**
-  - Uses anon-users for social interactions
+  - Uses anonUsers for social interactions
   - Example of social identity integration
 
-### 4. Experimental Features
+### 4. Agent System
+- **Agent Management**
+  - Agent registration and activation
+  - Capability-based permissions
+  - Agent verification and security
+  - Mission assignment and execution
+  
+- **Knowledge Management**
+  - Knowledge creation and storage
+  - Compression and decompression
+  - Knowledge sharing between agents
+  - Knowledge transfer and ownership management
+
+### 5. Experimental Features
 #### Reality Stability Index
 - **Narrative Game Mechanic**
   - Calculates "matrix anomalies"
@@ -115,12 +128,13 @@ graph TD
   - Used for reality stability calculations
   - Development and agent testing platform
 
-### 5. Administration
+### 6. Administration
 #### Role System
 - **Access Control**
   - Admin-only functionality
-  - Currently in development
-  - Future expansion planned
+  - Role-based permissions
+  - Access control for sensitive operations
+  - Agent rank management
 
 ## Data Flow Examples
 
@@ -128,9 +142,9 @@ graph TD
 ```mermaid
 graph LR
     A[Anonymous Visit] --> B[Fingerprint Created]
-    B --> C[Transitory Records]
-    C --> D[Social Identity]
-    D --> E[Linked Fingerprint]
+    B --> C[Social Interactions]
+    C --> D[AnonUser Created]
+    D --> E[Linked to Account]
 ```
 
 ### Interaction Capture Flow
@@ -138,7 +152,7 @@ graph LR
 graph LR
     A[User Action] --> B[Impression Created]
     B --> C[Fingerprint Linked]
-    C --> D[Data Stored]
+    C --> D[Data Stored in MongoDB]
     D --> E[Available for Analysis]
 ```
 
@@ -150,6 +164,42 @@ graph LR
     C --> D[Progress Tracking]
     D --> E[Completion/Rewards]
 ```
+
+## MongoDB Integration
+
+### Collections Structure
+- **User Identity**
+  - `fingerprints`: Anonymous user tracking
+  - `accounts`: Wallet-linked accounts
+  - `anonUsers`: Social identities
+  
+- **Game Systems**
+  - `profiles`: User profiles
+  - `capabilities`: User skills
+  - `missions`: User tasks
+  - `stats`: User performance metrics
+  
+- **Agent System**
+  - `agents`: AI agents
+  - `agentInvites`: Invitations
+  - `knowledge`: Agent knowledge base
+  - `knowledgeShares`: Shared knowledge
+
+### Data Access Patterns
+- **Safe Filters**
+  - Use `idFilter` utility for MongoDB ObjectId handling
+  - Validate filters before database operations
+  - Error handling for invalid ObjectIds
+  
+- **Transactions**
+  - MongoDB sessions for data consistency
+  - Transaction utilities for multi-document operations
+  - Proper error handling and rollback
+
+### Timestamp Handling
+- Native JavaScript `Date` objects for timestamps
+- Utility functions for timestamp conversion and comparison
+- Consistent timestamp handling across services
 
 ## Integration Points
 
@@ -193,7 +243,7 @@ graph LR
      interface CreateAccountRequest {
        walletAddress: string;
        fingerprintId?: string;
-       transitoryFingerprintId?: string;
+       anonUserId?: string; // Previously transitoryFingerprintId
        userConsent: {
          identityLinking: boolean;
          dataRetention: boolean;

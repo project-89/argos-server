@@ -6,7 +6,6 @@ import {
   CreateKnowledgeRequest,
   GetKnowledgeRequest,
   UpdateKnowledgeRequest,
-  ListKnowledgeRequest,
   ShareKnowledgeRequest,
   TransferKnowledgeRequest,
   KnowledgeStatus,

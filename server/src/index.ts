@@ -2,6 +2,14 @@ import { config } from "dotenv";
 import path from "path";
 import express from "express";
 import http from "http";
+import cors from "cors";
+import helmet from "helmet";
+import { setupRateLimiter } from "./middleware/rateLimiter.middleware";
+import { errorHandler } from "./middleware/error.middleware";
+import router from "./routes";
+import { initDatabases } from "./utils";
+import { setupScheduledTasks } from "./scheduled";
+import { initializeMCPSystem } from "./mcp.system";
 
 // Load environment variables based on NODE_ENV first
 const envFile = process.env.NODE_ENV === "test" ? ".env.test" : ".env";
@@ -13,14 +21,10 @@ console.log("Environment loaded:", {
   IP_RATE_LIMIT_DISABLED: process.env.IP_RATE_LIMIT_DISABLED,
 });
 
-import { errorHandler } from "./middleware";
 import { configureCORS, corsErrorHandler } from "./middleware/global.middleware";
 import { configureAPI } from "./constants/config/api";
 import { withMetrics, ipRateLimit } from "./middleware";
 import { HEALTH_RATE_LIMIT_CONFIG, initializeRateLimits } from "./constants/config/limits";
-import routes from "./routes";
-import { initDatabases } from "./utils";
-import { setupScheduledTasks } from "./scheduled";
 
 // Initialize MongoDB database
 initDatabases().catch((err) => {
@@ -30,6 +34,12 @@ initDatabases().catch((err) => {
 
 // Create Express app
 const app = express();
+
+// Middleware
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(setupRateLimiter);
 
 // Configure CORS
 configureCORS(app);
@@ -48,7 +58,7 @@ app.use("/metrics", healthMiddleware);
 configureAPI(app);
 
 // Mount all routes
-app.use("/api", routes);
+app.use("/api", router);
 
 // Register error handlers
 app.use(corsErrorHandler);
@@ -61,12 +71,28 @@ const PORT = process.env.PORT || 3000;
 const server = http.createServer(app);
 
 // Start the server
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+async function startServer() {
+  try {
+    // Initialize databases
+    await initDatabases();
 
-  // Setup scheduled tasks after server starts
-  setupScheduledTasks();
-});
+    // Initialize the MCP system
+    await initializeMCPSystem();
+
+    // Setup scheduled tasks
+    setupScheduledTasks();
+
+    // Start the server
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error("Failed to start server:", error);
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Handle shutdown gracefully
 process.on("SIGTERM", () => {

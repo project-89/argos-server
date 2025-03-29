@@ -15,6 +15,7 @@ import onboardingRoutes from "./onboarding.routes";
 import agentRoutes from "./agent.routes";
 import agentInviteRoutes from "./agentInvite.routes";
 import knowledgeRoutes from "./knowledge.routes";
+import mcpRoutes from "./mcp.routes";
 
 const router = Router();
 
@@ -42,5 +43,6 @@ router.use(onboardingRoutes); // /onboarding/*
 router.use(agentRoutes);
 router.use(agentInviteRoutes);
 router.use(knowledgeRoutes); // /knowledge/*
+router.use(mcpRoutes); // /mcp/*
 
 export default router;
